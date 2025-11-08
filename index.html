@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebsiteHadir SD Negeri Muhara</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js dan XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="[Ukuran asli] SD Negeri Muhara.png">
+
+  <style>
+    /* Jam analog futuristik */
+    #analogClock {
+      background: radial-gradient(circle at center, #ffffff 40%, #e0e7ff 100%);
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(30, 58, 138, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .clock-glow {
+      box-shadow: 0 0 12px rgba(37,99,235,0.5);
+    }
+    .tab-active {
+      background-color: #dc2626;
+      color: white !important;
+      font-weight: 600;
+    }
+    .tab-button:hover {
+      background-color: rgba(220, 38, 38, 0.1);
+    }
+    .card {
+      @apply bg-white shadow rounded-xl p-6 text-center transition-transform transform hover:scale-[1.02];
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+  <!-- HEADER -->
+  <header class="bg-white shadow-md">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between py-4 px-5">
+      <!-- Logo + Teks -->
+      <div class="flex items-center gap-4">
+        <img src="[Ukuran asli] SD Negeri Muhara.png" alt="Logo SDN Muhara"
+          class="h-16 w-auto rounded-md bg-white shadow p-1" />
+        <div>
+          <h1 class="text-2xl font-bold text-blue-900">SD Negeri Muhara</h1>
+          <p class="text-red-600 italic font-medium text-sm">"Guru Hadir, Siswa Terinspirasi."</p>
+        </div>
+      </div>
+
+      <!-- Tanggal + Jam -->
+      <div class="text-right mt-3 sm:mt-0">
+        <p id="current-date" class="text-sm text-gray-600 font-semibold mb-1"></p>
+        <canvas id="analogClock" width="80" height="80" class="clock-glow"></canvas>
+      </div>
+    </div>
+
+    <!-- Garis Merah Putih -->
+    <div class="h-2 w-full bg-gradient-to-r from-red-600 via-white to-red-600"></div>
+  </header>
+
+  <!-- NAVIGASI TAB -->
+  <nav class="bg-white shadow-inner border-b border-gray-200 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex justify-center gap-2 py-3 flex-wrap">
+      <button data-page="dashboard" id="tab-dashboard"
+        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold tab-active">
+        📊 Dashboard
+      </button>
+      <button data-page="guru" id="tab-guru"
+        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">
+        👩‍🏫 Data Guru
+      </button>
+      <button data-page="laporan" id="tab-laporan"
+        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">
+        📅 Laporan Bulanan
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN CONTENT -->
+  <main class="max-w-7xl mx-auto px-5 py-6">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard">
+      <div class="grid md:grid-cols-3 gap-6 mb-8">
+        <div class="card">
+          <h3 class="text-gray-500">Total Guru</h3>
+          <p id="totalGuru" class="text-4xl font-bold text-blue-900">0</p>
+        </div>
+        <div class="card">
+          <h3 class="text-gray-500">Hadir Hari Ini</h3>
+          <p id="totalHadir" class="text-4xl font-bold text-green-600">0</p>
+        </div>
+        <div class="card">
+          <h3 class="text-gray-500">Izin / Sakit / Dinas</h3>
+          <p id="totalLain" class="text-4xl font-bold text-yellow-500">0</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-6 mb-8">
+        <h3 class="font-semibold text-blue-900 mb-4">Grafik Kehadiran Hari Ini</h3>
+        <canvas id="chartDashboard" height="120"></canvas>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="font-semibold text-blue-900 mb-4">Aktivitas Terbaru</h3>
+        <div id="recent-activity" class="text-sm text-gray-700 space-y-1">
+          <p class="text-gray-400">Memuat data...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DATA GURU -->
+    <section id="page-guru" class="hidden">
+      <h2 class="text-2xl font-bold text-blue-900 mb-4">👩‍🏫 Daftar Guru</h2>
+      <div class="bg-white rounded-xl shadow p-6 overflow-x-auto">
+        <table class="min-w-full border text-sm">
+          <thead class="bg-red-50 text-blue-900 font-semibold">
+            <tr>
+              <th class="border p-2">NIP</th>
+              <th class="border p-2">Nama Guru</th>
+              <th class="border p-2">Jabatan</th>
+              <th class="border p-2">Status</th>
+            </tr>
+          </thead>
+          <tbody id="guruTableBody">
+            <tr><td colspan="4" class="text-center p-4 text-gray-500">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- LAPORAN BULANAN -->
+    <section id="page-laporan" class="hidden">
+      <h2 class="text-2xl font-bold text-blue-900 mb-4">📅 Laporan Bulanan</h2>
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <input type="month" id="bulan" class="border rounded p-2" />
+        <button id="tampilkanLaporanBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Tampilkan</button>
+        <button id="exportLaporanBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">📥 Export Excel</button>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-6 overflow-auto mb-6">
+        <table class="min-w-full border text-sm">
+          <thead class="bg-red-50 text-blue-900 font-semibold">
+            <tr>
+              <th class="border p-2">Tanggal</th>
+              <th class="border p-2">Nama Guru</th>
+              <th class="border p-2">Jam</th>
+              <th class="border p-2">Lokasi</th>
+              <th class="border p-2">Status</th>
+            </tr>
+          </thead>
+          <tbody id="laporanTableBody">
+            <tr><td colspan="5" class="text-center p-4 text-gray-500">Pilih bulan untuk menampilkan data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div id="resume-laporan" class="bg-blue-50 rounded-xl shadow p-6 text-gray-700"></div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-blue-900 text-white text-center py-3 text-sm font-medium tracking-wide">
+    D.A.N × GPT-5 | 2025
+  </footer>
+
+  <!-- SCRIPT JS -->
+  <script src="app.js"></script>
+
+  <script>
+    // ----------- JAM ANALOG FUTURISTIK -----------
+    const canvas = document.getElementById("analogClock");
+    const ctx = canvas.getContext("2d");
+    const radius = canvas.height / 2;
+    ctx.translate(radius, radius);
+
+    function drawClock() {
+      drawFace(ctx, radius);
+      drawNumbers(ctx, radius);
+      drawTime(ctx, radius);
+    }
+
+    function drawFace(ctx, radius) {
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.95, 0, 2 * Math.PI);
+      ctx.fillStyle = "white";
+      ctx.fill();
+
+      const grad = ctx.createRadialGradient(0, 0, radius * 0.95, 0, 0, radius * 1.05);
+      grad.addColorStop(0, "#93c5fd");
+      grad.addColorStop(0.5, "white");
+      grad.addColorStop(1, "#1e3a8a");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = radius * 0.05;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
+      ctx.fillStyle = "#1e3a8a";
+      ctx.fill();
+    }
+
+    function drawNumbers(ctx, radius) {
+      let ang, num;
+      ctx.font = radius * 0.15 + "px Poppins";
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      for (num = 1; num <= 12; num++) {
+        ang = (num * Math.PI) / 6;
+        ctx.rotate(ang);
+        ctx.translate(0, -radius * 0.8);
+        ctx.rotate(-ang);
+        ctx.fillStyle = "#1e3a8a";
+        ctx.fillText(num.toString(), 0, 0);
+        ctx.rotate(ang);
+        ctx.translate(0, radius * 0.8);
+        ctx.rotate(-ang);
+      }
+    }
+
+    function drawTime(ctx, radius) {
+      const now = new Date();
+      const hour = now.getHours();
+      const minute = now.getMinutes();
+      const second = now.getSeconds();
+      const hourPos = ((hour % 12) + minute / 60) * Math.PI / 6;
+      drawHand(ctx, hourPos, radius * 0.5, radius * 0.07, "#1e3a8a");
+      const minutePos = (minute + second / 60) * Math.PI / 30;
+      drawHand(ctx, minutePos, radius * 0.75, radius * 0.05, "#dc2626");
+      const secondPos = (second * Math.PI) / 30;
+      drawHand(ctx, secondPos, radius * 0.85, radius * 0.02, "#16a34a");
+    }
+
+    function drawHand(ctx, pos, length, width, color) {
+      ctx.beginPath();
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = color;
+      ctx.moveTo(0, 0);
+      ctx.rotate(pos);
+      ctx.lineTo(0, -length);
+      ctx.stroke();
+      ctx.rotate(-pos);
+    }
+
+    setInterval(drawClock, 1000);
+
+    // ----------- TANGGAL OTOMATIS -----------
+    const today = new Date();
+    const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+    document.getElementById("current-date").textContent = today.toLocaleDateString("id-ID", options);
+
+    // ----------- TAB NAVIGASI -----------
+    document.querySelectorAll("nav button[data-page]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("section[id^='page-']").forEach(s => s.classList.add("hidden"));
+        document.querySelectorAll("nav button").forEach(b => b.classList.remove("tab-active"));
+        document.getElementById("page-" + btn.dataset.page).classList.remove("hidden");
+        btn.classList.add("tab-active");
+      });
+    });
+  </script>
+
+</body>
+</html>
