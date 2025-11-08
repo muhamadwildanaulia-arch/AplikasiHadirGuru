@@ -16,7 +16,6 @@
   <link rel="icon" type="image/png" href="[Ukuran asli] SD Negeri Muhara.png">
 
   <style>
-    /* Jam analog futuristik */
     #analogClock {
       background: radial-gradient(circle at center, #ffffff 40%, #e0e7ff 100%);
       border-radius: 50%;
@@ -44,50 +43,68 @@
   <!-- HEADER -->
   <header class="bg-white shadow-md">
     <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between py-4 px-5">
-      <!-- Logo + Teks -->
       <div class="flex items-center gap-4">
-        <img src="[Ukuran asli] SD Negeri Muhara.png" alt="Logo SDN Muhara"
-          class="h-16 w-auto rounded-md bg-white shadow p-1" />
+        <img src="[Ukuran asli] SD Negeri Muhara.png" alt="Logo SDN Muhara" class="h-16 w-auto rounded-md bg-white shadow p-1" />
         <div>
           <h1 class="text-2xl font-bold text-blue-900">SD Negeri Muhara</h1>
           <p class="text-red-600 italic font-medium text-sm">"Guru Hadir, Siswa Terinspirasi."</p>
         </div>
       </div>
 
-      <!-- Tanggal + Jam -->
       <div class="text-right mt-3 sm:mt-0">
         <p id="current-date" class="text-sm text-gray-600 font-semibold mb-1"></p>
         <canvas id="analogClock" width="80" height="80" class="clock-glow"></canvas>
       </div>
     </div>
-
-    <!-- Garis Merah Putih -->
     <div class="h-2 w-full bg-gradient-to-r from-red-600 via-white to-red-600"></div>
   </header>
 
-  <!-- NAVIGASI TAB -->
+  <!-- NAVIGASI -->
   <nav class="bg-white shadow-inner border-b border-gray-200 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto flex justify-center gap-2 py-3 flex-wrap">
-      <button data-page="dashboard" id="tab-dashboard"
-        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold tab-active">
-        📊 Dashboard
-      </button>
-      <button data-page="guru" id="tab-guru"
-        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">
-        👩‍🏫 Data Guru
-      </button>
-      <button data-page="laporan" id="tab-laporan"
-        class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">
-        📅 Laporan Bulanan
-      </button>
+      <button data-page="kehadiran" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold tab-active">📥 Isi Kehadiran</button>
+      <button data-page="dashboard" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">📊 Dashboard</button>
+      <button data-page="guru" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">👩‍🏫 Data Guru</button>
+      <button data-page="laporan" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">📅 Laporan Bulanan</button>
     </div>
   </nav>
 
-  <!-- MAIN CONTENT -->
   <main class="max-w-7xl mx-auto px-5 py-6">
 
+    <!-- FORM KEHADIRAN -->
+    <section id="page-kehadiran">
+      <h2 class="text-2xl font-bold text-blue-900 mb-4">📥 Isi Kehadiran Guru</h2>
+
+      <div class="bg-white rounded-xl shadow p-6 max-w-lg mx-auto space-y-4">
+        <div>
+          <label class="block font-medium text-gray-700 mb-1">Nama Guru</label>
+          <select id="namaGuru" class="border rounded p-2 w-full"></select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-700 mb-1">Status Kehadiran</label>
+          <select id="statusKehadiran" class="border rounded p-2 w-full">
+            <option value="">-- Pilih Status --</option>
+            <option value="Hadir">Hadir</option>
+            <option value="Izin">Izin</option>
+            <option value="Sakit">Sakit</option>
+            <option value="Dinas Luar">Dinas Luar</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block font-medium text-gray-700 mb-1">Lokasi (otomatis)</label>
+          <input type="text" id="lokasi" readonly class="border rounded p-2 w-full bg-gray-50 text-gray-600" placeholder="Menunggu lokasi..." />
+        </div>
+
+        <button id="kirimKehadiranBtn" class="bg-red-600 hover:bg-red-700 text-white w-full py-2 rounded font-semibold">
+          🚀 Kirim Kehadiran
+        </button>
+      </div>
+    </section>
+
     <!-- DASHBOARD -->
-    <section id="page-dashboard">
+    <section id="page-dashboard" class="hidden">
       <div class="grid md:grid-cols-3 gap-6 mb-8">
         <div class="card">
           <h3 class="text-gray-500">Total Guru</h3>
@@ -167,107 +184,10 @@
 
   </main>
 
-  <!-- FOOTER -->
   <footer class="bg-blue-900 text-white text-center py-3 text-sm font-medium tracking-wide">
     D.A.N × GPT-5 | 2025
   </footer>
 
-  <!-- SCRIPT JS -->
   <script src="app.js"></script>
-
-  <script>
-    // ----------- JAM ANALOG FUTURISTIK -----------
-    const canvas = document.getElementById("analogClock");
-    const ctx = canvas.getContext("2d");
-    const radius = canvas.height / 2;
-    ctx.translate(radius, radius);
-
-    function drawClock() {
-      drawFace(ctx, radius);
-      drawNumbers(ctx, radius);
-      drawTime(ctx, radius);
-    }
-
-    function drawFace(ctx, radius) {
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.95, 0, 2 * Math.PI);
-      ctx.fillStyle = "white";
-      ctx.fill();
-
-      const grad = ctx.createRadialGradient(0, 0, radius * 0.95, 0, 0, radius * 1.05);
-      grad.addColorStop(0, "#93c5fd");
-      grad.addColorStop(0.5, "white");
-      grad.addColorStop(1, "#1e3a8a");
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = radius * 0.05;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(0, 0, radius * 0.05, 0, 2 * Math.PI);
-      ctx.fillStyle = "#1e3a8a";
-      ctx.fill();
-    }
-
-    function drawNumbers(ctx, radius) {
-      let ang, num;
-      ctx.font = radius * 0.15 + "px Poppins";
-      ctx.textBaseline = "middle";
-      ctx.textAlign = "center";
-      for (num = 1; num <= 12; num++) {
-        ang = (num * Math.PI) / 6;
-        ctx.rotate(ang);
-        ctx.translate(0, -radius * 0.8);
-        ctx.rotate(-ang);
-        ctx.fillStyle = "#1e3a8a";
-        ctx.fillText(num.toString(), 0, 0);
-        ctx.rotate(ang);
-        ctx.translate(0, radius * 0.8);
-        ctx.rotate(-ang);
-      }
-    }
-
-    function drawTime(ctx, radius) {
-      const now = new Date();
-      const hour = now.getHours();
-      const minute = now.getMinutes();
-      const second = now.getSeconds();
-      const hourPos = ((hour % 12) + minute / 60) * Math.PI / 6;
-      drawHand(ctx, hourPos, radius * 0.5, radius * 0.07, "#1e3a8a");
-      const minutePos = (minute + second / 60) * Math.PI / 30;
-      drawHand(ctx, minutePos, radius * 0.75, radius * 0.05, "#dc2626");
-      const secondPos = (second * Math.PI) / 30;
-      drawHand(ctx, secondPos, radius * 0.85, radius * 0.02, "#16a34a");
-    }
-
-    function drawHand(ctx, pos, length, width, color) {
-      ctx.beginPath();
-      ctx.lineWidth = width;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = color;
-      ctx.moveTo(0, 0);
-      ctx.rotate(pos);
-      ctx.lineTo(0, -length);
-      ctx.stroke();
-      ctx.rotate(-pos);
-    }
-
-    setInterval(drawClock, 1000);
-
-    // ----------- TANGGAL OTOMATIS -----------
-    const today = new Date();
-    const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
-    document.getElementById("current-date").textContent = today.toLocaleDateString("id-ID", options);
-
-    // ----------- TAB NAVIGASI -----------
-    document.querySelectorAll("nav button[data-page]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        document.querySelectorAll("section[id^='page-']").forEach(s => s.classList.add("hidden"));
-        document.querySelectorAll("nav button").forEach(b => b.classList.remove("tab-active"));
-        document.getElementById("page-" + btn.dataset.page).classList.remove("hidden");
-        btn.classList.add("tab-active");
-      });
-    });
-  </script>
-
 </body>
 </html>
