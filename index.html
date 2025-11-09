@@ -1,135 +1,100 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>WebsiteHadir • SDN Muhara</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase (Compat) -->
+  <!-- Firebase compat (global) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 
-  <link rel="icon" href="Logo.png">
+  <style>
+    /* small tweaks */
+    body{font-family:Inter, system-ui, -apple-system, Roboto, Arial;}
+    #toasts { position: fixed; right: 16px; bottom: 16px; z-index:9999; display:flex; flex-direction:column; gap:8px;}
+  </style>
 </head>
-<body class="antialiased bg-slate-50 text-slate-800">
+<body class="bg-slate-50">
 
-  <div class="min-h-screen flex">
+  <div class="max-w-7xl mx-auto p-6">
+    <header class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-2xl font-bold">SDN Muhara — WebsiteHadir</h1>
+        <div id="current-date-top" class="text-sm text-gray-600"></div>
+      </div>
+      <div>
+        <div id="clock-small" class="text-sm text-gray-600"></div>
+      </div>
+    </header>
 
-    <!-- Sidebar -->
-    <aside class="bg-gradient-to-b from-red-900 to-red-700 w-64 p-5 hidden md:flex flex-col text-white">
-      <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" class="w-12 h-12 bg-white rounded-md p-1">
-        <div>
-          <div class="font-bold">SDN Muhara</div>
-          <div class="text-sm text-red-200">WebsiteHadir • Dashboard</div>
-        </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-white rounded p-6 shadow">
+        <h2 class="font-semibold mb-3">Isi Kehadiran Guru</h2>
+        <label class="block text-sm mb-1">Nama Guru</label>
+        <select id="namaGuru" class="w-full border rounded p-2 mb-3"><option>-- Memuat --</option></select>
+
+        <label class="block text-sm mb-1">Status Kehadiran</label>
+        <select id="statusKehadiran" class="w-full border rounded p-2 mb-3">
+          <option value="">-- Pilih --</option>
+          <option>Hadir</option><option>Izin</option><option>Sakit</option><option>Dinas Luar</option>
+        </select>
+
+        <label class="block text-sm mb-1">Lokasi (otomatis)</label>
+        <input id="lokasi" class="w-full border rounded p-2 mb-3 bg-gray-50" readonly placeholder="📍 Menentukan lokasi..." />
+
+        <button id="kirimKehadiranBtn" class="bg-rose-600 text-white px-4 py-2 rounded">Kirim Kehadiran</button>
+        <div id="kehadiran-status" class="text-sm text-gray-500 mt-2">—</div>
       </div>
 
-      <nav class="flex-1 space-y-2">
-        <button data-page="kehadiran" class="block w-full text-left py-2 px-3 rounded hover:bg-white/10">📥 Isi Kehadiran</button>
-        <button data-page="dashboard" class="block w-full text-left py-2 px-3 rounded hover:bg-white/10">📊 Dashboard</button>
-        <button data-page="guru" class="block w-full text-left py-2 px-3 rounded hover:bg-white/10">👩‍🏫 Data Guru</button>
-        <button data-page="laporan" class="block w-full text-left py-2 px-3 rounded hover:bg-white/10">📅 Laporan Bulanan</button>
-      </nav>
-      <div class="text-xs text-red-200 mt-auto">Versi 2025</div>
-    </aside>
-
-    <!-- Main Content -->
-    <div class="flex-1 flex flex-col">
-
-      <!-- Header -->
-      <header class="flex justify-between items-center bg-white/80 border-b border-slate-200 px-4 py-3 sticky top-0 z-40 backdrop-blur">
-        <div>
-          <div id="current-date-top" class="text-sm text-slate-500"></div>
-          <h1 class="text-lg font-semibold">Dashboard Kehadiran</h1>
-        </div>
-        <div class="flex gap-4 items-center">
-          <div id="clock-small" class="text-sm text-slate-500"></div>
-          <button id="btn-open-admin" class="bg-rose-600 text-white px-3 py-1 rounded">Login Admin</button>
-          <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden">Logout</button>
-        </div>
-      </header>
-
-      <!-- Content -->
-      <main class="flex-1 p-6 max-w-7xl mx-auto">
-
-        <!-- Isi Kehadiran -->
-        <section id="page-kehadiran">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-white rounded-xl shadow p-6">
-              <h2 class="text-xl font-semibold mb-3">📥 Isi Kehadiran Guru</h2>
-              <p class="text-sm text-slate-500 mb-4">Pilih nama lalu kirim kehadiran. Guru tidak perlu login.</p>
-
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm mb-1">Nama Guru</label>
-                  <select id="namaGuru" class="w-full border rounded p-2"></select>
-                </div>
-
-                <div>
-                  <label class="block text-sm mb-1">Status Kehadiran</label>
-                  <select id="statusKehadiran" class="w-full border rounded p-2">
-                    <option value="">-- Pilih Status --</option>
-                    <option value="Hadir">Hadir</option>
-                    <option value="Izin">Izin</option>
-                    <option value="Sakit">Sakit</option>
-                    <option value="Dinas Luar">Dinas Luar</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-sm mb-1">Lokasi (otomatis)</label>
-                  <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50" placeholder="📍 Menentukan lokasi..." />
-                </div>
-
-                <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
-                <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
-              </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow p-6">
-              <h3 class="font-semibold mb-2">Grafik Kehadiran Hari Ini</h3>
-              <canvas id="chartDashboard" height="200"></canvas>
-            </div>
-          </div>
-        </section>
-
-        <!-- Dashboard -->
-        <section id="page-dashboard" class="hidden">
-          <p class="text-slate-500">📊 Fitur dashboard menyusul di sini.</p>
-        </section>
-
-        <!-- Data Guru -->
-        <section id="page-guru" class="hidden">
-          <h2 class="text-xl font-semibold mb-3">👩‍🏫 Data Guru</h2>
-          <div class="bg-white rounded-xl shadow p-4 overflow-auto">
-            <table class="min-w-full text-sm">
-              <thead class="bg-rose-50 text-rose-700 font-semibold">
-                <tr>
-                  <th class="border p-2 text-left">NIP</th>
-                  <th class="border p-2 text-left">Nama</th>
-                  <th class="border p-2 text-left">Jabatan</th>
-                </tr>
-              </thead>
-              <tbody id="guruTableBody">
-                <tr><td colspan="3" class="text-center p-4 text-slate-500">Memuat data...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- Laporan -->
-        <section id="page-laporan" class="hidden">
-          <h2 class="text-xl font-semibold mb-3">📅 Laporan Bulanan</h2>
-          <p class="text-slate-500">Masih dalam pengembangan.</p>
-        </section>
-      </main>
+      <div class="bg-white rounded p-6 shadow">
+        <h3 class="font-semibold mb-3">Grafik Kehadiran Hari Ini</h3>
+        <canvas id="chartDashboard" height="240"></canvas>
+        <div id="recent-activity" class="mt-4 text-sm text-gray-700">Memuat aktivitas...</div>
+      </div>
     </div>
+
+    <section class="mt-8 bg-white rounded p-6 shadow">
+      <h3 class="font-semibold mb-3">Data Guru</h3>
+      <table class="min-w-full text-sm">
+        <thead class="text-left text-gray-700"><tr><th class="p-2">NIP</th><th class="p-2">Nama</th><th class="p-2">Jabatan</th></tr></thead>
+        <tbody id="guruTableBody"><tr><td colspan="3" class="p-4 text-gray-500">Memuat...</td></tr></tbody>
+      </table>
+    </section>
   </div>
 
-  <script type="module" src="app.firebase.js"></script>
+  <div id="toasts" aria-live="polite"></div>
+
+  <!-- load app.firebase.js (regular script, uses global firebase) -->
+  <script src="app.firebase.js"></script>
+
+  <script>
+    // quick helper to show console errors gracefully
+    function toast(msg, type='info', t=3500){
+      const c = document.getElementById('toasts');
+      const el = document.createElement('div');
+      el.textContent = msg;
+      el.className = 'px-4 py-2 rounded shadow ' + (type==='err' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800');
+      c.appendChild(el);
+      setTimeout(()=> el.remove(), t);
+    }
+
+    // Basic sanity checks after load
+    window.addEventListener('load', () => {
+      // check firebase loaded
+      if (!window.firebase) {
+        toast('Firebase SDK tidak ditemukan — app.firebase.js membutuhkan Firebase compat scripts.', 'err', 8000);
+        console.error('Firebase not found.');
+      }
+      if (!document.getElementById('namaGuru')) {
+        toast('Elemen namaGuru tidak ditemukan di DOM', 'err', 6000);
+      }
+      // If app.firebase.js logs errors, check console
+      console.log('Index loaded — cek console untuk error jika tidak berfungsi.');
+    });
+  </script>
 </body>
 </html>
