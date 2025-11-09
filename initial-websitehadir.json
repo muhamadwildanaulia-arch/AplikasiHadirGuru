@@ -1,0 +1,31 @@
+{
+  "guru": {
+    "g1": {
+      "nama": "D.A.N",
+      "nip": "19890116",
+      "jabatan": "Kepala Sekolah",
+      "status": "Aktif"
+    },
+    "g2": {
+      "nama": "Siti Rahma",
+      "nip": "19900101",
+      "jabatan": "Guru Kelas",
+      "status": "Aktif"
+    },
+    "g3": {
+      "nama": "Iwan",
+      "nip": "19920505",
+      "jabatan": "Guru PJOK",
+      "status": "Aktif"
+    }
+  },
+  "kehadiran": {
+    "k1": {
+      "nama": "D.A.N",
+      "status": "Hadir",
+      "jam": "07:25:12",
+      "tanggal": "2025-11-09",
+      "lokasi": "-8.67,115.23"
+    }
+  }
+}
