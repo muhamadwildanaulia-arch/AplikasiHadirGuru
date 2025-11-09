@@ -8,21 +8,31 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Chart.js dan XLSX -->
+  <!-- Chart.js & XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Favicon -->
+  <!-- Firebase SDK (Compat for Realtime Database) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
+    .card {
+      background: #ffffff;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+      border-radius: 1rem;
+      padding: 1.5rem;
+      text-align: center;
+      transition: transform 160ms ease;
+    }
+    .card:hover { transform: scale(1.02); }
+
     #analogClock {
       background: radial-gradient(circle at center, #ffffff 40%, #e0e7ff 100%);
       border-radius: 50%;
       box-shadow: 0 0 15px rgba(30, 58, 138, 0.4), inset 0 0 10px rgba(0, 0, 0, 0.1);
-    }
-    .clock-glow {
-      box-shadow: 0 0 12px rgba(37,99,235,0.5);
     }
     .tab-active {
       background-color: #dc2626;
@@ -31,9 +41,6 @@
     }
     .tab-button:hover {
       background-color: rgba(220, 38, 38, 0.1);
-    }
-    .card {
-      @apply bg-white shadow rounded-xl p-6 text-center transition-transform transform hover:scale-[1.02];
     }
   </style>
 </head>
@@ -53,13 +60,13 @@
 
       <div class="text-right mt-3 sm:mt-0">
         <p id="current-date" class="text-sm text-gray-600 font-semibold mb-1"></p>
-        <canvas id="analogClock" width="80" height="80" class="clock-glow"></canvas>
+        <canvas id="analogClock" width="80" height="80"></canvas>
       </div>
     </div>
     <div class="h-2 w-full bg-gradient-to-r from-red-600 via-white to-red-600"></div>
   </header>
 
-  <!-- NAVIGASI -->
+  <!-- NAVIGATION -->
   <nav class="bg-white shadow-inner border-b border-gray-200 sticky top-0 z-40">
     <div class="max-w-7xl mx-auto flex justify-center gap-2 py-3 flex-wrap">
       <button data-page="kehadiran" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold tab-active">📥 Isi Kehadiran</button>
@@ -71,18 +78,18 @@
 
   <main class="max-w-7xl mx-auto px-5 py-6">
 
-    <!-- FORM KEHADIRAN -->
+    <!-- ISI KEHADIRAN -->
     <section id="page-kehadiran">
       <h2 class="text-2xl font-bold text-blue-900 mb-4">📥 Isi Kehadiran Guru</h2>
 
       <div class="bg-white rounded-xl shadow p-6 max-w-lg mx-auto space-y-4">
         <div>
-          <label class="block font-medium text-gray-700 mb-1">Nama Guru</label>
+          <label for="namaGuru" class="block font-medium text-gray-700 mb-1">Nama Guru</label>
           <select id="namaGuru" class="border rounded p-2 w-full"></select>
         </div>
 
         <div>
-          <label class="block font-medium text-gray-700 mb-1">Status Kehadiran</label>
+          <label for="statusKehadiran" class="block font-medium text-gray-700 mb-1">Status Kehadiran</label>
           <select id="statusKehadiran" class="border rounded p-2 w-full">
             <option value="">-- Pilih Status --</option>
             <option value="Hadir">Hadir</option>
@@ -93,7 +100,7 @@
         </div>
 
         <div>
-          <label class="block font-medium text-gray-700 mb-1">Lokasi (otomatis)</label>
+          <label for="lokasi" class="block font-medium text-gray-700 mb-1">Lokasi (otomatis)</label>
           <input type="text" id="lokasi" readonly class="border rounded p-2 w-full bg-gray-50 text-gray-600" placeholder="Menunggu lokasi..." />
         </div>
 
@@ -153,7 +160,7 @@
       </div>
     </section>
 
-    <!-- LAPORAN BULANAN -->
+    <!-- LAPORAN -->
     <section id="page-laporan" class="hidden">
       <h2 class="text-2xl font-bold text-blue-900 mb-4">📅 Laporan Bulanan</h2>
       <div class="flex flex-wrap items-center gap-3 mb-4">
