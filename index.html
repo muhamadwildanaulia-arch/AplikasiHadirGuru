@@ -177,5 +177,289 @@
   </footer>
 
   <script type="module" src="app.firebase.js"></script>
+
+  <!-- ===== Admin Manual Login & Client-side Guru CRUD (Demo) ===== -->
+  <!-- Paste START: Admin manual login + CRUD (localStorage) -->
+  <script>
+  (function(){
+    // --- Konfigurasi demo (ganti credential ini untuk deploy internal) ---
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'admin123'; // GANTI sebelum produksi
+
+    // --- Helper DOM ---
+    function $ (s) { return document.querySelector(s); }
+    function $$ (s) { return Array.from(document.querySelectorAll(s)); }
+
+    // --- Inject Admin Button di NAV (kanan) ---
+    (function injectAdminBtn(){
+      const nav = document.querySelector('nav .max-w-7xl') || document.querySelector('nav');
+      if (!nav) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'ml-auto flex items-center gap-2';
+      wrapper.innerHTML = `
+        <button id="btn-open-admin" class="tab-button px-4 py-1 rounded-md text-white bg-gray-700 hover:bg-gray-800">Admin</button>
+        <button id="btn-admin-logout" class="hidden text-sm text-gray-600 underline">Logout</button>
+      `;
+      nav.appendChild(wrapper);
+    })();
+
+    // --- Modal HTML (hidden) ---
+    const modalHtml = `
+      <div id="admin-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+          <h3 class="text-lg font-semibold text-gray-800 mb-3">Login Admin</h3>
+          <div class="space-y-2">
+            <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
+            <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
+            <div class="flex gap-2 justify-end mt-2">
+              <button id="admin-cancel" class="px-3 py-1 rounded bg-gray-100">Batal</button>
+              <button id="admin-submit" class="px-3 py-1 rounded bg-red-600 text-white">Login</button>
+            </div>
+            <p id="admin-msg" class="text-sm text-red-600 mt-2"></p>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // --- Admin CRUD UI insertion (Data Guru page) ---
+    function injectAdminControls(){
+      const guruSection = document.getElementById('page-guru');
+      if (!guruSection) return;
+      if (document.getElementById('admin-controls')) return; // already injected
+      const ctrl = document.createElement('div');
+      ctrl.id = 'admin-controls';
+      ctrl.className = 'mt-4 mb-4 flex gap-2 items-center';
+      ctrl.innerHTML = `
+        <button id="btn-add-guru-admin" class="bg-green-600 text-white px-3 py-1 rounded">Tambah Guru</button>
+        <button id="btn-sync-local" class="bg-gray-200 px-3 py-1 rounded text-sm">Sinkron: local</button>
+        <span class="text-sm text-gray-500 ml-3">Anda sedang melihat mode <strong>Admin</strong>.</span>
+      `;
+      guruSection.querySelector('.bg-white')?.prepend(ctrl); // try insert at top of card
+      if (!guruSection.querySelector('#admin-controls')) guruSection.prepend(ctrl);
+    }
+
+    // --- Modal add/edit guru (small) ---
+    const guruModalHtml = `
+      <div id="guru-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+          <h3 class="text-lg font-semibold text-gray-800 mb-3" id="guru-modal-title">Tambah Guru</h3>
+          <div class="space-y-2">
+            <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
+            <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
+            <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
+            <div class="flex gap-2 justify-end mt-2">
+              <button id="guru-cancel" class="px-3 py-1 rounded bg-gray-100">Batal</button>
+              <button id="guru-save" class="px-3 py-1 rounded bg-red-600 text-white">Simpan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', guruModalHtml);
+
+    // --- Storage keys & helpers ---
+    const KEY_ADMIN = 'wh_admin_logged';
+    const KEY_GURU = 'wh_guru_list_v1'; // array of { id, nip, nama, jabatan }
+
+    function isAdmin(){ return localStorage.getItem(KEY_ADMIN) === '1'; }
+    function setAdmin(val){ if(val) localStorage.setItem(KEY_ADMIN,'1'); else localStorage.removeItem(KEY_ADMIN); }
+
+    function getLocalGuruList(){
+      try { return JSON.parse(localStorage.getItem(KEY_GURU) || '[]'); }
+      catch(e){ return []; }
+    }
+    function saveLocalGuruList(list){ localStorage.setItem(KEY_GURU, JSON.stringify(list)); }
+
+    // --- Utilities for rendering guru table & select ---
+    function renderGuruTable(){
+      const tbody = document.getElementById('guruTableBody');
+      if (!tbody) return;
+      const list = getLocalGuruList();
+      if (list.length === 0){
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-gray-500">Belum ada guru terdaftar.</td></tr>';
+        populateNamaGuruSelect();
+        return;
+      }
+      tbody.innerHTML = '';
+      list.forEach(g => {
+        const tr = document.createElement('tr');
+        tr.className = 'align-top';
+        tr.innerHTML = `
+          <td class="border p-2">${g.nip || ''}</td>
+          <td class="border p-2">${escapeHtml(g.nama)}</td>
+          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+          <td class="border p-2">
+            ${ isAdmin() ? `<button data-id="${g.id}" class="edit-guru inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
+                            <button data-id="${g.id}" class="del-guru inline-block bg-red-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-gray-500">—</span>'}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // attach handlers
+      $$('.edit-guru').forEach(b => b.onclick = e => {
+        const id = e.currentTarget.dataset.id;
+        openGuruModalForEdit(id);
+      });
+      $$('.del-guru').forEach(b => b.onclick = e => {
+        const id = e.currentTarget.dataset.id;
+        if (!confirm('Hapus guru ini?')) return;
+        deleteGuruById(id);
+      });
+
+      // also populate select #namaGuru
+      populateNamaGuruSelect();
+    }
+
+    function populateNamaGuruSelect(){
+      const sel = document.getElementById('namaGuru');
+      if (!sel) return;
+      const list = getLocalGuruList();
+      sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
+      list.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.nama;
+        opt.textContent = g.nama + (g.jabatan ? ' — ' + g.jabatan : '');
+        sel.appendChild(opt);
+      });
+    }
+
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
+
+    // --- CRUD operations on local storage ---
+    function addGuru(data){
+      const list = getLocalGuruList();
+      const id = 'g'+Date.now();
+      list.push(Object.assign({ id }, data));
+      saveLocalGuruList(list);
+      renderGuruTable();
+    }
+    function updateGuru(id, data){
+      const list = getLocalGuruList();
+      const idx = list.findIndex(x=>x.id===id);
+      if (idx === -1) return false;
+      list[idx] = Object.assign({}, list[idx], data);
+      saveLocalGuruList(list);
+      renderGuruTable();
+      return true;
+    }
+    function deleteGuruById(id){
+      let list = getLocalGuruList();
+      list = list.filter(x=>x.id!==id);
+      saveLocalGuruList(list);
+      renderGuruTable();
+    }
+
+    // --- Modal behaviors ---
+    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
+    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+
+    function openGuruModalForCreate(){
+      $('#guru-modal-title').textContent = 'Tambah Guru';
+      $('#guru-nip').value = ''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value='';
+      $('#guru-modal').classList.remove('hidden');
+      $('#guru-save').dataset.editId = '';
+    }
+    function openGuruModalForEdit(id){
+      const list = getLocalGuruList();
+      const g = list.find(x=>x.id===id);
+      if (!g) return alert('Data guru tidak ditemukan');
+      $('#guru-modal-title').textContent = 'Edit Guru';
+      $('#guru-nip').value = g.nip || '';
+      $('#guru-nama-input').value = g.nama || '';
+      $('#guru-jabatan-input').value = g.jabatan || '';
+      $('#guru-modal').classList.remove('hidden');
+      $('#guru-save').dataset.editId = id;
+    }
+
+    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
+
+    // --- Login flow ---
+    function showAdminUI(){
+      injectAdminControls();
+      // show logout button
+      $('#btn-admin-logout').classList.remove('hidden');
+      $('#btn-open-admin').classList.add('hidden');
+      // show edit buttons in table
+      renderGuruTable();
+    }
+    function hideAdminUI(){
+      // hide controls
+      const ctrl = document.getElementById('admin-controls'); if (ctrl) ctrl.remove();
+      $('#btn-admin-logout').classList.add('hidden');
+      $('#btn-open-admin').classList.remove('hidden');
+      renderGuruTable();
+    }
+
+    // --- Sync helper (placeholder for future Firebase) ---
+    function syncToStorage(){
+      // If you have Firebase or server, implement sync here.
+      // For now just ensure local storage has at least demo data.
+      const current = getLocalGuruList();
+      if (current.length === 0){
+        // seed demo data
+        const demo = [
+          { id:'g1', nip:'19850101', nama:'Siti Nurjanah', jabatan:'Matematika' },
+          { id:'g2', nip:'19870102', nama:'Budi Santoso', jabatan:'Bahasa Indonesia' },
+          { id:'g3', nip:'19890103', nama:'Rina Maharani', jabatan:'IPA' }
+        ];
+        saveLocalGuruList(demo);
+      }
+      renderGuruTable();
+    }
+
+    // --- Attach event listeners (modal buttons etc) ---
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
+      if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
+      if (e.target && e.target.id === 'admin-submit') {
+        const u = $('#admin-username').value.trim();
+        const p = $('#admin-password').value.trim();
+        if (u === ADMIN_USER && p === ADMIN_PASS) {
+          setAdmin(true);
+          closeAdminModal();
+          showAdminUI();
+          alert('Login Admin berhasil (demo).');
+        } else {
+          $('#admin-msg').textContent = 'Credential salah.';
+        }
+      }
+      if (e.target && e.target.id === 'btn-admin-logout') {
+        if (!confirm('Keluar sebagai admin?')) return;
+        setAdmin(false);
+        hideAdminUI();
+        alert('Logout berhasil.');
+      }
+
+      if (e.target && e.target.id === 'btn-add-guru-admin') openGuruModalForCreate();
+      if (e.target && e.target.id === 'guru-cancel') closeGuruModal();
+      if (e.target && e.target.id === 'guru-save') {
+        const editId = e.target.dataset.editId || '';
+        const nip = $('#guru-nip').value.trim();
+        const nama = $('#guru-nama-input').value.trim();
+        const jab = $('#guru-jabatan-input').value.trim();
+        if (!nama) return alert('Masukkan nama guru');
+        if (editId) updateGuru(editId, { nip, nama, jabatan: jab });
+        else addGuru({ nip, nama, jabatan: jab });
+        closeGuruModal();
+      }
+      if (e.target && e.target.id === 'btn-sync-local') {
+        syncToStorage(); alert('Sinkronisasi lokal selesai.');
+      }
+    });
+
+    // --- Initial boot ---
+    (function boot(){
+      // render table (if page present)
+      syncToStorage();
+      if (isAdmin()) showAdminUI();
+      else hideAdminUI();
+    })();
+
+  })();
+  </script>
+  <!-- Paste END -->
+
 </body>
 </html>
