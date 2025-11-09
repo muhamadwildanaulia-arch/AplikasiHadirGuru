@@ -1,328 +1,394 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebsiteHadir SD Negeri Muhara</title>
+  <title>WebsiteHadir — SDN Muhara (Dashboard)</title>
 
-  <!-- Tailwind CSS (dev via CDN) -->
+  <!-- Tailwind (CDN, dev) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Chart.js & XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase SDK (compat untuk Realtime DB) -->
+  <!-- Firebase compat scripts (required by app.firebase.js) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
-    .card { background:#fff; box-shadow:0 6px 18px rgba(0,0,0,0.06); border-radius:1rem; padding:1.5rem; text-align:center; transition:transform 160ms; }
-    .card:hover{ transform:scale(1.02); }
-    #analogClock{ background: radial-gradient(circle at center,#fff 40%,#e0e7ff 100%); border-radius:50%; box-shadow:0 0 15px rgba(30,58,138,0.2), inset 0 0 8px rgba(0,0,0,0.05); }
-    .tab-active{ background-color:#dc2626; color:white !important; font-weight:600; }
-    .tab-button:hover{ background-color: rgba(220,38,38,0.08); }
+    /* small visual tweaks */
+    .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
+    .sidebar .nav-item { color: rgba(255,255,255,0.92); }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    /* toast */
+    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
   </style>
 </head>
-<body class="bg-gray-50 text-gray-800">
+<body class="antialiased bg-slate-50 text-slate-800">
 
-  <!-- HEADER -->
-  <header class="bg-white shadow-md">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between py-4 px-5">
-      <div class="flex items-center gap-4">
-        <img src="Logo.png" alt="Logo SDN Muhara" class="h-16 w-auto rounded-md bg-white shadow p-1" />
+  <div class="min-h-screen flex">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
+      <div class="flex items-center gap-3 mb-6">
+        <img src="Logo.png" alt="logo" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
         <div>
-          <h1 class="text-2xl font-bold text-blue-900">SD Negeri Muhara</h1>
-          <p class="text-red-600 italic font-medium text-sm">"Guru Hadir, Siswa Terinspirasi."</p>
+          <h1 class="text-white font-bold">SDN Muhara</h1>
+          <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
         </div>
       </div>
 
-      <div class="text-right mt-3 sm:mt-0">
-        <p id="current-date" class="text-sm text-gray-600 font-semibold mb-1"></p>
-        <canvas id="analogClock" width="80" height="80"></canvas>
+      <nav class="mt-6 flex-1">
+        <ul class="space-y-1">
+          <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
+          <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
+          <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">👩‍🏫 Data Guru</button></li>
+          <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📅 Laporan Bulanan</button></li>
+        </ul>
+      </nav>
+
+      <div class="mt-auto text-sm text-red-100">
+        <div class="px-3">Versi demo • 2025</div>
+      </div>
+    </aside>
+
+    <!-- MOBILE NAV (bottom) -->
+    <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/90 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
+      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
+      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
+      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
+      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="flex-1 min-w-0">
+
+      <!-- TOPBAR -->
+      <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
+        <div class="flex items-center gap-4">
+          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
+          <div>
+            <div class="text-sm text-slate-500" id="current-date-top"></div>
+            <div class="text-lg font-semibold">Dashboard Kehadiran</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2z" />
+            </svg>
+            Admin Aktif
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div id="clock-small" class="text-sm text-slate-600"></div>
+            <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
+            <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <main class="p-6">
+        <div class="max-w-7xl mx-auto">
+
+          <!-- GRID / HEADER CARDS -->
+          <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Total Guru</div>
+              <div id="totalGuru" class="text-3xl font-bold text-slate-800 mt-2">0</div>
+            </div>
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Hadir Hari Ini</div>
+              <div id="totalHadir" class="text-3xl font-bold text-green-600 mt-2">0</div>
+            </div>
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Izin / Sakit / Dinas</div>
+              <div id="totalLain" class="text-3xl font-bold text-amber-600 mt-2">0</div>
+            </div>
+          </div>
+
+          <!-- Kehadiran Form -->
+          <section id="page-kehadiran" class="">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="card-smooth p-6">
+                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran Guru</h2>
+                <p class="text-sm text-slate-500 mb-4">Pilih nama lalu kirim kehadiran. Tetap tanpa login untuk guru biasa.</p>
+
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Nama Guru</label>
+                    <select id="namaGuru" class="w-full border rounded p-2"></select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
+                    <select id="statusKehadiran" class="w-full border rounded p-2">
+                      <option value="">-- Pilih Status --</option>
+                      <option value="Hadir">Hadir</option>
+                      <option value="Izin">Izin</option>
+                      <option value="Sakit">Sakit</option>
+                      <option value="Dinas Luar">Dinas Luar</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
+                    <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
+                  </div>
+
+                  <div class="flex gap-3 items-center">
+                    <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
+                    <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="card-smooth p-6">
+                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
+                <div class="mt-4">
+                  <canvas id="chartDashboard" height="180"></canvas>
+                </div>
+                <div class="mt-6">
+                  <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
+                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
+                    <p class="text-slate-400">Memuat data...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Data Guru -->
+          <section id="page-guru" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
+              <div id="admin-controls-placeholder"></div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow p-4 overflow-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-rose-50 text-rose-700 font-semibold">
+                  <tr>
+                    <th class="border p-2 text-left">NIP</th>
+                    <th class="border p-2 text-left">Nama Guru</th>
+                    <th class="border p-2 text-left">Jabatan</th>
+                    <th class="border p-2 text-left">Status</th>
+                    <th class="border p-2 text-left">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="guruTableBody">
+                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Laporan -->
+          <section id="page-laporan" class="hidden">
+            <div class="mb-4 flex flex-wrap gap-3 items-center">
+              <input type="month" id="bulan" class="border rounded p-2" />
+              <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">Tampilkan</button>
+              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
+              <table class="min-w-full text-sm">
+                <thead class="bg-rose-50 text-rose-700 font-semibold">
+                  <tr>
+                    <th class="border p-2">Tanggal</th>
+                    <th class="border p-2">Nama Guru</th>
+                    <th class="border p-2">Jam</th>
+                    <th class="border p-2">Lokasi</th>
+                    <th class="border p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="laporanTableBody">
+                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="resume-laporan" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ADMIN MODAL & GURU MODAL (keperluan UI) -->
+  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
+      <div class="space-y-2">
+        <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
+        <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
+        <div class="flex justify-end gap-2">
+          <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+          <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
+        </div>
+        <p id="admin-msg" class="text-sm text-red-600"></p>
       </div>
     </div>
-    <div class="h-2 w-full bg-gradient-to-r from-red-600 via-white to-red-600"></div>
-  </header>
+  </div>
 
-  <!-- NAV -->
-  <nav class="bg-white shadow-inner border-b border-gray-200 sticky top-0 z-40">
-    <div class="max-w-7xl mx-auto flex justify-center gap-2 py-3 flex-wrap">
-      <button data-page="kehadiran" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold tab-active">📥 Isi Kehadiran</button>
-      <button data-page="dashboard" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">📊 Dashboard</button>
-      <button data-page="guru" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">👩‍🏫 Data Guru</button>
-      <button data-page="laporan" class="tab-button px-5 py-2 rounded-md text-blue-900 hover:font-semibold">📅 Laporan Bulanan</button>
+  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
+      <div class="space-y-2">
+        <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
+        <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
+        <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
+        <div class="flex justify-end gap-2">
+          <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+          <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
+        </div>
+      </div>
     </div>
-  </nav>
+  </div>
 
-  <main class="max-w-7xl mx-auto px-5 py-6">
-
-    <!-- FORM -->
-    <section id="page-kehadiran">
-      <h2 class="text-2xl font-bold text-blue-900 mb-4">📥 Isi Kehadiran Guru</h2>
-
-      <div class="bg-white rounded-xl shadow p-6 max-w-lg mx-auto space-y-4">
-        <div>
-          <label for="namaGuru" class="block font-medium text-gray-700 mb-1">Nama Guru</label>
-          <select id="namaGuru" class="border rounded p-2 w-full"></select>
-        </div>
-
-        <div>
-          <label for="statusKehadiran" class="block font-medium text-gray-700 mb-1">Status Kehadiran</label>
-          <select id="statusKehadiran" class="border rounded p-2 w-full">
-            <option value="">-- Pilih Status --</option>
-            <option value="Hadir">Hadir</option>
-            <option value="Izin">Izin</option>
-            <option value="Sakit">Sakit</option>
-            <option value="Dinas Luar">Dinas Luar</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="lokasi" class="block font-medium text-gray-700 mb-1">Lokasi (otomatis)</label>
-          <input type="text" id="lokasi" readonly class="border rounded p-2 w-full bg-gray-50 text-gray-600" placeholder="Menunggu lokasi..." />
-        </div>
-
-        <button id="kirimKehadiranBtn" class="bg-red-600 hover:bg-red-700 text-white w-full py-2 rounded font-semibold">
-          🚀 Kirim Kehadiran
-        </button>
-      </div>
-    </section>
-
-    <!-- DASHBOARD -->
-    <section id="page-dashboard" class="hidden">
-      <div class="grid md:grid-cols-3 gap-6 mb-8">
-        <div class="card">
-          <h3 class="text-gray-500">Total Guru</h3>
-          <p id="totalGuru" class="text-4xl font-bold text-blue-900">0</p>
-        </div>
-        <div class="card">
-          <h3 class="text-gray-500">Hadir Hari Ini</h3>
-          <p id="totalHadir" class="text-4xl font-bold text-green-600">0</p>
-        </div>
-        <div class="card">
-          <h3 class="text-gray-500">Izin / Sakit / Dinas</h3>
-          <p id="totalLain" class="text-4xl font-bold text-yellow-500">0</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl shadow p-6 mb-8">
-        <h3 class="font-semibold text-blue-900 mb-4">Grafik Kehadiran Hari Ini</h3>
-        <canvas id="chartDashboard" height="120"></canvas>
-      </div>
-
-      <div class="bg-white rounded-xl shadow p-6">
-        <h3 class="font-semibold text-blue-900 mb-4">Aktivitas Terbaru</h3>
-        <div id="recent-activity" class="text-sm text-gray-700 space-y-1">
-          <p class="text-gray-400">Memuat data...</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- DATA GURU -->
-    <section id="page-guru" class="hidden">
-      <h2 class="text-2xl font-bold text-blue-900 mb-4">👩‍🏫 Daftar Guru</h2>
-      <div class="bg-white rounded-xl shadow p-6 overflow-x-auto">
-        <!-- Admin controls will be injected here when admin logs in -->
-        <table class="min-w-full border text-sm mt-3">
-          <thead class="bg-red-50 text-blue-900 font-semibold">
-            <tr>
-              <th class="border p-2">NIP</th>
-              <th class="border p-2">Nama Guru</th>
-              <th class="border p-2">Jabatan</th>
-              <th class="border p-2">Status</th>
-            </tr>
-          </thead>
-          <tbody id="guruTableBody">
-            <tr><td colspan="4" class="text-center p-4 text-gray-500">Memuat data...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- LAPORAN -->
-    <section id="page-laporan" class="hidden">
-      <h2 class="text-2xl font-bold text-blue-900 mb-4">📅 Laporan Bulanan</h2>
-      <div class="flex flex-wrap items-center gap-3 mb-4">
-        <input type="month" id="bulan" class="border rounded p-2" />
-        <button id="tampilkanLaporanBtn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Tampilkan</button>
-        <button id="exportLaporanBtn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">📥 Export Excel</button>
-      </div>
-
-      <div class="bg-white rounded-xl shadow p-6 overflow-auto mb-6">
-        <table class="min-w-full border text-sm">
-          <thead class="bg-red-50 text-blue-900 font-semibold">
-            <tr>
-              <th class="border p-2">Tanggal</th>
-              <th class="border p-2">Nama Guru</th>
-              <th class="border p-2">Jam</th>
-              <th class="border p-2">Lokasi</th>
-              <th class="border p-2">Status</th>
-            </tr>
-          </thead>
-          <tbody id="laporanTableBody">
-            <tr><td colspan="5" class="text-center p-4 text-gray-500">Pilih bulan untuk menampilkan data.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div id="resume-laporan" class="bg-blue-50 rounded-xl shadow p-6 text-gray-700"></div>
-    </section>
-
-  </main>
-
-  <footer class="bg-blue-900 text-white text-center py-3 text-sm font-medium tracking-wide">
+  <footer class="fixed left-0 right-0 bottom-0 md:static md:mt-8 text-center text-slate-500 text-sm p-3 md:p-6">
     D.A.N × GPT-5 | 2025
   </footer>
 
-  <!-- app.firebase.js (harus ada, diambil / disesuaikan sebelumnya) -->
+  <!-- app.firebase.js (harus ada di repo) -->
   <script type="module" src="app.firebase.js"></script>
 
-  <!-- ===== Admin Manual Login & Client-side Guru CRUD (Firebase-aware) ===== -->
+  <!-- UI + Admin script (Firebase-aware) -->
   <script>
   (function(){
-    // --- Konfigurasi demo (ganti credential ini untuk deploy internal) ---
+    // UI helpers
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const toasts = $('#toasts');
+
+    function toast(msg, type='info', timeout=3800){
+      const el = document.createElement('div');
+      el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
+      el.style.minWidth = '220px';
+      if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
+      else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
+      else el.classList.add('bg-slate-100','text-slate-800');
+      el.textContent = msg;
+      toasts.appendChild(el);
+      setTimeout(()=> { el.classList.add('opacity-0'); setTimeout(()=>el.remove(),300); }, timeout);
+    }
+
+    // nav logic (sidebar & mobile buttons)
+    function showPage(name){
+      ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
+        const el = document.getElementById('page-'+p);
+        if (!el) return;
+        if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
+      });
+      // highlight buttons (sidebar)
+      $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
+    }
+    // attach nav
+    $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
+
+    // top date & clock
+    function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
+    function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
+    setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
+
+    // toggle sidebar on mobile
+    $('#btn-toggle-sidebar')?.addEventListener('click', ()=> {
+      const aside = document.querySelector('aside');
+      if (!aside) return;
+      aside.classList.toggle('hidden');
+    });
+
+    // keep required IDs for firebase script:
+    // namaGuru, statusKehadiran, lokasi, kirimKehadiranBtn, guruTableBody, totalGuru,totalHadir,totalLain, chartDashboard, recent-activity, laporan elements
+
+    // Admin login modal
+    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
+    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+
+    // admin credentials (demo)
     const ADMIN_USER = 'admin';
-    const ADMIN_PASS = 'admin123'; // GANTI sebelum produksi
+    const ADMIN_PASS = 'admin123';
 
-    // --- Helper DOM ---
-    function $ (s) { return document.querySelector(s); }
-    function $$ (s) { return Array.from(document.querySelectorAll(s)); }
+    function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
+    function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
 
-    // --- Inject Admin Button di NAV (kanan) ---
-    (function injectAdminBtn(){
-      const nav = document.querySelector('nav .max-w-7xl') || document.querySelector('nav');
-      if (!nav) return;
-      const wrapper = document.createElement('div');
-      wrapper.className = 'ml-auto flex items-center gap-2';
-      wrapper.innerHTML = `
-        <button id="btn-open-admin" class="tab-button px-4 py-1 rounded-md text-white bg-gray-700 hover:bg-gray-800">Admin</button>
-        <button id="btn-admin-logout" class="hidden text-sm text-gray-600 underline">Logout</button>
-      `;
-      nav.appendChild(wrapper);
-    })();
-
-    // --- Modal HTML (hidden) ---
-    const modalHtml = `
-      <div id="admin-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-lg p-6 w-96">
-          <h3 class="text-lg font-semibold text-gray-800 mb-3">Login Admin</h3>
-          <div class="space-y-2">
-            <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
-            <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
-            <div class="flex gap-2 justify-end mt-2">
-              <button id="admin-cancel" class="px-3 py-1 rounded bg-gray-100">Batal</button>
-              <button id="admin-submit" class="px-3 py-1 rounded bg-red-600 text-white">Login</button>
-            </div>
-            <p id="admin-msg" class="text-sm text-red-600 mt-2"></p>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-    // --- Admin CRUD UI insertion (Data Guru page) ---
+    // inject admin controls (in header area of Data Guru)
     function injectAdminControls(){
-      const guruSection = document.getElementById('page-guru');
-      if (!guruSection) return;
-      if (document.getElementById('admin-controls')) return; // already injected
-      const ctrl = document.createElement('div');
-      ctrl.id = 'admin-controls';
-      ctrl.className = 'mt-4 mb-4 flex gap-2 items-center';
-      ctrl.innerHTML = `
-        <button id="btn-add-guru-admin" class="bg-green-600 text-white px-3 py-1 rounded">Tambah Guru</button>
-        <button id="btn-sync-local" class="bg-gray-200 px-3 py-1 rounded text-sm">Sinkron: Firebase</button>
-        <span class="text-sm text-gray-500 ml-3">Anda sedang melihat mode <strong>Admin</strong>.</span>
+      const placeholder = $('#admin-controls-placeholder');
+      if (!placeholder) return;
+      if ($('#admin-controls')) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'admin-controls';
+      wrap.className = 'flex gap-2 items-center';
+      wrap.innerHTML = `
+        <button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>
+        <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>
       `;
-      // place controls at top of the card area
-      const card = guruSection.querySelector('.bg-white') || guruSection;
-      card.prepend(ctrl);
+      placeholder.appendChild(wrap);
     }
+    function removeAdminControls(){ $('#admin-controls')?.remove(); }
 
-    // --- Modal add/edit guru (small) ---
-    const guruModalHtml = `
-      <div id="guru-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-xl shadow-lg p-6 w-96">
-          <h3 class="text-lg font-semibold text-gray-800 mb-3" id="guru-modal-title">Tambah Guru</h3>
-          <div class="space-y-2">
-            <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
-            <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
-            <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
-            <div class="flex gap-2 justify-end mt-2">
-              <button id="guru-cancel" class="px-3 py-1 rounded bg-gray-100">Batal</button>
-              <button id="guru-save" class="px-3 py-1 rounded bg-red-600 text-white">Simpan</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', guruModalHtml);
+    // open/close guru modal
+    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden'); }
+    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; $('#guru-modal').classList.remove('hidden'); }
+    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
 
-    // --- Storage keys & helpers (fallback local) ---
-    const KEY_ADMIN = 'wh_admin_logged';
-    const KEY_GURU = 'wh_guru_list_v1'; // array of { id, nip, nama, jabatan }
-
-    function isAdmin(){ return localStorage.getItem(KEY_ADMIN) === '1'; }
-    function setAdmin(val){ if(val) localStorage.setItem(KEY_ADMIN,'1'); else localStorage.removeItem(KEY_ADMIN); }
-
-    function getLocalGuruList(){
-      try { return JSON.parse(localStorage.getItem(KEY_GURU) || '[]'); }
-      catch(e){ return []; }
-    }
-    function saveLocalGuruList(list){ localStorage.setItem(KEY_GURU, JSON.stringify(list)); }
-
-    // --- Utilities for rendering guru table & select ---
-    function renderGuruTableFromList(list){
-      const tbody = document.getElementById('guruTableBody');
-      if (!tbody) return;
-      if (!Array.isArray(list) || list.length === 0){
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-gray-500">Belum ada guru terdaftar.</td></tr>';
-        populateNamaGuruSelect(list || []);
-        return;
-      }
-      tbody.innerHTML = '';
+    // render functions used when Firebase dispatches 'gurus-updated' (app.firebase.js will dispatch)
+    function renderGuruTable(list){
+      const tb = $('#guruTableBody'); if (!tb) return;
+      if (!Array.isArray(list) || list.length===0){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect(list||[]); return; }
+      tb.innerHTML = '';
       list.forEach(g => {
         const tr = document.createElement('tr');
         tr.className = 'align-top';
         tr.innerHTML = `
-          <td class="border p-2">${g.nip || ''}</td>
-          <td class="border p-2">${escapeHtml(g.nama || g.name || '')}</td>
-          <td class="border p-2">${escapeHtml(g.jabatan || '')}</td>
+          <td class="border p-2">${g.nip||''}</td>
+          <td class="border p-2">${escapeHtml(g.nama||g.name||'')}</td>
+          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+          <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
           <td class="border p-2">
-            ${ isAdmin() ? `<button data-id="${g.id}" class="edit-guru inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
-                            <button data-id="${g.id}" class="del-guru inline-block bg-red-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-gray-500">—</span>'}
+            ${ isAdminLocal() ? `<button data-id="${g.id}" class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
+                                 <button data-id="${g.id}" class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-slate-400">—</span>'}
           </td>
         `;
-        tbody.appendChild(tr);
+        tb.appendChild(tr);
       });
-
-      // attach handlers
-      $$('.edit-guru').forEach(b => b.onclick = e => {
-        const id = e.currentTarget.dataset.id;
-        openGuruModalForEdit(id);
+      // wire up handlers
+      $$('.btn-edit').forEach(b => b.onclick = async (ev) => {
+        const id = ev.currentTarget.dataset.id;
+        const listCached = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+        const g = (listCached||[]).find(x=>x.id===id);
+        if (g) openGuruModalEdit(g);
+        else toast('Data guru tidak ditemukan', 'err');
       });
-      $$('.del-guru').forEach(b => b.onclick = e => {
-        const id = e.currentTarget.dataset.id;
+      $$('.btn-del').forEach(b => b.onclick = async (ev) => {
+        const id = ev.currentTarget.dataset.id;
         if (!confirm('Hapus guru ini?')) return;
-        // choose firebase if available
-        if (window.deleteGuruFirebase) {
-          deleteGuruFirebase(id).catch(err=>alert('Gagal hapus: '+(err.message||err)));
-        } else {
-          deleteGuruById(id);
-        }
+        try {
+          if (window.deleteGuruFirebase) await window.deleteGuruFirebase(id);
+          else {
+            // local fallback remove
+            const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]').filter(x=>x.id!==id);
+            localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+            renderGuruTable(list);
+          }
+          toast('Guru dihapus', 'ok');
+        } catch(err){ console.error(err); toast('Gagal hapus: '+(err&&err.message?err.message:err), 'err'); }
       });
-
-      // also populate select #namaGuru
-      populateNamaGuruSelect(list);
     }
 
-    function populateNamaGuruSelect(list){
-      const sel = document.getElementById('namaGuru');
-      if (!sel) return;
+    function populateNamaSelect(list){
+      const sel = $('#namaGuru'); if (!sel) return;
       sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
-      (list || []).forEach(g => {
+      (list||[]).forEach(g => {
         const opt = document.createElement('option');
         opt.value = `${g.nip||g.id}|${g.nama||g.name||''}`;
         opt.textContent = (g.nama||g.name||'') + (g.jabatan ? ' — ' + g.jabatan : '');
@@ -332,181 +398,130 @@
 
     function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
 
-    // --- CRUD fallback (localStorage) ---
-    function addGuruLocal(data){
-      const list = getLocalGuruList();
-      const id = 'g'+Date.now();
-      list.push(Object.assign({ id }, data));
-      saveLocalGuruList(list);
-      renderGuruTableFromList(list);
-    }
-    function updateGuruLocal(id, data){
-      const list = getLocalGuruList();
-      const idx = list.findIndex(x=>x.id===id);
-      if (idx === -1) return false;
-      list[idx] = Object.assign({}, list[idx], data);
-      saveLocalGuruList(list);
-      renderGuruTableFromList(list);
-      return true;
-    }
-    function deleteGuruLocal(id){
-      let list = getLocalGuruList();
-      list = list.filter(x=>x.id!==id);
-      saveLocalGuruList(list);
-      renderGuruTableFromList(list);
-    }
+    // listen for firebase-driven update event (app.firebase.js dispatches 'gurus-updated')
+    window.addEventListener('gurus-updated', (ev) => {
+      const list = ev.detail || [];
+      window.__latest_guru_list = list;
+      localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+      renderGuruTable(list);
+      populateNamaSelect(list);
+      // set totals
+      $('#totalGuru') && ( $('#totalGuru').textContent = String(list.length) );
+      toast('Daftar guru diperbarui (Realtime)', 'info', 1800);
+    });
 
-    // --- Modal behaviors ---
-    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
-    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
-
-    function openGuruModalForCreate(){
-      $('#guru-modal-title').textContent = 'Tambah Guru';
-      $('#guru-nip').value = ''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value='';
-      $('#guru-modal').classList.remove('hidden');
-      $('#guru-save').dataset.editId = '';
-    }
-    function openGuruModalForEdit(id){
-      // if firebase exists, try to read from localStorage list saved by firebase listener, else use localStorage fallback
-      const list = (window.__latest_guru_list || getLocalGuruList());
-      const g = (list || []).find(x=>x.id===id);
-      if (!g) return alert('Data guru tidak ditemukan');
-      $('#guru-modal-title').textContent = 'Edit Guru';
-      $('#guru-nip').value = g.nip || '';
-      $('#guru-nama-input').value = g.nama || g.name || '';
-      $('#guru-jabatan-input').value = g.jabatan || '';
-      $('#guru-modal').classList.remove('hidden');
-      $('#guru-save').dataset.editId = id;
-    }
-
-    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
-
-    // --- Show/hide admin UI ---
-    function showAdminUI(){
-      injectAdminControls();
-      $('#btn-admin-logout').classList.remove('hidden');
-      $('#btn-open-admin').classList.add('hidden');
-      // render current list (prefer firebase-updated list if available)
-      const list = window.__latest_guru_list || getLocalGuruList();
-      renderGuruTableFromList(list);
-    }
-    function hideAdminUI(){
-      const ctrl = document.getElementById('admin-controls'); if (ctrl) ctrl.remove();
-      $('#btn-admin-logout').classList.add('hidden');
-      $('#btn-open-admin').classList.remove('hidden');
-      const list = window.__latest_guru_list || getLocalGuruList();
-      renderGuruTableFromList(list);
-    }
-
-    // --- Helper: attempt to trigger firebase sync if available ---
-    function trySyncFromFirebase(){
-      if (window.syncFromFirebase) {
-        try {
-          window.syncFromFirebase();
-        } catch(e){ console.warn('syncFromFirebase error', e); }
-      } else {
-        // no firebase: ensure local exists
-        const list = getLocalGuruList();
-        if (!list || list.length === 0) {
-          // seed demo local data (only if totally empty)
-          const demo = [
-            { id:'g1', nip:'19850101', nama:'Siti Nurjanah', jabatan:'Matematika' },
-            { id:'g2', nip:'19870102', nama:'Budi Santoso', jabatan:'Bahasa Indonesia' },
-            { id:'g3', nip:'19890103', nama:'Rina Maharani', jabatan:'IPA' }
-          ];
-          saveLocalGuruList(demo);
-        }
-        renderGuruTableFromList(getLocalGuruList());
-      }
-    }
-
-    // --- Attach event listeners (modal buttons etc) ---
+    // Admin modal events
     document.addEventListener('click', async (e) => {
+      // open admin modal
       if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
       if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
       if (e.target && e.target.id === 'admin-submit') {
         const u = $('#admin-username').value.trim();
         const p = $('#admin-password').value.trim();
         if (u === ADMIN_USER && p === ADMIN_PASS) {
-          setAdmin(true);
+          setAdminLocal(true);
           closeAdminModal();
-          showAdminUI();
-          alert('Login Admin berhasil (demo).');
+          injectAdminControls();
+          $('#admin-badge').classList.remove('hidden');
+          $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
+          // show admin controls in Data Guru
+          injectAdminControls();
+          // render current list as admin
+          const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+          renderGuruTable(list);
+          toast('Login Admin berhasil', 'ok');
         } else {
           $('#admin-msg').textContent = 'Credential salah.';
         }
       }
+
       if (e.target && e.target.id === 'btn-admin-logout') {
         if (!confirm('Keluar sebagai admin?')) return;
-        setAdmin(false);
-        hideAdminUI();
-        alert('Logout berhasil.');
+        setAdminLocal(false);
+        $('#admin-badge').classList.add('hidden');
+        $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden');
+        removeAdminControls();
+        const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+        renderGuruTable(list);
+        toast('Logout berhasil', 'ok');
       }
 
-      if (e.target && e.target.id === 'btn-add-guru-admin') openGuruModalForCreate();
+      // add guru button
+      if (e.target && e.target.id === 'btn-add-guru-admin') openGuruModalCreate();
       if (e.target && e.target.id === 'guru-cancel') closeGuruModal();
+
+      // save guru (create/update)
       if (e.target && e.target.id === 'guru-save') {
         const editId = e.target.dataset.editId || '';
         const nip = $('#guru-nip').value.trim();
         const nama = $('#guru-nama-input').value.trim();
         const jab = $('#guru-jabatan-input').value.trim();
-        if (!nama) return alert('Masukkan nama guru');
-
-        // If firebase CRUD functions available, use them. Otherwise fallback to local.
+        if (!nama) return toast('Masukkan nama guru', 'err');
         try {
           if (editId) {
             if (window.updateGuruFirebase) {
               await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
             } else {
-              updateGuruLocal(editId, { nip, nama, jabatan: jab });
+              // local fallback
+              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+              const idx = list.findIndex(x=>x.id===editId);
+              if (idx>=0){ list[idx] = Object.assign({}, list[idx], { nip, nama, jabatan: jab }); localStorage.setItem('wh_guru_list_v1', JSON.stringify(list)); renderGuruTable(list); }
             }
+            toast('Perubahan disimpan', 'ok');
           } else {
             if (window.addGuruFirebase) {
               await window.addGuruFirebase({ nip, nama, jabatan: jab });
             } else {
-              addGuruLocal({ nip, nama, jabatan: jab });
+              // local fallback
+              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+              const id = 'g' + Date.now();
+              list.push({ id, nip, nama, jabatan: jab });
+              localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+              renderGuruTable(list);
             }
+            toast('Guru tersimpan', 'ok');
           }
-          closeGuruModal();
-          // UI will update via firebase listener; if local fallback, we already updated table.
-        } catch(err){
-          alert('Gagal menyimpan guru: ' + (err && err.message ? err.message : err));
-        }
+        } catch(err){ console.error(err); toast('Gagal menyimpan guru: '+(err&&err.message?err.message:err), 'err'); }
+        closeGuruModal();
       }
+
+      // trigger sync
       if (e.target && e.target.id === 'btn-sync-local') {
-        // trigger firebase sync if available, else re-render local
-        trySyncFromFirebase();
-        alert('Sinkronisasi dipicu.');
+        if (window.syncFromFirebase) { try { window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu', 'info'); } catch(e){ toast('Sinkron gagal: '+e.message,'err'); } }
+        else { const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]'); renderGuruTable(list); toast('Menggunakan data lokal', 'info'); }
       }
     });
 
-    // --- Listen to firebase-driven event (app.firebase.js dispatches 'gurus-updated') ---
-    window.addEventListener('gurus-updated', (ev) => {
-      const list = ev.detail || [];
-      // keep a cached reference for modal edit
-      window.__latest_guru_list = list;
-      // also store to localStorage for fallback & total count
-      try { saveLocalGuruList(list); } catch(e){}
-      renderGuruTableFromList(list);
-      // update totalGuru counter if present
-      const totalGuruEl = document.getElementById('totalGuru');
-      if (totalGuruEl) totalGuruEl.textContent = String(list.length);
-    });
+    // initial boot: show default page
+    showPage('kehadiran');
 
-    // --- Initial boot ---
-    (function boot(){
-      trySyncFromFirebase();
-      if (isAdmin()) showAdminUI(); else hideAdminUI();
-      // if firebase already loaded and dispatched before this script, also check localStorage fallback
-      const local = getLocalGuruList();
-      if ((!window.__latest_guru_list || window.__latest_guru_list.length === 0) && local && local.length) {
-        window.__latest_guru_list = local;
-        renderGuruTableFromList(local);
-      }
-    })();
+    // Admin badge initial
+    if (isAdminLocal()) {
+      $('#admin-badge').classList.remove('hidden'); $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
+      injectAdminControls();
+    } else {
+      $('#admin-badge').classList.add('hidden');
+    }
+
+    // Replace native alerts used in older scripts by toasts where appropriate:
+    // Keep compatibility — older code (app.firebase.js) may still call alert(); that's fine.
+    // But our admin/add UI uses toast above.
+
+    // ensure nama select is populated with localStorage fallback quickly
+    const local = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+    if (local && local.length) { renderGuruTable(local); populateNamaSelect(local); }
+
+    // Kehadiran button feedback (this works together with app.firebase.js's handler)
+    $('#kirimKehadiranBtn')?.addEventListener('click', () => {
+      // small UI change: show status
+      $('#kehadiran-status').textContent = 'Mengirim...';
+      setTimeout(()=>{ $('#kehadiran-status').textContent = '—'; }, 1200);
+      // actual send is handled in app.firebase.js (which listens same button)
+    });
 
   })();
   </script>
 
+  <!-- end -->
 </body>
 </html>
