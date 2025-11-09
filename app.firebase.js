@@ -160,11 +160,57 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(()=>{ drawClock(); setCurrentDate(); }, 1000);
 
   // geolocation fill once
+    // geolocation fill once — tampilkan nama tempat bila ada, tetap simpan coords
   const lokasiEl = document.getElementById('lokasi');
+  const coordsSmallEl = document.getElementById('coords-small');
+  const placeNameEl = document.getElementById('placeName');
+
+  // muat nama tempat dari localStorage bila ada
+  try {
+    const savedPlace = localStorage.getItem('wh_place_name') || '';
+    if (placeNameEl && savedPlace) {
+      placeNameEl.value = savedPlace;
+    }
+  } catch(e){ /* ignore */ }
+
+  // helper: update lokasi UI (tampilkan name jika ada, selalu tunjukkan coords di coords-small)
+  function showLocationDisplay(lat, lng){
+    const coordsText = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    const saved = (placeNameEl && placeNameEl.value && placeNameEl.value.trim()) ? placeNameEl.value.trim() : '';
+    if (lokasiEl) lokasiEl.value = saved || coordsText;
+    if (coordsSmallEl) coordsSmallEl.textContent = 'Koordinat: ' + coordsText;
+  }
+
   if (navigator.geolocation && lokasiEl) {
     navigator.geolocation.getCurrentPosition(pos => {
-      lokasiEl.value = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-    }, () => {}, { timeout: 7000 });
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      // tampilkan
+      showLocationDisplay(lat, lng);
+      // simpan coords ke field hidden (tidak wajib) atau biarkan form mengirim koordinat lewat lokasi field jika belum ada nama
+      // optionally keep a hidden input if you need real coords separately:
+      // document.getElementById('lokasi_coords')?.value = `${lat},${lng}`;
+    }, (err) => {
+      console.warn('Geolocation gagal:', err && err.message);
+    }, { timeout: 7000 });
+  }
+
+  // simpan perubahan nama tempat ke localStorage saat diedit
+  if (placeNameEl) {
+    placeNameEl.addEventListener('change', (e) => {
+      try { localStorage.setItem('wh_place_name', e.target.value || ''); } catch(e){}
+      // If we already have coords shown in coordsSmallEl, keep them; otherwise nothing to change
+      // If coords previously obtained, re-render lokasi display so name replaces coords
+      const coordsText = coordsSmallEl?.textContent?.replace('Koordinat: ','') || '';
+      if (coordsText && coordsText.includes(',')) {
+        const parts = coordsText.split(',').map(s=>s.trim());
+        const lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+        if (!Number.isNaN(lat) && !Number.isNaN(lng)) showLocationDisplay(lat, lng);
+      } else {
+        // no coords available — set lokasi to name directly
+        if (lokasiEl) lokasiEl.value = placeNameEl.value || '';
+      }
+    });
   }
 
   // send attendance (keep previous behavior)
