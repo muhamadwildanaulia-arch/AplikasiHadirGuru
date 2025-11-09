@@ -161,11 +161,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // geolocation fill once
   const lokasiEl = document.getElementById('lokasi');
-  if (navigator.geolocation && lokasiEl) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      lokasiEl.value = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-    }, () => {}, { timeout: 7000 });
-  }
+// Lokasi otomatis: tampilkan nama tempat (reverse geocoding OpenStreetMap)
+if (navigator.geolocation && lokasiEl) {
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    const lat = pos.coords.latitude.toFixed(6);
+    const lon = pos.coords.longitude.toFixed(6);
+    lokasiEl.value = "Mencari lokasi...";
+    try {
+      const resp = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+      const data = await resp.json();
+      if (data && data.display_name) {
+        lokasiEl.value = data.display_name;
+      } else {
+        lokasiEl.value = `${lat}, ${lon}`;
+      }
+    } catch (err) {
+      console.warn("Gagal reverse geocode:", err);
+      lokasiEl.value = `${lat}, ${lon}`;
+    }
+  }, () => {
+    lokasiEl.value = "Lokasi tidak ditemukan";
+  }, { enableHighAccuracy: true, timeout: 10000 });
+}
 
   // send attendance (keep previous behavior)
   const kirimBtn = document.getElementById('kirimKehadiranBtn');
