@@ -125,7 +125,8 @@
     <section id="page-guru" class="hidden">
       <h2 class="text-2xl font-bold text-blue-900 mb-4">👩‍🏫 Daftar Guru</h2>
       <div class="bg-white rounded-xl shadow p-6 overflow-x-auto">
-        <table class="min-w-full border text-sm">
+        <!-- Admin controls will be injected here when admin logs in -->
+        <table class="min-w-full border text-sm mt-3">
           <thead class="bg-red-50 text-blue-900 font-semibold">
             <tr>
               <th class="border p-2">NIP</th>
@@ -176,10 +177,10 @@
     D.A.N × GPT-5 | 2025
   </footer>
 
+  <!-- app.firebase.js (harus ada, diambil / disesuaikan sebelumnya) -->
   <script type="module" src="app.firebase.js"></script>
 
-  <!-- ===== Admin Manual Login & Client-side Guru CRUD (Demo) ===== -->
-  <!-- Paste START: Admin manual login + CRUD (localStorage) -->
+  <!-- ===== Admin Manual Login & Client-side Guru CRUD (Firebase-aware) ===== -->
   <script>
   (function(){
     // --- Konfigurasi demo (ganti credential ini untuk deploy internal) ---
@@ -232,11 +233,12 @@
       ctrl.className = 'mt-4 mb-4 flex gap-2 items-center';
       ctrl.innerHTML = `
         <button id="btn-add-guru-admin" class="bg-green-600 text-white px-3 py-1 rounded">Tambah Guru</button>
-        <button id="btn-sync-local" class="bg-gray-200 px-3 py-1 rounded text-sm">Sinkron: local</button>
+        <button id="btn-sync-local" class="bg-gray-200 px-3 py-1 rounded text-sm">Sinkron: Firebase</button>
         <span class="text-sm text-gray-500 ml-3">Anda sedang melihat mode <strong>Admin</strong>.</span>
       `;
-      guruSection.querySelector('.bg-white')?.prepend(ctrl); // try insert at top of card
-      if (!guruSection.querySelector('#admin-controls')) guruSection.prepend(ctrl);
+      // place controls at top of the card area
+      const card = guruSection.querySelector('.bg-white') || guruSection;
+      card.prepend(ctrl);
     }
 
     // --- Modal add/edit guru (small) ---
@@ -258,7 +260,7 @@
     `;
     document.body.insertAdjacentHTML('beforeend', guruModalHtml);
 
-    // --- Storage keys & helpers ---
+    // --- Storage keys & helpers (fallback local) ---
     const KEY_ADMIN = 'wh_admin_logged';
     const KEY_GURU = 'wh_guru_list_v1'; // array of { id, nip, nama, jabatan }
 
@@ -272,13 +274,12 @@
     function saveLocalGuruList(list){ localStorage.setItem(KEY_GURU, JSON.stringify(list)); }
 
     // --- Utilities for rendering guru table & select ---
-    function renderGuruTable(){
+    function renderGuruTableFromList(list){
       const tbody = document.getElementById('guruTableBody');
       if (!tbody) return;
-      const list = getLocalGuruList();
-      if (list.length === 0){
+      if (!Array.isArray(list) || list.length === 0){
         tbody.innerHTML = '<tr><td colspan="4" class="text-center p-4 text-gray-500">Belum ada guru terdaftar.</td></tr>';
-        populateNamaGuruSelect();
+        populateNamaGuruSelect(list || []);
         return;
       }
       tbody.innerHTML = '';
@@ -287,8 +288,8 @@
         tr.className = 'align-top';
         tr.innerHTML = `
           <td class="border p-2">${g.nip || ''}</td>
-          <td class="border p-2">${escapeHtml(g.nama)}</td>
-          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+          <td class="border p-2">${escapeHtml(g.nama || g.name || '')}</td>
+          <td class="border p-2">${escapeHtml(g.jabatan || '')}</td>
           <td class="border p-2">
             ${ isAdmin() ? `<button data-id="${g.id}" class="edit-guru inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
                             <button data-id="${g.id}" class="del-guru inline-block bg-red-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-gray-500">—</span>'}
@@ -305,50 +306,54 @@
       $$('.del-guru').forEach(b => b.onclick = e => {
         const id = e.currentTarget.dataset.id;
         if (!confirm('Hapus guru ini?')) return;
-        deleteGuruById(id);
+        // choose firebase if available
+        if (window.deleteGuruFirebase) {
+          deleteGuruFirebase(id).catch(err=>alert('Gagal hapus: '+(err.message||err)));
+        } else {
+          deleteGuruById(id);
+        }
       });
 
       // also populate select #namaGuru
-      populateNamaGuruSelect();
+      populateNamaGuruSelect(list);
     }
 
-    function populateNamaGuruSelect(){
+    function populateNamaGuruSelect(list){
       const sel = document.getElementById('namaGuru');
       if (!sel) return;
-      const list = getLocalGuruList();
       sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
-      list.forEach(g => {
+      (list || []).forEach(g => {
         const opt = document.createElement('option');
-        opt.value = g.nama;
-        opt.textContent = g.nama + (g.jabatan ? ' — ' + g.jabatan : '');
+        opt.value = `${g.nip||g.id}|${g.nama||g.name||''}`;
+        opt.textContent = (g.nama||g.name||'') + (g.jabatan ? ' — ' + g.jabatan : '');
         sel.appendChild(opt);
       });
     }
 
     function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
 
-    // --- CRUD operations on local storage ---
-    function addGuru(data){
+    // --- CRUD fallback (localStorage) ---
+    function addGuruLocal(data){
       const list = getLocalGuruList();
       const id = 'g'+Date.now();
       list.push(Object.assign({ id }, data));
       saveLocalGuruList(list);
-      renderGuruTable();
+      renderGuruTableFromList(list);
     }
-    function updateGuru(id, data){
+    function updateGuruLocal(id, data){
       const list = getLocalGuruList();
       const idx = list.findIndex(x=>x.id===id);
       if (idx === -1) return false;
       list[idx] = Object.assign({}, list[idx], data);
       saveLocalGuruList(list);
-      renderGuruTable();
+      renderGuruTableFromList(list);
       return true;
     }
-    function deleteGuruById(id){
+    function deleteGuruLocal(id){
       let list = getLocalGuruList();
       list = list.filter(x=>x.id!==id);
       saveLocalGuruList(list);
-      renderGuruTable();
+      renderGuruTableFromList(list);
     }
 
     // --- Modal behaviors ---
@@ -362,12 +367,13 @@
       $('#guru-save').dataset.editId = '';
     }
     function openGuruModalForEdit(id){
-      const list = getLocalGuruList();
-      const g = list.find(x=>x.id===id);
+      // if firebase exists, try to read from localStorage list saved by firebase listener, else use localStorage fallback
+      const list = (window.__latest_guru_list || getLocalGuruList());
+      const g = (list || []).find(x=>x.id===id);
       if (!g) return alert('Data guru tidak ditemukan');
       $('#guru-modal-title').textContent = 'Edit Guru';
       $('#guru-nip').value = g.nip || '';
-      $('#guru-nama-input').value = g.nama || '';
+      $('#guru-nama-input').value = g.nama || g.name || '';
       $('#guru-jabatan-input').value = g.jabatan || '';
       $('#guru-modal').classList.remove('hidden');
       $('#guru-save').dataset.editId = id;
@@ -375,42 +381,47 @@
 
     function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
 
-    // --- Login flow ---
+    // --- Show/hide admin UI ---
     function showAdminUI(){
       injectAdminControls();
-      // show logout button
       $('#btn-admin-logout').classList.remove('hidden');
       $('#btn-open-admin').classList.add('hidden');
-      // show edit buttons in table
-      renderGuruTable();
+      // render current list (prefer firebase-updated list if available)
+      const list = window.__latest_guru_list || getLocalGuruList();
+      renderGuruTableFromList(list);
     }
     function hideAdminUI(){
-      // hide controls
       const ctrl = document.getElementById('admin-controls'); if (ctrl) ctrl.remove();
       $('#btn-admin-logout').classList.add('hidden');
       $('#btn-open-admin').classList.remove('hidden');
-      renderGuruTable();
+      const list = window.__latest_guru_list || getLocalGuruList();
+      renderGuruTableFromList(list);
     }
 
-    // --- Sync helper (placeholder for future Firebase) ---
-    function syncToStorage(){
-      // If you have Firebase or server, implement sync here.
-      // For now just ensure local storage has at least demo data.
-      const current = getLocalGuruList();
-      if (current.length === 0){
-        // seed demo data
-        const demo = [
-          { id:'g1', nip:'19850101', nama:'Siti Nurjanah', jabatan:'Matematika' },
-          { id:'g2', nip:'19870102', nama:'Budi Santoso', jabatan:'Bahasa Indonesia' },
-          { id:'g3', nip:'19890103', nama:'Rina Maharani', jabatan:'IPA' }
-        ];
-        saveLocalGuruList(demo);
+    // --- Helper: attempt to trigger firebase sync if available ---
+    function trySyncFromFirebase(){
+      if (window.syncFromFirebase) {
+        try {
+          window.syncFromFirebase();
+        } catch(e){ console.warn('syncFromFirebase error', e); }
+      } else {
+        // no firebase: ensure local exists
+        const list = getLocalGuruList();
+        if (!list || list.length === 0) {
+          // seed demo local data (only if totally empty)
+          const demo = [
+            { id:'g1', nip:'19850101', nama:'Siti Nurjanah', jabatan:'Matematika' },
+            { id:'g2', nip:'19870102', nama:'Budi Santoso', jabatan:'Bahasa Indonesia' },
+            { id:'g3', nip:'19890103', nama:'Rina Maharani', jabatan:'IPA' }
+          ];
+          saveLocalGuruList(demo);
+        }
+        renderGuruTableFromList(getLocalGuruList());
       }
-      renderGuruTable();
     }
 
     // --- Attach event listeners (modal buttons etc) ---
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', async (e) => {
       if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
       if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
       if (e.target && e.target.id === 'admin-submit') {
@@ -440,26 +451,62 @@
         const nama = $('#guru-nama-input').value.trim();
         const jab = $('#guru-jabatan-input').value.trim();
         if (!nama) return alert('Masukkan nama guru');
-        if (editId) updateGuru(editId, { nip, nama, jabatan: jab });
-        else addGuru({ nip, nama, jabatan: jab });
-        closeGuruModal();
+
+        // If firebase CRUD functions available, use them. Otherwise fallback to local.
+        try {
+          if (editId) {
+            if (window.updateGuruFirebase) {
+              await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
+            } else {
+              updateGuruLocal(editId, { nip, nama, jabatan: jab });
+            }
+          } else {
+            if (window.addGuruFirebase) {
+              await window.addGuruFirebase({ nip, nama, jabatan: jab });
+            } else {
+              addGuruLocal({ nip, nama, jabatan: jab });
+            }
+          }
+          closeGuruModal();
+          // UI will update via firebase listener; if local fallback, we already updated table.
+        } catch(err){
+          alert('Gagal menyimpan guru: ' + (err && err.message ? err.message : err));
+        }
       }
       if (e.target && e.target.id === 'btn-sync-local') {
-        syncToStorage(); alert('Sinkronisasi lokal selesai.');
+        // trigger firebase sync if available, else re-render local
+        trySyncFromFirebase();
+        alert('Sinkronisasi dipicu.');
       }
+    });
+
+    // --- Listen to firebase-driven event (app.firebase.js dispatches 'gurus-updated') ---
+    window.addEventListener('gurus-updated', (ev) => {
+      const list = ev.detail || [];
+      // keep a cached reference for modal edit
+      window.__latest_guru_list = list;
+      // also store to localStorage for fallback & total count
+      try { saveLocalGuruList(list); } catch(e){}
+      renderGuruTableFromList(list);
+      // update totalGuru counter if present
+      const totalGuruEl = document.getElementById('totalGuru');
+      if (totalGuruEl) totalGuruEl.textContent = String(list.length);
     });
 
     // --- Initial boot ---
     (function boot(){
-      // render table (if page present)
-      syncToStorage();
-      if (isAdmin()) showAdminUI();
-      else hideAdminUI();
+      trySyncFromFirebase();
+      if (isAdmin()) showAdminUI(); else hideAdminUI();
+      // if firebase already loaded and dispatched before this script, also check localStorage fallback
+      const local = getLocalGuruList();
+      if ((!window.__latest_guru_list || window.__latest_guru_list.length === 0) && local && local.length) {
+        window.__latest_guru_list = local;
+        renderGuruTableFromList(local);
+      }
     })();
 
   })();
   </script>
-  <!-- Paste END -->
 
 </body>
 </html>
