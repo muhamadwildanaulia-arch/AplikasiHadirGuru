@@ -109,7 +109,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- KIRIM KEHADIRAN ---
-  document.getElementById("kirimKehadiranBtn").addEventListener("click", async () => {
+  document.getElementById("kirimKehadiranBtn").addEventListener("click", async function handleSubmitKehadiran(e) {
+    e.preventDefault();
     const guruVal = selectGuru.value;
     const status = document.getElementById("statusKehadiran").value;
     if (!guruVal || !status) return alert("Pilih guru dan status terlebih dahulu.");
@@ -125,17 +126,20 @@ document.addEventListener("DOMContentLoaded", () => {
       timestamp: firebase.database.ServerValue.TIMESTAMP,
     };
 
-    const btn = document.getElementById("kirimKehadiranBtn");
+    const btn = this;
     const oldText = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = "Mengirim...";
 
     try {
-      await db.ref("kehadiran").push(payload);
+      const newRef = db.ref("kehadiran").push(); // buat node baru
+      console.log("Membuat ref baru:", newRef.key);
+      await newRef.set(payload);
+      console.log("Kirim berhasil:", newRef.key);
       alert("✅ Kehadiran berhasil dikirim!");
     } catch (e) {
-      console.error("Gagal kirim:", e);
-      alert("❌ Gagal kirim. Periksa koneksi atau rules Firebase.");
+      console.error("Gagal kirim kehadiran:", e);
+      alert("❌ Gagal kirim. Periksa koneksi atau rules Firebase.\n\n" + (e.message || e));
     } finally {
       btn.disabled = false;
       btn.innerHTML = oldText;
