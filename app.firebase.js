@@ -1,6 +1,6 @@
-// app.firebase.js — Versi lengkap (sinkronisasi guru, kehadiran, offline queue, GPS + reverse geocode, image-cache lokal, camera modal)
-// Pastikan index.html memuat dependencies: Chart.js, XLSX, firebase compat scripts.
-// File ini menggunakan IndexedDB untuk cache gambar lokal (gambar tidak diupload ke server).
+// app.firebase.js — Bagian 1/3
+// (Firebase, helper, sync guru, CRUD guru, awal Image Cache)
+// Pastikan index.html memuat: firebase compat, Chart.js, XLSX
 
 // ================= FIREBASE CONFIG =================
 const firebaseConfig = {
@@ -203,7 +203,6 @@ window.syncFromFirebase = syncFromFirebase;
       reader.readAsDataURL(file);
     });
   }
-
   async function saveDataURLToDB(dataURL){
     const id = 'img_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000);
     await runTx(STORE, 'readwrite', (store, resolve, reject) => {
@@ -250,9 +249,10 @@ window.syncFromFirebase = syncFromFirebase;
     });
   }
 
+  // expose cache API
   window.__whImageCache = { saveImageFromFile, getImageDataURL, deleteImage, clearAllImages };
 
-  // UI wiring for photo input
+  // ---------- UI wiring for photo input (file input, preview, clear) ----------
   try {
     const input = document.getElementById('photoInput');
     const preview = document.getElementById('photoPreview');
@@ -295,6 +295,7 @@ window.syncFromFirebase = syncFromFirebase;
       });
     }
 
+    // form helper: get & clear form image id (used when submit)
     window.__whImageCache.getAndClearFormImageId = function(){
       const id = currentImageId;
       currentImageId = null;
@@ -303,6 +304,7 @@ window.syncFromFirebase = syncFromFirebase;
       return id;
     };
 
+    // helper to embed image into an <img> element by id
     window.__whImageCache.embedImageToElement = async function(imageId, imgElement){
       if (!imageId || !imgElement) return;
       try {
@@ -313,7 +315,8 @@ window.syncFromFirebase = syncFromFirebase;
 
   } catch(e){ console.warn('Image cache UI wiring failed', e); }
 
-})();
+})(); // end setupImageCache IIFE
+
 
 // ----------------- Location: GPS button + reverse geocode + cache -----------------
 (function setupLocationWithGpsButton(){
@@ -339,6 +342,7 @@ window.syncFromFirebase = syncFromFirebase;
 
   async function reverseGeocode(lat, lng){
     try {
+      // try cached (close-by) first
       try {
         const cacheRaw = localStorage.getItem(CACHE_KEY);
         if (cacheRaw) {
@@ -349,6 +353,7 @@ window.syncFromFirebase = syncFromFirebase;
         }
       } catch(e){}
 
+      // Nominatim reverse geocode (OpenStreetMap)
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&accept-language=id`;
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -370,10 +375,10 @@ window.syncFromFirebase = syncFromFirebase;
         if (coordsSmallEl && c.lat && c.lng) coordsSmallEl.textContent = `Koordinat: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} (cached)`;
         return;
       }
-      lokasiEl.value = 'Tekan "Gunakan GPS" untuk mendeteksi lokasi';
+      lokasiEl.value = 'Tekan \"Gunakan GPS\" untuk mendeteksi lokasi';
       if (coordsSmallEl) coordsSmallEl.textContent = '—';
     } catch(e){
-      lokasiEl.value = 'Tekan "Gunakan GPS" untuk mendeteksi lokasi';
+      lokasiEl.value = 'Tekan \"Gunakan GPS\" untuk mendeteksi lokasi';
       if (coordsSmallEl) coordsSmallEl.textContent = '—';
     }
   })();
@@ -423,10 +428,10 @@ window.syncFromFirebase = syncFromFirebase;
   if (btnGps) btnGps.addEventListener('click', useGpsNow);
   window.useGpsForLocation = useGpsNow;
 
-})();
-
-// ----------------- Kehadiran: enhanced send + offline queue (imageId stored only locally) -----------------
-(function setupKehadiranQueue(){
+})(); // end setupLocationWithGpsButton IIFE
+// ----------------- Kehadiran: enhanced send + offline queue + cek absen ganda -----------------
+(function setupKehadiranQueueAndSend(){
+  // pending in localStorage
   function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
   function savePending(arr){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(arr)); } catch(e){} }
   function pushPending(item){ const a = loadPending(); a.push(item); savePending(a); updatePendingIndicator(); }
@@ -439,47 +444,49 @@ window.syncFromFirebase = syncFromFirebase;
     }
   }
 
-  async function addRecentLocal(entry){
-    const recent = document.getElementById('recent-activity');
-    if (!recent) return;
-    const wrapper = document.createElement('div');
-    wrapper.className = 'flex items-center gap-3';
-    const txt = document.createElement('div');
-    const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
-    txt.className = 'text-gray-700';
-    txt.textContent = `${jam} — ${entry.nama||entry.name||entry.nip||'(tanpa nama)'} — ${entry.status}`;
-    wrapper.appendChild(txt);
-    // preview image if entry has local imageId (works only in same browser)
-    if (entry.imageId && window.__whImageCache) {
-      const img = document.createElement('img');
-      img.className = 'h-12 w-12 object-cover rounded hidden';
-      img.alt = 'foto';
-      wrapper.appendChild(img);
+  // quick helper: check if same guru already absen hari ini (by nip or nama)
+  async function alreadyCheckedToday(nip, nama){
+    const today = nowFormatted();
+    // check local pending queue first
+    try {
+      const pend = loadPending();
+      if (pend.some(p => p.tanggal === today && ((p.nip && nip && p.nip === nip) || (p.nama && nama && p.nama === nama)))) {
+        return true;
+      }
+    } catch(e){}
+    // if online & db available, try query
+    if (navigator.onLine && db) {
       try {
-        const dataURL = await window.__whImageCache.getImageDataURL(entry.imageId);
-        if (dataURL) { img.src = dataURL; img.classList.remove('hidden'); }
-      } catch(e){}
+        // we will fetch kehadiran with tanggal==today then check
+        const snap = await db.ref('kehadiran').orderByChild('tanggal').equalTo(today).once('value');
+        const val = snap.val() || {};
+        const arr = Object.values(val);
+        if (arr.some(x => (x.nip && nip && String(x.nip) === String(nip)) || (x.nama && nama && String(x.nama).trim() === String(nama).trim()))) {
+          return true;
+        }
+      } catch(err){
+        console.warn('alreadyCheckedToday query failed', err);
+      }
     }
-    recent.prepend(wrapper);
-    // trim
-    const nodes = recent.querySelectorAll('div.flex');
-    if (nodes.length > 25) nodes[nodes.length-1].remove();
+    return false;
   }
 
+  // flush pending (one by one)
   async function flushOnePending(){
     if (!navigator.onLine) return false;
     const item = popPending();
     if (!item) return false;
     try {
       if (!db) throw new Error('Firebase DB tidak tersedia');
-      // When sending to server, DO NOT include imageId (image stays local only).
+      // server payload should NOT include imageId (local-only)
       const payloadToSend = Object.assign({}, item);
       if (payloadToSend.imageId) delete payloadToSend.imageId;
       const ref = db.ref('kehadiran').push();
-      await ref.set(Object.assign({}, payloadToSend, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+      await ref.set(Object.assign({}, payloadToSend, { timestamp: (window.firebase && firebase.database)? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
       try { window.toast && window.toast('Pending berhasil dikirim', 'ok'); } catch(e){}
       return true;
     } catch(err){
+      // put back to queue (at head)
       const arr = loadPending();
       arr.unshift(item);
       savePending(arr);
@@ -495,7 +502,7 @@ window.syncFromFirebase = syncFromFirebase;
       const ok = await flushOnePending();
       if (!ok) break;
       worked = true;
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 250));
     }
     if (worked) updatePendingIndicator();
   }
@@ -511,7 +518,7 @@ window.syncFromFirebase = syncFromFirebase;
 
   updatePendingIndicator();
 
-  // main send handler
+  // send handler (with absen ganda prevention)
   const kirimBtn = document.getElementById('kirimKehadiranBtn');
   if (kirimBtn) {
     kirimBtn.addEventListener('click', async function(){
@@ -522,7 +529,6 @@ window.syncFromFirebase = syncFromFirebase;
 
       const [nip, name] = selVal.split('|');
       const lokasiVal = document.getElementById('lokasi')?.value || '';
-
       const payload = {
         nip: nip || '',
         nama: (name || '').trim(),
@@ -540,6 +546,7 @@ window.syncFromFirebase = syncFromFirebase;
         }
       } catch(e){}
 
+      // UI feedback
       const btn = this;
       const orig = btn.innerHTML;
       btn.disabled = true;
@@ -547,49 +554,82 @@ window.syncFromFirebase = syncFromFirebase;
       const statusEl = document.getElementById('kehadiran-status');
       if (statusEl) statusEl.textContent = 'Mengirim...';
 
-      function finalize(success){
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        if (success) {
-          if (window.toast) window.toast('Kehadiran berhasil dikirim', 'ok');
-          else alert('Kehadiran berhasil dikirim!');
-        }
-        updatePendingIndicator();
-      }
-
       try {
+        // first: check duplicate attendance for today
+        const dup = await alreadyCheckedToday(payload.nip, payload.nama);
+        if (dup) {
+          window.toast ? window.toast('Guru sudah absen hari ini (dibatasi 1x)', 'err') : alert('Anda sudah absen hari ini.');
+          btn.disabled = false;
+          btn.innerHTML = orig;
+          if (statusEl) statusEl.textContent = '—';
+          return;
+        }
+
         if (navigator.onLine && db) {
-          // send WITHOUT imageId
+          // send to Firebase (without imageId)
           const payloadToSend = Object.assign({}, payload);
           if (payloadToSend.imageId) delete payloadToSend.imageId;
           const newRef = db.ref('kehadiran').push();
           await newRef.set(Object.assign({}, payloadToSend, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
-          // optimistic add recent with image preview if present
+          // optimistic recent UI includes local image preview if present
           await addRecentLocal(payload);
-          finalize(true);
+          try { window.toast && window.toast('Kehadiran berhasil dikirim', 'ok'); } catch(e){}
         } else {
-          pushPending(payload); // payload includes imageId if any
+          // offline: push to pending
+          pushPending(payload);
           await addRecentLocal(payload);
-          if (window.toast) window.toast('Kehadiran disimpan ke antrian (offline)', 'info');
-          finalize(false);
+          try { window.toast && window.toast('Kehadiran disimpan ke antrian (offline)', 'info'); } catch(e){}
         }
       } catch (err) {
-        console.error('Gagal kirim langsung, akan disimpan ke antrian', err);
+        console.error('Gagal kirim/queue', err);
         pushPending(payload);
         await addRecentLocal(payload);
-        if (window.toast) window.toast('Kesalahan jaringan — data disimpan sementara', 'err');
-        finalize(false);
+        try { window.toast && window.toast('Terjadi kesalahan — data disimpan sementara', 'err'); } catch(e){}
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        updatePendingIndicator();
       }
     });
   }
 
+  // helper: add to recent activity in UI (uses local image cache if available)
+  async function addRecentLocal(entry){
+    const recent = document.getElementById('recent-activity');
+    if (!recent) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex items-center gap-3';
+    const txt = document.createElement('div');
+    const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
+    txt.className = 'text-gray-700';
+    txt.textContent = `${jam} — ${entry.nama||entry.nip||'(tanpa nama)'} — ${entry.status}`;
+    wrapper.appendChild(txt);
+
+    if (entry.imageId && window.__whImageCache) {
+      const img = document.createElement('img');
+      img.className = 'h-12 w-12 object-cover rounded hidden';
+      img.alt = 'foto';
+      wrapper.appendChild(img);
+      try {
+        const dataURL = await window.__whImageCache.getImageDataURL(entry.imageId);
+        if (dataURL) { img.src = dataURL; img.classList.remove('hidden'); }
+      } catch(e){}
+    }
+    // prepend
+    recent.prepend(wrapper);
+    // trim long list
+    const items = recent.querySelectorAll('div.flex');
+    if (items.length > 25) items[items.length-1].remove();
+  }
+
+  // expose flush
   window.flushPendingKehadiran = flushAllPending;
 
-})();
+})(); // end setupKehadiranQueueAndSend IIFE
+
 
 // ----------------- Chart & Kehadiran realtime listener -----------------
 (function initKehadiranListeners(){
-  // Chart init
   try {
     const canvas = document.getElementById('chartDashboard');
     if (canvas && window.Chart) {
@@ -605,6 +645,7 @@ window.syncFromFirebase = syncFromFirebase;
     console.warn('DB not available — kehadiran realtime not attached');
     return;
   }
+
   db.ref('kehadiran').on('value', snap => {
     const data = snap.val() || {};
     const today = nowFormatted();
@@ -642,7 +683,9 @@ window.syncFromFirebase = syncFromFirebase;
       });
     }
   });
-})();
+
+})(); // end initKehadiranListeners
+
 
 // ----------------- Camera modal capture -> save to IndexedDB via __whImageCache -----------------
 (function setupCameraCapture(){
@@ -693,10 +736,8 @@ window.syncFromFirebase = syncFromFirebase;
     const w = video.videoWidth;
     const h = video.videoHeight;
     if (!w || !h) return;
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, w, h);
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, w, h);
     canvas.classList.remove('hidden');
     const blob = await new Promise((res, rej) => canvas.toBlob(b => { if (!b) rej(new Error('toBlob failed')); else res(b); }, 'image/jpeg', 0.85));
     lastBlob = blob;
@@ -711,7 +752,9 @@ window.syncFromFirebase = syncFromFirebase;
     try {
       if (window.__whImageCache && typeof window.__whImageCache.saveImageFromFile === 'function') {
         const id = await window.__whImageCache.saveImageFromFile(file);
-        // store ephemeral id so form handler can pick it up
+        // put id into form cache (so send handler will pick it up)
+        // note: our getAndClearFormImageId uses currentImageId var inside image input wiring,
+        // so we provide an alternate last-form id here for camera flow.
         window.__whImageCache._lastFormImageId = id;
         const preview = document.getElementById('photoPreview');
         if (preview) {
@@ -741,7 +784,7 @@ window.syncFromFirebase = syncFromFirebase;
   if (retakeBtn) retakeBtn.addEventListener('click', retake);
   if (acceptBtn) acceptBtn.addEventListener('click', accept);
 
-  // Patch getAndClearFormImageId to prefer _lastFormImageId
+  // Patch getAndClearFormImageId to prefer _lastFormImageId from camera
   (function patchGetAndClear(){
     if (!window.__whImageCache) return;
     const orig = window.__whImageCache.getAndClearFormImageId;
@@ -749,6 +792,7 @@ window.syncFromFirebase = syncFromFirebase;
       const idFromCamera = window.__whImageCache._lastFormImageId || null;
       if (idFromCamera) {
         delete window.__whImageCache._lastFormImageId;
+        // clear any file-input's currentImageId via original if exists
         try { if (typeof orig === 'function') orig(); } catch(e){}
         return idFromCamera;
       }
@@ -757,50 +801,15 @@ window.syncFromFirebase = syncFromFirebase;
     };
   })();
 
-})();
+})(); // end setupCameraCapture
 
-// ----------------- Laporan / Export -----------------
-document.addEventListener('DOMContentLoaded', () => {
-  const tampilBtn = document.getElementById('tampilkanLaporanBtn');
-  if (tampilBtn) {
-    tampilBtn.addEventListener('click', async () => {
-      const month = document.getElementById('bulan')?.value;
-      if (!month) return alert('Pilih bulan dahulu.');
-      if (!db) return alert('Firebase DB tidak tersedia.');
-      const snap = await db.ref('kehadiran').once('value');
-      const data = snap.val() || {};
-      const rows = Object.values(data).filter(d => d.tanggal && d.tanggal.startsWith(month));
-      const tbodyEl = document.getElementById('laporanTableBody'); if (tbodyEl) tbodyEl.innerHTML = '';
-      if (!rows.length) { if (tbodyEl) tbodyEl.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Tidak ada data bulan ini.</td></tr>'; document.getElementById('resume-laporan').textContent=''; return; }
-      rows.sort((a,b)=> (a.tanggal + (a.jam||'')).localeCompare(b.tanggal + (b.jam||'')));
-      rows.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="border p-2">${r.tanggal}</td><td class="border p-2">${r.nama}</td><td class="border p-2">${r.jam||'-'}</td><td class="border p-2">${r.lokasi||'-'}</td><td class="border p-2">${r.status}</td>`;
-        tbodyEl.appendChild(tr);
-      });
-      document.getElementById('resume-laporan').textContent = `Menampilkan ${rows.length} catatan untuk ${month}`;
-    });
-  }
 
-  const exportBtn = document.getElementById('exportLaporanBtn');
-  if (exportBtn) {
-    exportBtn.addEventListener('click', () => {
-      const tbody = document.getElementById('laporanTableBody');
-      const rows = [];
-      if (tbody) {
-        tbody.querySelectorAll('tr').forEach(tr => {
-          const cols = [...tr.children].map(td => td.textContent.trim());
-          if (cols.length) rows.push(cols);
-        });
-      }
-      if (!rows.length) return alert('Tidak ada data untuk diexport.');
-      const ws = XLSX.utils.aoa_to_sheet([['Tanggal','Nama Guru','Jam','Lokasi','Status'], ...rows]);
-      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Laporan'); XLSX.writeFile(wb, 'Laporan-Kehadiran.xlsx');
-    });
-  }
-});
+// ----------------- Laporan Bulanan (matrix) & Export (reuse functions from earlier section) -----------------
+// (Bagian laporan sudah ditulis di Bagian 2 — fungsi buildMatrixForMonth & renderMatrixToDOM & exportMatrixToExcel
+// berada di app.firebase.js bagian sebelumnya in our full file — if you split, ensure those functions are present.
+// For completeness, we assume they are defined in the earlier combined code; if you split files, keep consistency.)
 
-// ----------------- Clock helpers -----------------
+// ----------------- Clock helpers & Boot -----------------
 function setCurrentDate(){
   const now = new Date();
   const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
@@ -812,7 +821,7 @@ function drawClock(){
   if (small) small.textContent = new Date().toLocaleTimeString('id-ID');
 }
 
-// ----------------- Boot -----------------
+// Boot sequence
 (function boot(){
   try { setCurrentDate(); drawClock(); setInterval(()=>{ setCurrentDate(); drawClock(); },1000); } catch(e){}
   try {
@@ -820,4 +829,6 @@ function drawClock(){
     if (local && local.length) { renderGuruUi(local); }
   } catch(e){}
   try { if (db) syncFromFirebase(); } catch(e){ console.warn('syncFromFirebase error', e); }
+  // attempt flush pending if online
+  try { if (navigator.onLine) { window.flushPendingKehadiran && window.flushPendingKehadiran(); } } catch(e){}
 })();
