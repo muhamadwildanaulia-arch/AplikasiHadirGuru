@@ -149,11 +149,17 @@
                   </div>
 
                   <div>
-                   <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
-                    <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
-                    <div id="coords-small" class="text-xs text-slate-400 mt-1">Mendeteksi lokasi...</div>
+                    <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
+                    <div class="flex gap-2">
+                      <input id="lokasi" readonly class="flex-1 border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
+                      <button id="btn-use-gps" class="px-3 py-2 rounded bg-rose-600 text-white text-sm flex items-center gap-2" title="Gunakan GPS untuk deteksi lokasi">
+                        <span id="btn-gps-icon">📍</span>
+                        <span id="btn-gps-label">Gunakan GPS</span>
+                      </button>
                   </div>
-                  
+                  <div id="coords-small" class="text-xs text-slate-400 mt-1">Mendeteksi lokasi...</div>
+                </div>
+
                   <div class="flex gap-3 items-center">
                     <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
                     <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
