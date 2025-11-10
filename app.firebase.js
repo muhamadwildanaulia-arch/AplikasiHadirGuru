@@ -203,7 +203,7 @@ window.syncFromFirebase = syncFromFirebase;
       reader.readAsDataURL(file);
     });
   }
-  async function saveDataURLToDB(dataURL){
+async function saveDataURLToDB(dataURL){
     const id = 'img_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000);
     await runTx(STORE, 'readwrite', (store, resolve, reject) => {
       const rec = { id, dataURL, ts: Date.now() };
