@@ -1,7 +1,6 @@
-// app.firebase.js — Versi lengkap (sinkronisasi guru, kehadiran, offline queue, GPS + reverse geocode)
-// Catatan: Pastikan index.html sudah berisi elemen-elemen dengan ID yang dipakai:
-// namaGuru, statusKehadiran, lokasi, coords-small, btn-use-gps, kirimKehadiranBtn, guruTableBody,
-// totalGuru, totalHadir, totalLain, chartDashboard, recent-activity, bulan, tampilkanLaporanBtn, exportLaporanBtn
+// app.firebase.js — Versi lengkap (sinkronisasi guru, kehadiran, offline queue, GPS + reverse geocode, image-cache lokal, camera modal)
+// Pastikan index.html memuat dependencies: Chart.js, XLSX, firebase compat scripts.
+// File ini menggunakan IndexedDB untuk cache gambar lokal (gambar tidak diupload ke server).
 
 // ================= FIREBASE CONFIG =================
 const firebaseConfig = {
@@ -87,6 +86,7 @@ function renderGuruUi(list){
     }
   }
 }
+window.renderGuruTable = renderGuruUi; // alias
 
 // ----------------- Firebase: realtime sync for /gurus -----------------
 function syncFromFirebase(){
@@ -143,6 +143,178 @@ window.updateGuruFirebase = updateGuruFirebase;
 window.deleteGuruFirebase = deleteGuruFirebase;
 window.syncFromFirebase = syncFromFirebase;
 
+// ----------------- Image cache (IndexedDB) — local-only photos -----------------
+(function setupImageCache(){
+  const DB_NAME = 'wh_images_db_v1';
+  const STORE = 'images';
+  const DB_VER = 1;
+  let dbPromise = null;
+
+  function openDB(){
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = e => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
+      };
+      req.onsuccess = e => res(e.target.result);
+      req.onerror = e => rej(e.target.error || new Error('IndexedDB open failed'));
+    });
+    return dbPromise;
+  }
+
+  function runTx(storeName, mode, fn){
+    return openDB().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(storeName, mode);
+      const store = tx.objectStore(storeName);
+      fn(store, res, rej);
+      tx.oncomplete = () => {};
+      tx.onerror = (ev) => rej(ev.target.error || new Error('Transaction error'));
+    }));
+  }
+
+  function fileToDataURLCompressed(file, maxWidth = 1200, quality = 0.75){
+    return new Promise((res, rej) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = e => {
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const scale = Math.min(1, maxWidth / img.width);
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(blob => {
+              if (!blob) return rej(new Error('toBlob failed'));
+              const reader2 = new FileReader();
+              reader2.onload = ev2 => res(ev2.target.result);
+              reader2.onerror = e2 => rej(e2);
+              reader2.readAsDataURL(blob);
+            }, 'image/jpeg', quality);
+          } catch(err){ rej(err); }
+        };
+        img.onerror = err => rej(err);
+        img.src = e.target.result;
+      };
+      reader.onerror = err => rej(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function saveDataURLToDB(dataURL){
+    const id = 'img_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000);
+    await runTx(STORE, 'readwrite', (store, resolve, reject) => {
+      const rec = { id, dataURL, ts: Date.now() };
+      const req = store.add(rec);
+      req.onsuccess = () => resolve(id);
+      req.onerror = (e) => reject(e.target.error || new Error('add image failed'));
+    });
+    return id;
+  }
+
+  async function saveImageFromFile(file){
+    const dataURL = await fileToDataURLCompressed(file, 1200, 0.75);
+    const id = await saveDataURLToDB(dataURL);
+    return id;
+  }
+
+  async function getImageDataURL(id){
+    if (!id) return null;
+    return await runTx(STORE, 'readonly', (store, resolve, reject) => {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const val = req.result;
+        resolve(val ? val.dataURL : null);
+      };
+      req.onerror = (e) => reject(e.target.error || new Error('get image failed'));
+    });
+  }
+
+  async function deleteImage(id){
+    if (!id) return;
+    return await runTx(STORE, 'readwrite', (store, resolve, reject) => {
+      const req = store.delete(id);
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error || new Error('delete failed'));
+    });
+  }
+
+  async function clearAllImages(){
+    return await runTx(STORE, 'readwrite', (store, resolve, reject) => {
+      const req = store.clear();
+      req.onsuccess = () => resolve(true);
+      req.onerror = (e) => reject(e.target.error || new Error('clear failed'));
+    });
+  }
+
+  window.__whImageCache = { saveImageFromFile, getImageDataURL, deleteImage, clearAllImages };
+
+  // UI wiring for photo input
+  try {
+    const input = document.getElementById('photoInput');
+    const preview = document.getElementById('photoPreview');
+    const btnClear = document.getElementById('btn-clear-photo');
+    let currentImageId = null;
+
+    async function showPreviewFromDataURL(dataURL){
+      if (!preview) return;
+      if (dataURL) { preview.src = dataURL; preview.classList.remove('hidden'); }
+      else { preview.src = ''; preview.classList.add('hidden'); }
+    }
+
+    if (input) {
+      input.addEventListener('change', async (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        try {
+          const id = await window.__whImageCache.saveImageFromFile(f);
+          currentImageId = id;
+          const dataURL = await window.__whImageCache.getImageDataURL(id);
+          await showPreviewFromDataURL(dataURL);
+          try { window.toast && window.toast('Foto disimpan di cache lokal', 'info'); } catch(e){}
+        } catch(err){
+          console.error('Simpan foto gagal', err);
+          try { window.toast && window.toast('Gagal simpan foto', 'err'); } catch(e){}
+        }
+      });
+    }
+
+    if (btnClear) {
+      btnClear.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        if (currentImageId) {
+          try { await window.__whImageCache.deleteImage(currentImageId); } catch(e){}
+          currentImageId = null;
+        }
+        if (input) input.value = '';
+        if (preview) { preview.src=''; preview.classList.add('hidden'); }
+        try { if (window.toast) window.toast('Foto dihapus dari cache form', 'info'); } catch(e){}
+      });
+    }
+
+    window.__whImageCache.getAndClearFormImageId = function(){
+      const id = currentImageId;
+      currentImageId = null;
+      if (input) input.value = '';
+      if (preview) { preview.src=''; preview.classList.add('hidden'); }
+      return id;
+    };
+
+    window.__whImageCache.embedImageToElement = async function(imageId, imgElement){
+      if (!imageId || !imgElement) return;
+      try {
+        const d = await window.__whImageCache.getImageDataURL(imageId);
+        if (d) { imgElement.src = d; imgElement.classList.remove('hidden'); }
+      } catch(e){}
+    };
+
+  } catch(e){ console.warn('Image cache UI wiring failed', e); }
+
+})();
+
 // ----------------- Location: GPS button + reverse geocode + cache -----------------
 (function setupLocationWithGpsButton(){
   const lokasiEl = document.getElementById('lokasi');
@@ -167,7 +339,6 @@ window.syncFromFirebase = syncFromFirebase;
 
   async function reverseGeocode(lat, lng){
     try {
-      // cache read
       try {
         const cacheRaw = localStorage.getItem(CACHE_KEY);
         if (cacheRaw) {
@@ -176,7 +347,7 @@ window.syncFromFirebase = syncFromFirebase;
             return parsed.name;
           }
         }
-      } catch(e){ /* ignore */ }
+      } catch(e){}
 
       const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&accept-language=id`;
       const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
@@ -254,7 +425,7 @@ window.syncFromFirebase = syncFromFirebase;
 
 })();
 
-// ----------------- Kehadiran: enhanced send + offline queue -----------------
+// ----------------- Kehadiran: enhanced send + offline queue (imageId stored only locally) -----------------
 (function setupKehadiranQueue(){
   function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
   function savePending(arr){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(arr)); } catch(e){} }
@@ -268,16 +439,31 @@ window.syncFromFirebase = syncFromFirebase;
     }
   }
 
-  function addRecentLocal(entry){
+  async function addRecentLocal(entry){
     const recent = document.getElementById('recent-activity');
     if (!recent) return;
-    const p = document.createElement('p');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex items-center gap-3';
+    const txt = document.createElement('div');
     const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
-    p.className = 'text-gray-700';
-    p.textContent = `${jam} — ${entry.nama||entry.name||entry.nip||'(tanpa nama)'} — ${entry.status}`;
-    recent.prepend(p);
-    const nodes = recent.querySelectorAll('p');
-    if (nodes.length > 20) nodes[nodes.length-1].remove();
+    txt.className = 'text-gray-700';
+    txt.textContent = `${jam} — ${entry.nama||entry.name||entry.nip||'(tanpa nama)'} — ${entry.status}`;
+    wrapper.appendChild(txt);
+    // preview image if entry has local imageId (works only in same browser)
+    if (entry.imageId && window.__whImageCache) {
+      const img = document.createElement('img');
+      img.className = 'h-12 w-12 object-cover rounded hidden';
+      img.alt = 'foto';
+      wrapper.appendChild(img);
+      try {
+        const dataURL = await window.__whImageCache.getImageDataURL(entry.imageId);
+        if (dataURL) { img.src = dataURL; img.classList.remove('hidden'); }
+      } catch(e){}
+    }
+    recent.prepend(wrapper);
+    // trim
+    const nodes = recent.querySelectorAll('div.flex');
+    if (nodes.length > 25) nodes[nodes.length-1].remove();
   }
 
   async function flushOnePending(){
@@ -286,8 +472,11 @@ window.syncFromFirebase = syncFromFirebase;
     if (!item) return false;
     try {
       if (!db) throw new Error('Firebase DB tidak tersedia');
+      // When sending to server, DO NOT include imageId (image stays local only).
+      const payloadToSend = Object.assign({}, item);
+      if (payloadToSend.imageId) delete payloadToSend.imageId;
       const ref = db.ref('kehadiran').push();
-      await ref.set(Object.assign({}, item, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+      await ref.set(Object.assign({}, payloadToSend, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
       try { window.toast && window.toast('Pending berhasil dikirim', 'ok'); } catch(e){}
       return true;
     } catch(err){
@@ -333,7 +522,6 @@ window.syncFromFirebase = syncFromFirebase;
 
       const [nip, name] = selVal.split('|');
       const lokasiVal = document.getElementById('lokasi')?.value || '';
-      try { /* no manual placeName now */ } catch(e){}
 
       const payload = {
         nip: nip || '',
@@ -343,6 +531,14 @@ window.syncFromFirebase = syncFromFirebase;
         tanggal: nowFormatted(),
         lokasi: lokasiVal
       };
+
+      // attach imageId to pending item ONLY (not to server payload)
+      try {
+        if (window.__whImageCache && typeof window.__whImageCache.getAndClearFormImageId === 'function') {
+          const imageId = window.__whImageCache.getAndClearFormImageId();
+          if (imageId) payload.imageId = imageId; // will remain local only in pending queue
+        }
+      } catch(e){}
 
       const btn = this;
       const orig = btn.innerHTML;
@@ -363,20 +559,24 @@ window.syncFromFirebase = syncFromFirebase;
 
       try {
         if (navigator.onLine && db) {
+          // send WITHOUT imageId
+          const payloadToSend = Object.assign({}, payload);
+          if (payloadToSend.imageId) delete payloadToSend.imageId;
           const newRef = db.ref('kehadiran').push();
-          await newRef.set(Object.assign({}, payload, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
-          addRecentLocal(payload);
+          await newRef.set(Object.assign({}, payloadToSend, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+          // optimistic add recent with image preview if present
+          await addRecentLocal(payload);
           finalize(true);
         } else {
-          pushPending(payload);
-          addRecentLocal(payload);
+          pushPending(payload); // payload includes imageId if any
+          await addRecentLocal(payload);
           if (window.toast) window.toast('Kehadiran disimpan ke antrian (offline)', 'info');
           finalize(false);
         }
       } catch (err) {
         console.error('Gagal kirim langsung, akan disimpan ke antrian', err);
         pushPending(payload);
-        addRecentLocal(payload);
+        await addRecentLocal(payload);
         if (window.toast) window.toast('Kesalahan jaringan — data disimpan sementara', 'err');
         finalize(false);
       }
@@ -401,7 +601,6 @@ window.syncFromFirebase = syncFromFirebase;
     }
   } catch(e){ console.warn('init chart failed', e); }
 
-  // Kehadiran listener
   if (!db) {
     console.warn('DB not available — kehadiran realtime not attached');
     return;
@@ -413,7 +612,6 @@ window.syncFromFirebase = syncFromFirebase;
     const hadir = arr.filter(x => x && x.tanggal === today && x.status === 'Hadir').length;
     const lain = arr.filter(x => x && x.tanggal === today && x.status !== 'Hadir').length;
 
-    // update counts
     const totalGuruEl = document.getElementById('totalGuru');
     if (totalGuruEl) {
       try {
@@ -424,7 +622,6 @@ window.syncFromFirebase = syncFromFirebase;
     const totalHadirEl = document.getElementById('totalHadir'); if (totalHadirEl) totalHadirEl.textContent = String(hadir);
     const totalLainEl = document.getElementById('totalLain'); if (totalLainEl) totalLainEl.textContent = String(lain);
 
-    // update chart
     try {
       if (window.dashboardChart) {
         window.dashboardChart.data.datasets[0].data = [hadir, lain];
@@ -432,7 +629,6 @@ window.syncFromFirebase = syncFromFirebase;
       }
     } catch(e){ console.warn('update chart failed', e); }
 
-    // recent activity
     const recent = document.getElementById('recent-activity');
     if (recent) {
       recent.innerHTML = '';
@@ -446,6 +642,121 @@ window.syncFromFirebase = syncFromFirebase;
       });
     }
   });
+})();
+
+// ----------------- Camera modal capture -> save to IndexedDB via __whImageCache -----------------
+(function setupCameraCapture(){
+  const btnOpen = document.getElementById('btn-open-camera');
+  const modal = document.getElementById('camera-modal');
+  const video = document.getElementById('camera-video');
+  const snapBtn = document.getElementById('btn-camera-snap');
+  const acceptBtn = document.getElementById('btn-camera-accept');
+  const retakeBtn = document.getElementById('btn-camera-retake');
+  const closeBtn = document.getElementById('btn-camera-close');
+  const canvas = document.getElementById('camera-canvas');
+
+  let stream = null;
+  let lastBlob = null;
+
+  function openModal(){ modal.classList.remove('hidden'); startCamera(); }
+  function closeModal(){ modal.classList.add('hidden'); stopCamera(); resetUI(); }
+
+  async function startCamera(){
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    } catch(err){
+      console.error('startCamera failed', err);
+      alert('Tidak dapat membuka kamera. Gunakan tombol unggah foto sebagai alternatif.');
+      closeModal();
+    }
+  }
+  function stopCamera(){
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    if (video) video.srcObject = null;
+  }
+
+  function resetUI(){
+    if (acceptBtn) acceptBtn.classList.add('hidden');
+    if (retakeBtn) retakeBtn.classList.add('hidden');
+    if (snapBtn) snapBtn.classList.remove('hidden');
+    if (canvas) { canvas.width = canvas.height = 0; canvas.classList.add('hidden'); }
+    lastBlob = null;
+  }
+
+  async function snap(){
+    if (!video) return;
+    const w = video.videoWidth;
+    const h = video.videoHeight;
+    if (!w || !h) return;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+    canvas.classList.remove('hidden');
+    const blob = await new Promise((res, rej) => canvas.toBlob(b => { if (!b) rej(new Error('toBlob failed')); else res(b); }, 'image/jpeg', 0.85));
+    lastBlob = blob;
+    if (snapBtn) snapBtn.classList.add('hidden');
+    if (acceptBtn) acceptBtn.classList.remove('hidden');
+    if (retakeBtn) retakeBtn.classList.remove('hidden');
+  }
+
+  async function accept(){
+    if (!lastBlob) return;
+    const file = new File([lastBlob], 'photo_'+Date.now()+'.jpg', { type: lastBlob.type });
+    try {
+      if (window.__whImageCache && typeof window.__whImageCache.saveImageFromFile === 'function') {
+        const id = await window.__whImageCache.saveImageFromFile(file);
+        // store ephemeral id so form handler can pick it up
+        window.__whImageCache._lastFormImageId = id;
+        const preview = document.getElementById('photoPreview');
+        if (preview) {
+          const dataURL = await window.__whImageCache.getImageDataURL(id);
+          if (dataURL) { preview.src = dataURL; preview.classList.remove('hidden'); }
+        }
+        if (window.toast) window.toast('Foto disimpan di cache lokal', 'ok');
+      } else {
+        alert('Image cache tidak tersedia.');
+      }
+    } catch(err){
+      console.error('save captured image failed', err);
+      if (window.toast) window.toast('Gagal menyimpan foto', 'err');
+    } finally {
+      closeModal();
+    }
+  }
+
+  function retake(){
+    lastBlob = null;
+    resetUI();
+  }
+
+  if (btnOpen) btnOpen.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (snapBtn) snapBtn.addEventListener('click', snap);
+  if (retakeBtn) retakeBtn.addEventListener('click', retake);
+  if (acceptBtn) acceptBtn.addEventListener('click', accept);
+
+  // Patch getAndClearFormImageId to prefer _lastFormImageId
+  (function patchGetAndClear(){
+    if (!window.__whImageCache) return;
+    const orig = window.__whImageCache.getAndClearFormImageId;
+    window.__whImageCache.getAndClearFormImageId = function(){
+      const idFromCamera = window.__whImageCache._lastFormImageId || null;
+      if (idFromCamera) {
+        delete window.__whImageCache._lastFormImageId;
+        try { if (typeof orig === 'function') orig(); } catch(e){}
+        return idFromCamera;
+      }
+      if (typeof orig === 'function') return orig();
+      return null;
+    };
+  })();
+
 })();
 
 // ----------------- Laporan / Export -----------------
@@ -489,38 +800,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ----------------- Clock functions -----------------
+// ----------------- Clock helpers -----------------
 function setCurrentDate(){
   const now = new Date();
   const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
   const elTop = document.getElementById('current-date-top');
   if (elTop) elTop.textContent = now.toLocaleDateString('id-ID', opts);
-  const el = document.getElementById('current-date');
-  if (el) el.textContent = now.toLocaleDateString('id-ID', opts);
 }
 function drawClock(){
   const small = document.getElementById('clock-small');
   if (small) small.textContent = new Date().toLocaleTimeString('id-ID');
-  const c = document.getElementById('analogClock'); if (!c) return;
-  try {
-    const ctx = c.getContext('2d'); const r = c.width/2; ctx.clearRect(0,0,c.width,c.height); ctx.save(); ctx.translate(r,r);
-    ctx.strokeStyle='#1e3a8a'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,r-4,0,2*Math.PI); ctx.stroke();
-    const now = new Date(); const sec = now.getSeconds(), min = now.getMinutes(), hr = now.getHours()%12;
-    ctx.rotate((Math.PI/6)*(hr + min/60)); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r*0.5); ctx.stroke(); ctx.rotate(-(Math.PI/6)*(hr + min/60));
-    ctx.rotate((Math.PI/30)*(min + sec/60)); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r*0.75); ctx.stroke(); ctx.rotate(-(Math.PI/30)*(min + sec/60));
-    ctx.strokeStyle='#ef4444'; ctx.rotate((Math.PI/30)*sec); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-r*0.85); ctx.stroke(); ctx.restore();
-  } catch(e){ console.warn('drawClock error', e); }
 }
 
-// ----------------- Boot helpers -----------------
+// ----------------- Boot -----------------
 (function boot(){
-  // quick init of date/clock
   try { setCurrentDate(); drawClock(); setInterval(()=>{ setCurrentDate(); drawClock(); },1000); } catch(e){}
-  // initial render from localStorage for quick UI
   try {
     const local = JSON.parse(localStorage.getItem(KEY_GURU) || '[]');
     if (local && local.length) { renderGuruUi(local); }
   } catch(e){}
-  // try attach guru sync
   try { if (db) syncFromFirebase(); } catch(e){ console.warn('syncFromFirebase error', e); }
 })();
