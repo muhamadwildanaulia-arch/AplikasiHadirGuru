@@ -19,12 +19,25 @@
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
-    /* small visual tweaks */
+    /* visual polish */
     .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
-    .sidebar .nav-item { color: rgba(255,255,255,0.92); }
-    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    .sidebar .nav-item { color: rgba(255,255,255,0.95); transition: all .15s ease; }
+    .sidebar .nav-item:hover { transform: translateX(4px); }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); transition: transform .12s ease; }
+    .card-smooth:hover { transform: translateY(-3px); }
     /* toast */
-    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
+    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; pointer-events: none;}
+    .toast { pointer-events: auto; min-width: 220px; padding: 10px 14px; border-radius: 10px; box-shadow: 0 6px 18px rgba(2,6,23,0.12); transform-origin: 100% 100%; transition: transform .22s cubic-bezier(.2,.9,.2,1), opacity .18s ease; opacity: 0; transform: translateY(8px) scale(.98); }
+    .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+    .toast.ok { background: #ecfdf5; color:#065f46; }
+    .toast.err { background: #fff1f2; color:#9f1239; }
+    .toast.info { background: #f8fafc; color:#0f172a; }
+    /* modal overlay */
+    .modal-panel { max-width: 520px; width: 96%; border-radius: 12px; }
+    /* subtle focus */
+    :focus { outline: 3px solid rgba(59,130,246,.12); outline-offset: 2px; }
+    /* small responsive tweaks */
+    @media (max-width: 768px){ .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 50; } }
   </style>
 </head>
 <body class="antialiased bg-slate-50 text-slate-800">
@@ -32,16 +45,16 @@
   <div class="min-h-screen flex">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
+    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4" aria-label="Sidebar utama">
       <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" alt="logo" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
+        <img src="Logo.png" alt="logo SDN Muhara" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
         <div>
           <h1 class="text-white font-bold">SDN Muhara</h1>
           <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
         </div>
       </div>
 
-      <nav class="mt-6 flex-1">
+      <nav class="mt-6 flex-1" aria-label="Navigasi">
         <ul class="space-y-1">
           <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
           <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
@@ -56,11 +69,11 @@
     </aside>
 
     <!-- MOBILE NAV (bottom) -->
-    <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/90 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
-      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
-      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
-      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
-      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
+    <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/95 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
+      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm" aria-label="Isi Kehadiran">📥</button>
+      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm" aria-label="Dashboard">📊</button>
+      <button data-page="guru" class="px-3 py-2 rounded-full text-sm" aria-label="Daftar Guru">👩‍🏫</button>
+      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm" aria-label="Laporan Bulanan">📅</button>
     </div>
 
     <!-- MAIN CONTENT -->
@@ -69,23 +82,23 @@
       <!-- TOPBAR -->
       <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
         <div class="flex items-center gap-4">
-          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
+          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60" aria-label="Tampilkan navigasi">☰</button>
           <div>
-            <div class="text-sm text-slate-500" id="current-date-top"></div>
+            <div class="text-sm text-slate-500" id="current-date-top" aria-live="polite"></div>
             <div class="text-lg font-semibold">Dashboard Kehadiran</div>
           </div>
         </div>
 
         <div class="flex items-center gap-4">
-          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm" role="status" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2z" />
             </svg>
             Admin Aktif
           </div>
 
           <div class="flex items-center gap-3">
-            <div id="clock-small" class="text-sm text-slate-600"></div>
+            <div id="clock-small" class="text-sm text-slate-600" aria-live="polite"></div>
             <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
             <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
           </div>
@@ -120,13 +133,13 @@
 
                 <div class="space-y-4">
                   <div>
-                    <label class="block text-sm text-slate-700 mb-1">Nama Guru</label>
-                    <select id="namaGuru" class="w-full border rounded p-2"></select>
+                    <label for="namaGuru" class="block text-sm text-slate-700 mb-1">Nama Guru</label>
+                    <select id="namaGuru" class="w-full border rounded p-2" aria-label="Pilih nama guru"><option value="">-- Pilih Guru --</option></select>
                   </div>
 
                   <div>
-                    <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
-                    <select id="statusKehadiran" class="w-full border rounded p-2">
+                    <label for="statusKehadiran" class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
+                    <select id="statusKehadiran" class="w-full border rounded p-2" aria-label="Pilih status kehadiran">
                       <option value="">-- Pilih Status --</option>
                       <option value="Hadir">Hadir</option>
                       <option value="Izin">Izin</option>
@@ -140,7 +153,7 @@
                     <input id="placeName" class="w-full border rounded p-2" placeholder="Contoh: SDN Muhara — tap Simpan lokasi atau gunakan GPS" />
                     <div class="mt-2">
                       <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis — tampilkan nama bila tersedia)</label>
-                      <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
+                      <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." aria-readonly="true" />
                       <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
                     </div>
                   </div>
@@ -155,11 +168,11 @@
               <div class="card-smooth p-6">
                 <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
                 <div class="mt-4">
-                  <canvas id="chartDashboard" height="180"></canvas>
+                  <canvas id="chartDashboard" height="180" aria-label="Grafik kehadiran hari ini"></canvas>
                 </div>
                 <div class="mt-6">
                   <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
-                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
+                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm" aria-live="polite">
                     <p class="text-slate-400">Memuat data...</p>
                   </div>
                 </div>
@@ -175,7 +188,7 @@
             </div>
 
             <div class="bg-white rounded-xl shadow p-4 overflow-auto">
-              <table class="min-w-full text-sm">
+              <table class="min-w-full text-sm" role="table" aria-label="Daftar guru">
                 <thead class="bg-rose-50 text-rose-700 font-semibold">
                   <tr>
                     <th class="border p-2 text-left">NIP</th>
@@ -195,7 +208,7 @@
           <!-- Laporan -->
           <section id="page-laporan" class="hidden">
             <div class="mb-4 flex flex-wrap gap-3 items-center">
-              <input type="month" id="bulan" class="border rounded p-2" />
+              <input type="month" id="bulan" class="border rounded p-2" aria-label="Pilih bulan laporan" />
               <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">Tampilkan</button>
               <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
             </div>
@@ -229,9 +242,9 @@
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
 
   <!-- ADMIN MODAL & GURU MODAL (keperluan UI) -->
-  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
-      <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
+  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96 modal-panel">
+      <h3 id="admin-modal-title" class="text-lg font-semibold mb-2">Login Admin</h3>
       <div class="space-y-2">
         <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
         <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
@@ -244,8 +257,8 @@
     </div>
   </div>
 
-  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="guru-modal-title">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96 modal-panel">
       <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
       <div class="space-y-2">
         <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
@@ -274,17 +287,20 @@
     const $$ = s => Array.from(document.querySelectorAll(s));
     const toasts = $('#toasts');
 
-    function toast(msg, type='info', timeout=3800){
+    function makeToast(msg, type='info', timeout=3800){
       const el = document.createElement('div');
-      el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
-      el.style.minWidth = '220px';
-      if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
-      else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
-      else el.classList.add('bg-slate-100','text-slate-800');
+      el.className = 'toast ' + (type==='ok' ? 'ok' : (type==='err' ? 'err' : 'info'));
+      el.setAttribute('role','status');
       el.textContent = msg;
       toasts.appendChild(el);
-      setTimeout(()=> { el.classList.add('opacity-0'); setTimeout(()=>el.remove(),300); }, timeout);
+      // animate show
+      requestAnimationFrame(()=> el.classList.add('show'));
+      const t = setTimeout(()=> { el.classList.remove('show'); setTimeout(()=> el.remove(), 220); }, timeout);
+      // allow click to dismiss early
+      el.addEventListener('click', ()=> { clearTimeout(t); el.classList.remove('show'); setTimeout(()=> el.remove(), 120); });
     }
+    // backward-compatible alias
+    const toast = (m,t,timeout) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), timeout);
 
     // nav logic (sidebar & mobile buttons)
     function showPage(name){
@@ -295,6 +311,8 @@
       });
       // highlight buttons (sidebar)
       $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
+      // autofocus first input if kehadiran page
+      if (name === 'kehadiran') { setTimeout(()=> $('#namaGuru')?.focus(), 220); }
     }
     // attach nav
     $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
@@ -311,12 +329,39 @@
       aside.classList.toggle('hidden');
     });
 
+    // Admin modal handlers & generic modal helpers
+    function openModal(modal){ if(!modal) return; modal.classList.remove('hidden'); // focus first input
+      const first = modal.querySelector('input,select,button,textarea'); if(first) first.focus();
+      // trap focus lightly (basic)
+    }
+    function closeModal(modal){ if(!modal) return; modal.classList.add('hidden'); }
+
+    // modal close on overlay click and ESC
+    document.addEventListener('click', (ev) => {
+      // overlay clicks for admin/guru modals
+      if (ev.target && (ev.target.id === 'admin-modal' || ev.target.id === 'guru-modal')) {
+        closeModal(ev.target);
+      }
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        closeModal($('#admin-modal')); closeModal($('#guru-modal'));
+      }
+      // allow Enter to submit in modals
+      if (ev.key === 'Enter' && document.activeElement && document.activeElement.closest('#admin-modal')) {
+        $('#admin-submit')?.click();
+      }
+      if (ev.key === 'Enter' && document.activeElement && document.activeElement.closest('#guru-modal')) {
+        $('#guru-save')?.click();
+      }
+    });
+
     // keep required IDs for firebase script:
     // namaGuru, statusKehadiran, lokasi, kirimKehadiranBtn, guruTableBody, totalGuru,totalHadir,totalLain, chartDashboard, recent-activity, laporan elements
 
     // Admin login modal
-    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
-    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+    function openAdminModal(){ openModal($('#admin-modal')); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
+    function closeAdminModal(){ closeModal($('#admin-modal')); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
 
     // admin credentials (demo)
     const ADMIN_USER = 'admin';
@@ -342,8 +387,8 @@
     function removeAdminControls(){ $('#admin-controls')?.remove(); }
 
     // open/close guru modal
-    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden'); }
-    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; $('#guru-modal').classList.remove('hidden'); }
+    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; openModal($('#guru-modal')); }
+    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; openModal($('#guru-modal')); }
     function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
 
     // render functions used when Firebase dispatches 'gurus-updated' (app.firebase.js will dispatch)
@@ -415,7 +460,7 @@
       toast('Daftar guru diperbarui (Realtime)', 'info', 1800);
     });
 
-    // Admin modal events
+    // Admin modal events (delegated)
     document.addEventListener('click', async (e) => {
       // open admin modal
       if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
@@ -429,8 +474,6 @@
           injectAdminControls();
           $('#admin-badge').classList.remove('hidden');
           $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
-          // show admin controls in Data Guru
-          injectAdminControls();
           // render current list as admin
           const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
           renderGuruTable(list);
@@ -508,21 +551,40 @@
       $('#admin-badge').classList.add('hidden');
     }
 
-    // Replace native alerts used in older scripts by toasts where appropriate:
-    // Keep compatibility — older code (app.firebase.js) may still call alert(); that's fine.
-    // But our admin/add UI uses toast above.
-
     // ensure nama select is populated with localStorage fallback quickly
     const local = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
     if (local && local.length) { renderGuruTable(local); populateNamaSelect(local); }
 
     // Kehadiran button feedback (this works together with app.firebase.js's handler)
     $('#kirimKehadiranBtn')?.addEventListener('click', () => {
-      // small UI change: show status
       $('#kehadiran-status').textContent = 'Mengirim...';
       setTimeout(()=>{ $('#kehadiran-status').textContent = '—'; }, 1200);
       // actual send is handled in app.firebase.js (which listens same button)
     });
+
+    // Defensive Chart.js init for chartDashboard so the UI looks alive even before data arrives.
+    (function initChartPlaceholder(){
+      try {
+        const ctx = document.getElementById('chartDashboard');
+        if (!ctx) return;
+        if (!window.Chart) { return; }
+        const labels = ['07:00','08:00','09:00','10:00','11:00','12:00'];
+        const data = { labels, datasets: [{ label: 'Hadir', data: [0,0,0,0,0,0], tension:0.3, fill:false }] };
+        window._wh_chartDashboard = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data,
+          options: {
+            plugins: { legend: { display: false } },
+            scales: { x: { display: true }, y: { beginAtZero: true, ticks:{ stepSize:1 } } },
+            maintainAspectRatio: false
+          }
+        });
+        // app.firebase.js may update window._wh_chartDashboard.data later.
+      } catch(e){ console.warn('Chart placeholder init failed', e); }
+    })();
+
+    // simple alias for legacy code expecting `toast`
+    window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), 3600);
 
   })();
   </script>
