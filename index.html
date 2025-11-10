@@ -5,45 +5,46 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WebsiteHadir — SDN Muhara (Dashboard)</title>
 
-  <!-- Tailwind (CDN, dev) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Chart.js & XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase compat scripts (required by app.firebase.js) -->
+  <!-- Firebase compat -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
-    .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
-    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
-    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; pointer-events:none; }
-    .toast { pointer-events:auto; padding:10px 14px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.12); transform-origin:100% 100%; transition: transform .22s, opacity .18s; opacity:0; transform:translateY(8px) scale(.98); }
-    .toast.show{ opacity:1; transform:none; }
-    .toast.ok{ background:#ecfdf5;color:#065f46; }
-    .toast.err{ background:#fff1f2;color:#9f1239; }
-    .toast.info{ background:#f8fafc;color:#0f172a; }
+    .sidebar { background: linear-gradient(180deg,#7f1d1d,#b91c1c); }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc);
+      border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60;
+      display: flex; flex-direction: column; gap: 8px; pointer-events:none; }
+    .toast { pointer-events:auto; padding:10px 14px; border-radius:10px;
+      box-shadow:0 6px 18px rgba(2,6,23,0.12); transition: all .2s;
+      opacity:0; transform:translateY(8px) scale(.98); }
+    .toast.show{opacity:1;transform:none;}
+    .toast.ok{background:#ecfdf5;color:#065f46;}
+    .toast.err{background:#fff1f2;color:#9f1239;}
+    .toast.info{background:#f8fafc;color:#0f172a;}
   </style>
 </head>
 <body class="antialiased bg-slate-50 text-slate-800">
-
   <div class="min-h-screen flex">
-
     <!-- SIDEBAR -->
-    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4" aria-label="Sidebar utama">
+    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
       <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" alt="logo SDN Muhara" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
+        <img src="Logo.png" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
         <div>
           <h1 class="text-white font-bold">SDN Muhara</h1>
           <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
         </div>
       </div>
-
-      <nav class="mt-6 flex-1" aria-label="Navigasi">
+      <nav class="mt-6 flex-1">
         <ul class="space-y-1">
           <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
           <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
@@ -51,29 +52,25 @@
           <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📅 Laporan Bulanan</button></li>
         </ul>
       </nav>
-
-      <div class="mt-auto text-sm text-red-100 px-3">
-        Versi demo • 2025
-      </div>
+      <div class="mt-auto text-sm text-red-100 px-3">Versi demo • 2025</div>
     </aside>
 
-    <!-- MOBILE NAV (bottom) -->
+    <!-- MOBILE NAV -->
     <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/95 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
-      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm" aria-label="Isi Kehadiran">📥</button>
-      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm" aria-label="Dashboard">📊</button>
-      <button data-page="guru" class="px-3 py-2 rounded-full text-sm" aria-label="Daftar Guru">👩‍🏫</button>
-      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm" aria-label="Laporan Bulanan">📅</button>
+      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
+      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
+      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
+      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
     </div>
-
-    <!-- MAIN CONTENT -->
+    <!-- MAIN CONTENT (lanjutan) -->
     <div class="flex-1 min-w-0">
 
       <!-- TOPBAR -->
       <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
         <div class="flex items-center gap-4">
-          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60" aria-label="Tampilkan navigasi">☰</button>
+          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
           <div>
-            <div class="text-sm text-slate-500" id="current-date-top" aria-live="polite"></div>
+            <div class="text-sm text-slate-500" id="current-date-top"></div>
             <div class="text-lg font-semibold">Dashboard Kehadiran</div>
           </div>
         </div>
@@ -117,7 +114,9 @@
                 <div class="space-y-4">
                   <div>
                     <label for="namaGuru" class="block text-sm text-slate-700 mb-1">Nama Guru</label>
-                    <select id="namaGuru" class="w-full border rounded p-2" aria-label="Pilih nama guru"><option value="">-- Pilih Guru --</option></select>
+                    <select id="namaGuru" class="w-full border rounded p-2" aria-label="Pilih nama guru">
+                      <option value="">-- Pilih Guru --</option>
+                    </select>
                   </div>
 
                   <div>
@@ -136,7 +135,7 @@
                     <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
                     <div class="flex gap-2">
                       <input id="lokasi" readonly class="flex-1 border rounded p-2 bg-slate-50 text-slate-600" placeholder="Tekan 'Gunakan GPS' untuk mendeteksi lokasi" />
-                      <button id="btn-use-gps" class="px-3 py-2 rounded bg-rose-600 text-white text-sm flex items-center gap-2" title="Gunakan GPS untuk deteksi lokasi">
+                      <button id="btn-use-gps" class="px-3 py-2 rounded bg-rose-600 text-white text-sm flex items-center gap-2" title="Gunakan GPS">
                         <span id="btn-gps-icon">📍</span>
                         <span id="btn-gps-label">Gunakan GPS</span>
                       </button>
@@ -166,20 +165,20 @@
               </div>
 
               <div class="card-smooth p-6">
-                <h3 class="font-semibold">Grafik & Aktivitas</h3>
+                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
                 <div class="mt-4">
                   <canvas id="chartDashboard" height="180"></canvas>
                 </div>
                 <div class="mt-6">
                   <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
-                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm" aria-live="polite">
+                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
                     <p class="text-slate-400">Memuat data...</p>
                   </div>
                 </div>
               </div>
+
             </div>
           </section>
-
           <!-- Data Guru -->
           <section id="page-guru" class="hidden">
             <div class="flex items-center justify-between mb-4">
@@ -213,21 +212,9 @@
               <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
             </div>
 
-            <div class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
-              <table class="min-w-full text-sm">
-                <thead class="bg-rose-50 text-rose-700 font-semibold">
-                  <tr>
-                    <th class="border p-2">Tanggal</th>
-                    <th class="border p-2">Nama Guru</th>
-                    <th class="border p-2">Jam</th>
-                    <th class="border p-2">Lokasi</th>
-                    <th class="border p-2">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="laporanTableBody">
-                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>
-                </tbody>
-              </table>
+            <div id="laporan-matrix-wrap" class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
+              <div id="laporan-matrix-empty" class="text-slate-500 p-6 text-center">Pilih bulan untuk menampilkan laporan matrix kehadiran.</div>
+              <div id="laporan-matrix-table" class="w-full overflow-auto hidden"></div>
             </div>
 
             <div id="resume-laporan" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
@@ -293,26 +280,26 @@
     D.A.N × GPT-5 | 2025
   </footer>
 
-  <!-- app.firebase.js (harus ada di repo) -->
+  <!-- app.firebase.js -->
   <script type="module" src="app.firebase.js"></script>
 
-  <!-- Small UI script (navigation + toast) -->
+  <!-- UI small script (nav + toast + admin minimal) -->
   <script>
     (function(){
       const $ = s => document.querySelector(s);
       const $$ = s => Array.from(document.querySelectorAll(s));
       const toasts = $('#toasts');
 
-      function makeToast(msg, type='info', timeout=3800){
+      function makeToast(msg, type='info', timeout=3600){
         const el = document.createElement('div');
-        el.className = 'toast ' + (type==='ok' ? 'ok' : (type==='err' ? 'err' : 'info'));
+        el.className = 'toast ' + (type==='ok'?'ok':(type==='err'?'err':'info'));
         el.textContent = msg;
         toasts.appendChild(el);
         requestAnimationFrame(()=> el.classList.add('show'));
         const t = setTimeout(()=> { el.classList.remove('show'); setTimeout(()=> el.remove(), 220); }, timeout);
         el.addEventListener('click', ()=> { clearTimeout(t); el.classList.remove('show'); setTimeout(()=> el.remove(), 120); });
       }
-      window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), 3600);
+      window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'));
 
       function showPage(name){
         ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
@@ -321,21 +308,14 @@
           if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
         });
         $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
-        if (name === 'kehadiran') setTimeout(()=> $('#namaGuru')?.focus(), 220);
       }
       $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
-      document.getElementById('btn-toggle-sidebar')?.addEventListener('click', ()=> document.querySelector('aside')?.classList.toggle('hidden'));
 
-      function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
-      function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
-      setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
-      showPage('kehadiran');
-
-      // quick admin UI logic kept minimal (login uses local demo credentials)
+      // quick admin demo
       const ADMIN_USER='admin', ADMIN_PASS='admin123';
       function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
       function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
-      function injectAdminControls(){ if ($('#admin-controls')) return; const wrap=document.createElement('div'); wrap.id='admin-controls'; wrap.className='flex gap-2 items-center'; wrap.innerHTML=`<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button><button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>`; $('#admin-controls-placeholder')?.appendChild(wrap); }
+      function injectAdminControls(){ if ($('#admin-controls')) return; const wrap=document.createElement('div'); wrap.id='admin-controls'; wrap.className='flex gap-2 items-center'; wrap.innerHTML='<button id=\"btn-add-guru-admin\" class=\"bg-emerald-600 text-white px-3 py-1 rounded text-sm\">Tambah Guru</button><button id=\"btn-sync-local\" class=\"bg-slate-100 px-3 py-1 rounded text-sm\">Sinkron</button>'; $('#admin-controls-placeholder')?.appendChild(wrap); }
       function removeAdminControls(){ $('#admin-controls')?.remove(); }
 
       document.addEventListener('click', (e) => {
@@ -348,15 +328,6 @@
         if (e.target && e.target.id === 'btn-admin-logout') { if(confirm('Keluar sebagai admin?')){ setAdminLocal(false); $('#admin-badge').classList.add('hidden'); $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden'); removeAdminControls(); toast('Logout berhasil','ok'); } }
         if (e.target && e.target.id === 'btn-add-guru-admin') $('#guru-modal').classList.remove('hidden');
         if (e.target && e.target.id === 'guru-cancel') $('#guru-modal').classList.add('hidden');
-        if (e.target && e.target.id === 'guru-save') {
-          const editId = e.target.dataset.editId || ''; const nip = $('#guru-nip').value.trim(); const nama = $('#guru-nama-input').value.trim(); const jab = $('#guru-jabatan-input').value.trim();
-          if (!nama) return toast('Masukkan nama guru','err');
-          if (window.addGuruFirebase && !editId) { window.addGuruFirebase({ nip, nama, jabatan: jab }).then(()=> { toast('Guru tersimpan','ok'); $('#guru-modal').classList.add('hidden'); }).catch(err=>toast('Gagal: '+err.message,'err')); }
-          else if (window.updateGuruFirebase && editId) { window.updateGuruFirebase(editId, { nip, nama, jabatan: jab }).then(()=>{ toast('Perubahan disimpan','ok'); $('#guru-modal').classList.add('hidden'); }).catch(err=>toast('Gagal: '+err.message,'err')); }
-        }
-        if (e.target && e.target.id === 'btn-sync-local') {
-          if (window.syncFromFirebase) { try { window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu','info'); } catch(e){ toast('Sinkron gagal','err'); } } else { const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]'); if (window.renderGuruTable) window.renderGuruTable(list); toast('Menggunakan data lokal','info'); }
-        }
       });
 
       if (isAdminLocal()){ $('#admin-badge').classList.remove('hidden'); injectAdminControls(); $('#btn-open-admin').classList.add('hidden'); $('#btn-admin-logout').classList.remove('hidden'); }
