@@ -19,25 +19,14 @@
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
-    /* visual polish */
     .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
-    .sidebar .nav-item { color: rgba(255,255,255,0.95); transition: all .15s ease; }
-    .sidebar .nav-item:hover { transform: translateX(4px); }
-    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); transition: transform .12s ease; }
-    .card-smooth:hover { transform: translateY(-3px); }
-    /* toast */
-    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; pointer-events: none;}
-    .toast { pointer-events: auto; min-width: 220px; padding: 10px 14px; border-radius: 10px; box-shadow: 0 6px 18px rgba(2,6,23,0.12); transform-origin: 100% 100%; transition: transform .22s cubic-bezier(.2,.9,.2,1), opacity .18s ease; opacity: 0; transform: translateY(8px) scale(.98); }
-    .toast.show { opacity: 1; transform: translateY(0) scale(1); }
-    .toast.ok { background: #ecfdf5; color:#065f46; }
-    .toast.err { background: #fff1f2; color:#9f1239; }
-    .toast.info { background: #f8fafc; color:#0f172a; }
-    /* modal overlay */
-    .modal-panel { max-width: 520px; width: 96%; border-radius: 12px; }
-    /* subtle focus */
-    :focus { outline: 3px solid rgba(59,130,246,.12); outline-offset: 2px; }
-    /* small responsive tweaks */
-    @media (max-width: 768px){ .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 50; } }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; pointer-events:none; }
+    .toast { pointer-events:auto; padding:10px 14px; border-radius:10px; box-shadow:0 6px 18px rgba(2,6,23,0.12); transform-origin:100% 100%; transition: transform .22s, opacity .18s; opacity:0; transform:translateY(8px) scale(.98); }
+    .toast.show{ opacity:1; transform:none; }
+    .toast.ok{ background:#ecfdf5;color:#065f46; }
+    .toast.err{ background:#fff1f2;color:#9f1239; }
+    .toast.info{ background:#f8fafc;color:#0f172a; }
   </style>
 </head>
 <body class="antialiased bg-slate-50 text-slate-800">
@@ -63,8 +52,8 @@
         </ul>
       </nav>
 
-      <div class="mt-auto text-sm text-red-100">
-        <div class="px-3">Versi demo • 2025</div>
+      <div class="mt-auto text-sm text-red-100 px-3">
+        Versi demo • 2025
       </div>
     </aside>
 
@@ -90,15 +79,9 @@
         </div>
 
         <div class="flex items-center gap-4">
-          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm" role="status" aria-hidden="true">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2z" />
-            </svg>
-            Admin Aktif
-          </div>
-
+          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm">Admin Aktif</div>
           <div class="flex items-center gap-3">
-            <div id="clock-small" class="text-sm text-slate-600" aria-live="polite"></div>
+            <div id="clock-small" class="text-sm text-slate-600"></div>
             <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
             <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
           </div>
@@ -148,17 +131,32 @@
                     </select>
                   </div>
 
+                  <!-- Lokasi otomatis + tombol Gunakan GPS -->
                   <div>
                     <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
                     <div class="flex gap-2">
-                      <input id="lokasi" readonly class="flex-1 border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
+                      <input id="lokasi" readonly class="flex-1 border rounded p-2 bg-slate-50 text-slate-600" placeholder="Tekan 'Gunakan GPS' untuk mendeteksi lokasi" />
                       <button id="btn-use-gps" class="px-3 py-2 rounded bg-rose-600 text-white text-sm flex items-center gap-2" title="Gunakan GPS untuk deteksi lokasi">
                         <span id="btn-gps-icon">📍</span>
                         <span id="btn-gps-label">Gunakan GPS</span>
                       </button>
+                    </div>
+                    <div id="coords-small" class="text-xs text-slate-400 mt-1">—</div>
                   </div>
-                  <div id="coords-small" class="text-xs text-slate-400 mt-1">Mendeteksi lokasi...</div>
-                </div>
+
+                  <!-- Foto (opsional, hanya cache lokal) + kamera -->
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Foto (opsional, disimpan lokal)</label>
+                    <div class="flex gap-2 items-center">
+                      <input id="photoInput" accept="image/*" capture="environment" type="file" class="text-sm" />
+                      <button id="btn-open-camera" class="px-3 py-2 rounded bg-sky-600 text-white text-sm">📷 Kamera</button>
+                      <button id="btn-clear-photo" class="px-2 py-1 rounded bg-slate-100 text-sm">Hapus</button>
+                    </div>
+                    <div class="mt-2">
+                      <img id="photoPreview" src="" alt="Preview foto" class="max-h-36 rounded border hidden" />
+                      <div id="photoHint" class="text-xs text-slate-400 mt-1">Foto hanya tersimpan di perangkat Anda (IndexedDB).</div>
+                    </div>
+                  </div>
 
                   <div class="flex gap-3 items-center">
                     <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
@@ -168,9 +166,9 @@
               </div>
 
               <div class="card-smooth p-6">
-                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
+                <h3 class="font-semibold">Grafik & Aktivitas</h3>
                 <div class="mt-4">
-                  <canvas id="chartDashboard" height="180" aria-label="Grafik kehadiran hari ini"></canvas>
+                  <canvas id="chartDashboard" height="180"></canvas>
                 </div>
                 <div class="mt-6">
                   <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
@@ -240,13 +238,30 @@
     </div>
   </div>
 
+  <!-- Camera modal (getUserMedia) -->
+  <div id="camera-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
+    <div class="bg-white rounded p-4 max-w-md w-full">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="font-semibold">Ambil Foto</h4>
+        <button id="btn-camera-close" class="text-sm px-2">Tutup</button>
+      </div>
+      <video id="camera-video" autoplay playsinline class="w-full rounded bg-black"></video>
+      <div class="flex gap-2 mt-2">
+        <button id="btn-camera-snap" class="px-3 py-2 rounded bg-rose-600 text-white">Tangkap</button>
+        <button id="btn-camera-accept" class="px-3 py-2 rounded bg-emerald-600 text-white hidden">Simpan</button>
+        <button id="btn-camera-retake" class="px-3 py-2 rounded bg-slate-100 hidden">Ulang</button>
+      </div>
+      <canvas id="camera-canvas" class="hidden"></canvas>
+    </div>
+  </div>
+
   <!-- TOASTS -->
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- ADMIN MODAL & GURU MODAL (keperluan UI) -->
-  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="admin-modal-title">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96 modal-panel">
-      <h3 id="admin-modal-title" class="text-lg font-semibold mb-2">Login Admin</h3>
+  <!-- ADMIN MODAL & GURU MODAL -->
+  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
       <div class="space-y-2">
         <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
         <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
@@ -259,8 +274,8 @@
     </div>
   </div>
 
-  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true" aria-labelledby="guru-modal-title">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96 modal-panel">
+  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
       <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
       <div class="space-y-2">
         <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
@@ -281,316 +296,71 @@
   <!-- app.firebase.js (harus ada di repo) -->
   <script type="module" src="app.firebase.js"></script>
 
-  <!-- UI + Admin script (Firebase-aware) -->
+  <!-- Small UI script (navigation + toast) -->
   <script>
-  (function(){
-    // UI helpers
-    const $ = s => document.querySelector(s);
-    const $$ = s => Array.from(document.querySelectorAll(s));
-    const toasts = $('#toasts');
+    (function(){
+      const $ = s => document.querySelector(s);
+      const $$ = s => Array.from(document.querySelectorAll(s));
+      const toasts = $('#toasts');
 
-    function makeToast(msg, type='info', timeout=3800){
-      const el = document.createElement('div');
-      el.className = 'toast ' + (type==='ok' ? 'ok' : (type==='err' ? 'err' : 'info'));
-      el.setAttribute('role','status');
-      el.textContent = msg;
-      toasts.appendChild(el);
-      // animate show
-      requestAnimationFrame(()=> el.classList.add('show'));
-      const t = setTimeout(()=> { el.classList.remove('show'); setTimeout(()=> el.remove(), 220); }, timeout);
-      // allow click to dismiss early
-      el.addEventListener('click', ()=> { clearTimeout(t); el.classList.remove('show'); setTimeout(()=> el.remove(), 120); });
-    }
-    // backward-compatible alias
-    const toast = (m,t,timeout) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), timeout);
-
-    // nav logic (sidebar & mobile buttons)
-    function showPage(name){
-      ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
-        const el = document.getElementById('page-'+p);
-        if (!el) return;
-        if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
-      });
-      // highlight buttons (sidebar)
-      $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
-      // autofocus first input if kehadiran page
-      if (name === 'kehadiran') { setTimeout(()=> $('#namaGuru')?.focus(), 220); }
-    }
-    // attach nav
-    $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
-
-    // top date & clock
-    function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
-    function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
-    setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
-
-    // toggle sidebar on mobile
-    $('#btn-toggle-sidebar')?.addEventListener('click', ()=> {
-      const aside = document.querySelector('aside');
-      if (!aside) return;
-      aside.classList.toggle('hidden');
-    });
-
-    // Admin modal handlers & generic modal helpers
-    function openModal(modal){ if(!modal) return; modal.classList.remove('hidden'); // focus first input
-      const first = modal.querySelector('input,select,button,textarea'); if(first) first.focus();
-      // trap focus lightly (basic)
-    }
-    function closeModal(modal){ if(!modal) return; modal.classList.add('hidden'); }
-
-    // modal close on overlay click and ESC
-    document.addEventListener('click', (ev) => {
-      // overlay clicks for admin/guru modals
-      if (ev.target && (ev.target.id === 'admin-modal' || ev.target.id === 'guru-modal')) {
-        closeModal(ev.target);
+      function makeToast(msg, type='info', timeout=3800){
+        const el = document.createElement('div');
+        el.className = 'toast ' + (type==='ok' ? 'ok' : (type==='err' ? 'err' : 'info'));
+        el.textContent = msg;
+        toasts.appendChild(el);
+        requestAnimationFrame(()=> el.classList.add('show'));
+        const t = setTimeout(()=> { el.classList.remove('show'); setTimeout(()=> el.remove(), 220); }, timeout);
+        el.addEventListener('click', ()=> { clearTimeout(t); el.classList.remove('show'); setTimeout(()=> el.remove(), 120); });
       }
-    });
-    document.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape') {
-        closeModal($('#admin-modal')); closeModal($('#guru-modal'));
-      }
-      // allow Enter to submit in modals
-      if (ev.key === 'Enter' && document.activeElement && document.activeElement.closest('#admin-modal')) {
-        $('#admin-submit')?.click();
-      }
-      if (ev.key === 'Enter' && document.activeElement && document.activeElement.closest('#guru-modal')) {
-        $('#guru-save')?.click();
-      }
-    });
+      window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), 3600);
 
-    // keep required IDs for firebase script:
-    // namaGuru, statusKehadiran, lokasi, kirimKehadiranBtn, guruTableBody, totalGuru,totalHadir,totalLain, chartDashboard, recent-activity, laporan elements
-
-    // Admin login modal
-    function openAdminModal(){ openModal($('#admin-modal')); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
-    function closeAdminModal(){ closeModal($('#admin-modal')); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
-
-    // admin credentials (demo)
-    const ADMIN_USER = 'admin';
-    const ADMIN_PASS = 'admin123';
-
-    function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
-    function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
-
-    // inject admin controls (in header area of Data Guru)
-    function injectAdminControls(){
-      const placeholder = $('#admin-controls-placeholder');
-      if (!placeholder) return;
-      if ($('#admin-controls')) return;
-      const wrap = document.createElement('div');
-      wrap.id = 'admin-controls';
-      wrap.className = 'flex gap-2 items-center';
-      wrap.innerHTML = `
-        <button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>
-        <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>
-      `;
-      placeholder.appendChild(wrap);
-    }
-    function removeAdminControls(){ $('#admin-controls')?.remove(); }
-
-    // open/close guru modal
-    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; openModal($('#guru-modal')); }
-    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; openModal($('#guru-modal')); }
-    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
-
-    // render functions used when Firebase dispatches 'gurus-updated' (app.firebase.js will dispatch)
-    function renderGuruTable(list){
-      const tb = $('#guruTableBody'); if (!tb) return;
-      if (!Array.isArray(list) || list.length===0){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect(list||[]); return; }
-      tb.innerHTML = '';
-      list.forEach(g => {
-        const tr = document.createElement('tr');
-        tr.className = 'align-top';
-        tr.innerHTML = `
-          <td class="border p-2">${g.nip||''}</td>
-          <td class="border p-2">${escapeHtml(g.nama||g.name||'')}</td>
-          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
-          <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
-          <td class="border p-2">
-            ${ isAdminLocal() ? `<button data-id="${g.id}" class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
-                                 <button data-id="${g.id}" class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-slate-400">—</span>'}
-          </td>
-        `;
-        tb.appendChild(tr);
-      });
-      // wire up handlers
-      $$('.btn-edit').forEach(b => b.onclick = async (ev) => {
-        const id = ev.currentTarget.dataset.id;
-        const listCached = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-        const g = (listCached||[]).find(x=>x.id===id);
-        if (g) openGuruModalEdit(g);
-        else toast('Data guru tidak ditemukan', 'err');
-      });
-      $$('.btn-del').forEach(b => b.onclick = async (ev) => {
-        const id = ev.currentTarget.dataset.id;
-        if (!confirm('Hapus guru ini?')) return;
-        try {
-          if (window.deleteGuruFirebase) await window.deleteGuruFirebase(id);
-          else {
-            // local fallback remove
-            const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]').filter(x=>x.id!==id);
-            localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
-            renderGuruTable(list);
-          }
-          toast('Guru dihapus', 'ok');
-        } catch(err){ console.error(err); toast('Gagal hapus: '+(err&&err.message?err.message:err), 'err'); }
-      });
-    }
-
-    function populateNamaSelect(list){
-      const sel = $('#namaGuru'); if (!sel) return;
-      sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
-      (list||[]).forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = `${g.nip||g.id}|${g.nama||g.name||''}`;
-        opt.textContent = (g.nama||g.name||'') + (g.jabatan ? ' — ' + g.jabatan : '');
-        sel.appendChild(opt);
-      });
-    }
-
-    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
-
-    // listen for firebase-driven update event (app.firebase.js dispatches 'gurus-updated')
-    window.addEventListener('gurus-updated', (ev) => {
-      const list = ev.detail || [];
-      window.__latest_guru_list = list;
-      localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
-      renderGuruTable(list);
-      populateNamaSelect(list);
-      // set totals
-      $('#totalGuru') && ( $('#totalGuru').textContent = String(list.length) );
-      toast('Daftar guru diperbarui (Realtime)', 'info', 1800);
-    });
-
-    // Admin modal events (delegated)
-    document.addEventListener('click', async (e) => {
-      // open admin modal
-      if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
-      if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
-      if (e.target && e.target.id === 'admin-submit') {
-        const u = $('#admin-username').value.trim();
-        const p = $('#admin-password').value.trim();
-        if (u === ADMIN_USER && p === ADMIN_PASS) {
-          setAdminLocal(true);
-          closeAdminModal();
-          injectAdminControls();
-          $('#admin-badge').classList.remove('hidden');
-          $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
-          // render current list as admin
-          const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-          renderGuruTable(list);
-          toast('Login Admin berhasil', 'ok');
-        } else {
-          $('#admin-msg').textContent = 'Credential salah.';
-        }
-      }
-
-      if (e.target && e.target.id === 'btn-admin-logout') {
-        if (!confirm('Keluar sebagai admin?')) return;
-        setAdminLocal(false);
-        $('#admin-badge').classList.add('hidden');
-        $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden');
-        removeAdminControls();
-        const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-        renderGuruTable(list);
-        toast('Logout berhasil', 'ok');
-      }
-
-      // add guru button
-      if (e.target && e.target.id === 'btn-add-guru-admin') openGuruModalCreate();
-      if (e.target && e.target.id === 'guru-cancel') closeGuruModal();
-
-      // save guru (create/update)
-      if (e.target && e.target.id === 'guru-save') {
-        const editId = e.target.dataset.editId || '';
-        const nip = $('#guru-nip').value.trim();
-        const nama = $('#guru-nama-input').value.trim();
-        const jab = $('#guru-jabatan-input').value.trim();
-        if (!nama) return toast('Masukkan nama guru', 'err');
-        try {
-          if (editId) {
-            if (window.updateGuruFirebase) {
-              await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
-            } else {
-              // local fallback
-              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-              const idx = list.findIndex(x=>x.id===editId);
-              if (idx>=0){ list[idx] = Object.assign({}, list[idx], { nip, nama, jabatan: jab }); localStorage.setItem('wh_guru_list_v1', JSON.stringify(list)); renderGuruTable(list); }
-            }
-            toast('Perubahan disimpan', 'ok');
-          } else {
-            if (window.addGuruFirebase) {
-              await window.addGuruFirebase({ nip, nama, jabatan: jab });
-            } else {
-              // local fallback
-              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-              const id = 'g' + Date.now();
-              list.push({ id, nip, nama, jabatan: jab });
-              localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
-              renderGuruTable(list);
-            }
-            toast('Guru tersimpan', 'ok');
-          }
-        } catch(err){ console.error(err); toast('Gagal menyimpan guru: '+(err&&err.message?err.message:err), 'err'); }
-        closeGuruModal();
-      }
-
-      // trigger sync
-      if (e.target && e.target.id === 'btn-sync-local') {
-        if (window.syncFromFirebase) { try { window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu', 'info'); } catch(e){ toast('Sinkron gagal: '+e.message,'err'); } }
-        else { const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]'); renderGuruTable(list); toast('Menggunakan data lokal', 'info'); }
-      }
-    });
-
-    // initial boot: show default page
-    showPage('kehadiran');
-
-    // Admin badge initial
-    if (isAdminLocal()) {
-      $('#admin-badge').classList.remove('hidden'); $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
-      injectAdminControls();
-    } else {
-      $('#admin-badge').classList.add('hidden');
-    }
-
-    // ensure nama select is populated with localStorage fallback quickly
-    const local = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
-    if (local && local.length) { renderGuruTable(local); populateNamaSelect(local); }
-
-    // Kehadiran button feedback (this works together with app.firebase.js's handler)
-    $('#kirimKehadiranBtn')?.addEventListener('click', () => {
-      $('#kehadiran-status').textContent = 'Mengirim...';
-      setTimeout(()=>{ $('#kehadiran-status').textContent = '—'; }, 1200);
-      // actual send is handled in app.firebase.js (which listens same button)
-    });
-
-    // Defensive Chart.js init for chartDashboard so the UI looks alive even before data arrives.
-    (function initChartPlaceholder(){
-      try {
-        const ctx = document.getElementById('chartDashboard');
-        if (!ctx) return;
-        if (!window.Chart) { return; }
-        const labels = ['07:00','08:00','09:00','10:00','11:00','12:00'];
-        const data = { labels, datasets: [{ label: 'Hadir', data: [0,0,0,0,0,0], tension:0.3, fill:false }] };
-        window._wh_chartDashboard = new Chart(ctx.getContext('2d'), {
-          type: 'line',
-          data,
-          options: {
-            plugins: { legend: { display: false } },
-            scales: { x: { display: true }, y: { beginAtZero: true, ticks:{ stepSize:1 } } },
-            maintainAspectRatio: false
-          }
+      function showPage(name){
+        ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
+          const el = document.getElementById('page-'+p);
+          if (!el) return;
+          if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
         });
-        // app.firebase.js may update window._wh_chartDashboard.data later.
-      } catch(e){ console.warn('Chart placeholder init failed', e); }
+        $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
+        if (name === 'kehadiran') setTimeout(()=> $('#namaGuru')?.focus(), 220);
+      }
+      $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
+      document.getElementById('btn-toggle-sidebar')?.addEventListener('click', ()=> document.querySelector('aside')?.classList.toggle('hidden'));
+
+      function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
+      function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
+      setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
+      showPage('kehadiran');
+
+      // quick admin UI logic kept minimal (login uses local demo credentials)
+      const ADMIN_USER='admin', ADMIN_PASS='admin123';
+      function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
+      function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
+      function injectAdminControls(){ if ($('#admin-controls')) return; const wrap=document.createElement('div'); wrap.id='admin-controls'; wrap.className='flex gap-2 items-center'; wrap.innerHTML=`<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button><button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>`; $('#admin-controls-placeholder')?.appendChild(wrap); }
+      function removeAdminControls(){ $('#admin-controls')?.remove(); }
+
+      document.addEventListener('click', (e) => {
+        if (e.target && e.target.id === 'btn-open-admin') { $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
+        if (e.target && e.target.id === 'admin-cancel') $('#admin-modal').classList.add('hidden');
+        if (e.target && e.target.id === 'admin-submit') {
+          const u = $('#admin-username').value.trim(), p = $('#admin-password').value.trim();
+          if (u===ADMIN_USER && p===ADMIN_PASS){ setAdminLocal(true); $('#admin-modal').classList.add('hidden'); injectAdminControls(); $('#admin-badge').classList.remove('hidden'); $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden'); toast('Login Admin berhasil','ok'); } else { $('#admin-msg').textContent='Credential salah.'; }
+        }
+        if (e.target && e.target.id === 'btn-admin-logout') { if(confirm('Keluar sebagai admin?')){ setAdminLocal(false); $('#admin-badge').classList.add('hidden'); $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden'); removeAdminControls(); toast('Logout berhasil','ok'); } }
+        if (e.target && e.target.id === 'btn-add-guru-admin') $('#guru-modal').classList.remove('hidden');
+        if (e.target && e.target.id === 'guru-cancel') $('#guru-modal').classList.add('hidden');
+        if (e.target && e.target.id === 'guru-save') {
+          const editId = e.target.dataset.editId || ''; const nip = $('#guru-nip').value.trim(); const nama = $('#guru-nama-input').value.trim(); const jab = $('#guru-jabatan-input').value.trim();
+          if (!nama) return toast('Masukkan nama guru','err');
+          if (window.addGuruFirebase && !editId) { window.addGuruFirebase({ nip, nama, jabatan: jab }).then(()=> { toast('Guru tersimpan','ok'); $('#guru-modal').classList.add('hidden'); }).catch(err=>toast('Gagal: '+err.message,'err')); }
+          else if (window.updateGuruFirebase && editId) { window.updateGuruFirebase(editId, { nip, nama, jabatan: jab }).then(()=>{ toast('Perubahan disimpan','ok'); $('#guru-modal').classList.add('hidden'); }).catch(err=>toast('Gagal: '+err.message,'err')); }
+        }
+        if (e.target && e.target.id === 'btn-sync-local') {
+          if (window.syncFromFirebase) { try { window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu','info'); } catch(e){ toast('Sinkron gagal','err'); } } else { const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]'); if (window.renderGuruTable) window.renderGuruTable(list); toast('Menggunakan data lokal','info'); }
+        }
+      });
+
+      if (isAdminLocal()){ $('#admin-badge').classList.remove('hidden'); injectAdminControls(); $('#btn-open-admin').classList.add('hidden'); $('#btn-admin-logout').classList.remove('hidden'); }
     })();
-
-    // simple alias for legacy code expecting `toast`
-    window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'), 3600);
-
-  })();
   </script>
-
-  <!-- end -->
 </body>
 </html>
