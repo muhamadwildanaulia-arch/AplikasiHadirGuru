@@ -18,6 +18,7 @@ try {
   if (window.firebase && firebase.initializeApp) {
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     if (firebase.database) db = firebase.database();
+    window.db = db; // <- PENTING: expose ke window supaya modul lain yg cek window.db bekerja
     else console.warn('Firebase database compat not available.');
   } else {
     console.warn('Firebase compat SDK tidak ditemukan — operasi DB akan fallback ke localStorage.');
