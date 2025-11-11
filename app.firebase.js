@@ -1723,6 +1723,67 @@ function drawClock(){
   const small = document.getElementById('clock-small');
   if (small) small.textContent = new Date().toLocaleTimeString('id-ID');
 }
+/* ----------------- Compatibility & safe local render ----------------- */
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    // 1) Alias render functions (safe)
+    if (!window.renderGuruTable && typeof renderGuruUi === 'function') window.renderGuruTable = renderGuruUi;
+    if (!window.renderGuruUi && typeof renderGuruTable === 'function') window.renderGuruUi = renderGuruTable;
+
+    // 2) Map common differing element IDs so renderGuruUi/finders work
+    try {
+      // select id mapping
+      if (!document.getElementById('namaGuru') && document.getElementById('select-guru')) {
+        document.getElementById('select-guru').id = 'namaGuru';
+        console.info('Mapped select-guru → namaGuru');
+      }
+      // table tbody mapping: #guru-table -> tbody#guruTableBody
+      if (!document.getElementById('guruTableBody')) {
+        const t = document.getElementById('guru-table') || document.getElementById('guruTable');
+        if (t) {
+          const tb = t.querySelector('tbody') || t;
+          tb.id = 'guruTableBody';
+          console.info('Mapped guru-table tbody → guruTableBody');
+        }
+      }
+      // stat elements mapping (optional)
+      if (!document.getElementById('totalGuru') && document.getElementById('stat-total')) {
+        document.getElementById('stat-total').id = 'totalGuru';
+        console.info('Mapped stat-total → totalGuru');
+      }
+      if (!document.getElementById('totalHadir') && document.getElementById('stat-hadir')) {
+        document.getElementById('stat-hadir').id = 'totalHadir';
+        console.info('Mapped stat-hadir → totalHadir');
+      }
+      if (!document.getElementById('totalLain') && document.getElementById('stat-izin')) {
+        document.getElementById('stat-izin').id = 'totalLain';
+        console.info('Mapped stat-izin → totalLain');
+      }
+    } catch(e){ console.warn('ID mapping failed', e); }
+
+    // 3) Ensure render is called with local data (so table appears even if Firebase not ready)
+    try {
+      const local = JSON.parse(localStorage.getItem(KEY_GURU) || '[]');
+      if (local && local.length) {
+        if (typeof renderGuruUi === 'function') {
+          renderGuruUi(local);
+          console.info('Rendered guru from localStorage (renderGuruUi). Count:', local.length);
+        } else if (typeof renderGuruTable === 'function') {
+          renderGuruTable(local);
+          console.info('Rendered guru from localStorage (renderGuruTable). Count:', local.length);
+        } else {
+          console.warn('No render function available to display guru list');
+        }
+      } else {
+        console.info('No local guru data to render');
+      }
+    } catch(e){ console.warn('Render local data failed', e); }
+
+  } catch(err){
+    console.error('compat init error', err);
+  }
+});
+/* ----------------- end Compatibility & safe local render ----------------- */
 
 // Boot sequence
 (function boot(){
