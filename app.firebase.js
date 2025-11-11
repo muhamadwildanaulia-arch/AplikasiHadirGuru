@@ -1064,3 +1064,367 @@ window.syncFromFirebase = syncFromFirebase;
 
 })(); // end installer
 
+/* ===========================
+   PATCH: offline/online handlers
+   (idempotent — safe to append)
+   =========================== */
+(function install_wh_patches(){
+
+  // ---------- escapeHtml helper (define only if missing) ----------
+  if (typeof window.escapeHtml !== 'function') {
+    window.escapeHtml = function(s){
+      if(!s && s !== 0) return '';
+      return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c]));
+    };
+  }
+
+  // ---------- basic date/time helpers (if missing) ----------
+  if (typeof window.nowFormatted !== 'function') {
+    window.nowFormatted = function(){
+      const d = new Date();
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    };
+  }
+  if (typeof window.timeFormatted !== 'function') {
+    window.timeFormatted = function(){
+      return new Date().toTimeString().split(' ')[0];
+    };
+  }
+
+  // ---------- Safe globals / keys ----------
+  const KEY_PENDING = 'wh_pending_kehadiran';
+  const KEY_GURU = 'wh_guru_list_v1';
+
+  // ---------- Pending queue helpers (idempotent installer) ----------
+  if (!window.__wh_kirimKehadiran) {
+    window.__wh_kirimKehadiran = (function(){
+      function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
+      function savePending(arr){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(arr)); } catch(e){} }
+      function pushPending(item){ const a = loadPending(); a.push(item); savePending(a); updatePendingIndicator(); }
+      function popPending(){ const a = loadPending(); if (!a.length) return null; const it = a.shift(); savePending(a); updatePendingIndicator(); return it; }
+      function updatePendingIndicator(){
+        const pending = loadPending().length;
+        const statusEl = document.getElementById('kehadiran-status');
+        if (statusEl) statusEl.textContent = pending ? `Pending: ${pending} item${pending>1?'s':''}` : '—';
+      }
+
+      async function sendToFirebaseOnce(item){
+        if (!navigator.onLine) return false;
+        if (!window.db) return false;
+        try {
+          const payload = Object.assign({}, item);
+          if (payload.imageId) delete payload.imageId; // don't send local-only id
+          const ref = window.db.ref('kehadiran').push();
+          await ref.set(Object.assign({}, payload, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+          return true;
+        } catch(err){
+          console.warn('sendToFirebaseOnce failed', err);
+          return false;
+        }
+      }
+
+      // flush pending sequentially until failure
+      async function flushPending(){
+        if (!navigator.onLine) return;
+        let arr = loadPending();
+        if (!arr.length) { updatePendingIndicator(); return; }
+        while (arr.length){
+          const item = arr[0];
+          const ok = await sendToFirebaseOnce(item);
+          if (!ok) break;
+          arr.shift();
+          savePending(arr);
+          updatePendingIndicator();
+          await new Promise(r => setTimeout(r, 150));
+        }
+      }
+
+      // send single item: prefer immediate send, fallback to pushPending
+      async function sendOrQueue(item){
+        try {
+          if (navigator.onLine && window.db) {
+            const ok = await sendToFirebaseOnce(item);
+            if (ok) {
+              try { addRecentLocal(item); } catch(e){}
+              return { status: 'sent' };
+            }
+          }
+        } catch(e){}
+        pushPending(item);
+        try { addRecentLocal(item); } catch(e){}
+        return { status: 'queued' };
+      }
+
+      // lightweight UI recent helper (only if DOM exists)
+      async function addRecentLocal(entry){
+        try {
+          const recent = document.getElementById('recent-activity'); if (!recent) return;
+          const wrapper = document.createElement('div');
+          wrapper.className = 'flex items-center gap-3';
+          const txt = document.createElement('div');
+          const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
+          txt.className = 'text-gray-700 text-sm';
+          txt.textContent = `${jam} — ${entry.nama||entry.nip||'(tanpa nama)'} — ${entry.status}`;
+          wrapper.appendChild(txt);
+          if (entry.imageId && window.__whImageCache) {
+            const img = document.createElement('img');
+            img.className = 'h-12 w-12 object-cover rounded hidden';
+            img.alt = 'foto';
+            wrapper.appendChild(img);
+            try {
+              const dataURL = await window.__whImageCache.getImageDataURL(entry.imageId);
+              if (dataURL) { img.src = dataURL; img.classList.remove('hidden'); }
+            } catch(e){}
+          }
+          recent.prepend(wrapper);
+          const items = recent.querySelectorAll('div.flex');
+          if (items.length > 25) items[items.length-1].remove();
+        } catch(e){ console.warn('addRecentLocal failed', e); }
+      }
+
+      // wire online events
+      window.addEventListener('online', () => { try { window.toast && window.toast('Koneksi kembali — mengirim antrian...', 'info'); } catch(e){}; flushPending(); });
+      window.addEventListener('offline', () => { try { window.toast && window.toast('Anda offline — kehadiran akan disimpan sementara', 'err'); } catch(e){}; updatePendingIndicator(); });
+
+      // expose
+      return {
+        loadPending, savePending, pushPending, popPending, updatePendingIndicator, flushPending, sendOrQueue, addRecentLocal
+      };
+    })();
+  } // end __wh_kirimKehadiran installer
+
+  // ---------- Attach handler to #kirimKehadiranBtn (safe, replace old) ----------
+  (function attach_kirim_btn(){
+    const btnOld = document.getElementById('kirimKehadiranBtn');
+    if (!btnOld) return;
+    const btn = btnOld.cloneNode(true);
+    btnOld.parentNode.replaceChild(btn, btnOld);
+
+    btn.addEventListener('click', async function(ev){
+      ev.preventDefault();
+      const selVal = document.getElementById('namaGuru')?.value;
+      const status = document.getElementById('statusKehadiran')?.value;
+      if (!selVal) { window.toast ? window.toast('Pilih nama guru terlebih dahulu', 'err') : alert('Pilih nama guru terlebih dahulu.'); return; }
+      if (!status) { window.toast ? window.toast('Pilih status kehadiran', 'err') : alert('Pilih status kehadiran.'); return; }
+
+      const [nip, name] = (selVal||'').split('|');
+      const lokasiVal = document.getElementById('lokasi')?.value || '';
+      const payload = {
+        nip: (nip||'').trim(),
+        nama: (name||'').trim(),
+        status: status,
+        jam: window.timeFormatted(),
+        tanggal: window.nowFormatted(),
+        lokasi: lokasiVal
+      };
+
+      // attach local imageId if present (image cache exposes getAndClearFormImageId)
+      try {
+        if (window.__whImageCache && typeof window.__whImageCache.getAndClearFormImageId === 'function') {
+          const id = window.__whImageCache.getAndClearFormImageId();
+          if (id) payload.imageId = id;
+        }
+      } catch(e){}
+
+      // UI feedback
+      const orig = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = 'Mengirim...';
+      try {
+        // duplicate check against pending
+        const today = window.nowFormatted();
+        const pend = window.__wh_kirimKehadiran.loadPending();
+        if (pend.some(p => p.tanggal === today && ((p.nip && payload.nip && p.nip === payload.nip) || (p.nama && payload.nama && p.nama === payload.nama)))) {
+          window.toast && window.toast('Guru sudah absen hari ini (pending)', 'err');
+          return;
+        }
+        const res = await window.__wh_kirimKehadiran.sendOrQueue(payload);
+        if (res.status === 'sent') {
+          window.toast && window.toast('Kehadiran berhasil dikirim', 'ok');
+        } else {
+          window.toast && window.toast('Kehadiran disimpan ke antrian (offline)', 'info');
+        }
+      } catch(err){
+        console.error('kirim error', err);
+        try { window.__wh_kirimKehadiran.pushPending(payload); window.toast && window.toast('Gagal kirim — disimpan lokal', 'err'); } catch(e){}
+      } finally {
+        btn.disabled = false; btn.innerHTML = orig; window.__wh_kirimKehadiran.updatePendingIndicator();
+      }
+    });
+  })();
+
+  // ---------- Robust laporan builder & export (idempotent) ----------
+  if (!window.__wh_laporan_installed) {
+    window.__wh_laporan_installed = true;
+
+    function normalizeDateToYYYYMMDD(raw){
+      if (raw === null || raw === undefined) return null;
+      if (typeof raw === 'number') {
+        const ms = raw < 1e12 ? raw*1000 : raw;
+        const d = new Date(ms); if (!isNaN(d)) return d.toISOString().slice(0,10); return null;
+      }
+      if (typeof raw === 'string') {
+        const s = raw.trim();
+        const m = s.match(/(\d{4}-\d{2}-\d{2})/);
+        if (m) return m[1];
+        const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0,10);
+        return null;
+      }
+      if (raw && raw._date) return normalizeDateToYYYYMMDD(raw._date);
+      return null;
+    }
+    function normalizeStatus(raw){
+      if (raw === null || raw === undefined) return '';
+      const s = String(raw).trim().toLowerCase();
+      if (!s) return '';
+      if (s.includes('hadir') || s==='h') return 'H';
+      if (s.includes('izin') || s==='i') return 'I';
+      if (s.includes('sakit') || s==='s') return 'S';
+      if (s.includes('dinas') || s==='d') return 'D';
+      const first = s.charAt(0).toUpperCase();
+      return /[HISD]/.test(first) ? first : first;
+    }
+    function loadLocalGuru(){ try { return JSON.parse(localStorage.getItem(KEY_GURU) || '[]'); } catch(e){ return []; } }
+    function loadPendingLocal(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
+
+    async function loadKehadiranAll(){
+      const out = [];
+      const pend = loadPendingLocal() || [];
+      out.push(...pend);
+      if (window.db) {
+        try {
+          const snap = await window.db.ref('kehadiran').once('value');
+          const val = snap.val() || {};
+          Object.values(val).forEach(x => out.push(x));
+        } catch(e){ console.warn('loadKehadiranAll: firebase read failed', e); }
+      } else {
+        console.info('loadKehadiranAll: firebase not available on page (offline).');
+      }
+      return out;
+    }
+
+    async function buildMatrixForMonth(ym){
+      const res = { days: [], rows: [], debug: { processed:0, matched:0, unmatched:0 } };
+      if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return res;
+      const [y,mm] = ym.split('-').map(Number);
+      const daysInMonth = new Date(y, mm, 0).getDate();
+      res.days = Array.from({length:daysInMonth}, (_,i)=> i+1);
+      const gurus = loadLocalGuru();
+      res.rows = gurus.map(g => ({
+        id: g.id, nip: g.nip, nama: g.nama, jabatan: g.jabatan,
+        key: (g.nip && String(g.nip).trim() && String(g.nip).trim() !== '-') ? String(g.nip).trim() : (g.nama||'').toString().trim().toLowerCase(),
+        cells: Array(daysInMonth).fill('')
+      }));
+      const entries = await loadKehadiranAll();
+      entries.forEach(e => {
+        res.debug.processed++;
+        const dateStr = normalizeDateToYYYYMMDD(e.tanggal || e.date || e.tgl || e.createdAt || e.timestamp);
+        if (!dateStr) { res.debug.unmatched++; return; }
+        const parts = dateStr.split('-'); if (parts.length < 3) { res.debug.unmatched++; return; }
+        const ym0 = `${parts[0]}-${parts[1]}`; if (ym0 !== ym) return;
+        const d = Number(parts[2]); if (!d || d < 1 || d > daysInMonth) { res.debug.unmatched++; return; }
+        const stat = normalizeStatus(e.status || e.keterangan || e.ket || e.ket_status);
+        const nipRaw = e.nip ? String(e.nip).trim() : '';
+        const matchKey = (nipRaw && nipRaw !== '-') ? nipRaw : (e.nama||e.name||'').toString().trim().toLowerCase();
+        let row = res.rows.find(r => r.key === matchKey);
+        if (!row && matchKey) row = res.rows.find(r => (r.nama||'').toString().trim().toLowerCase() === matchKey);
+        if (!row && e.nama) {
+          const nm = (e.nama||'').toString().trim().toLowerCase();
+          row = res.rows.find(r => (r.nama||'').toString().trim().toLowerCase().includes(nm) || nm.includes((r.nama||'').toString().trim().toLowerCase()));
+        }
+        if (row) {
+          res.debug.matched++;
+          const mark = stat || (e.status ? String(e.status).trim().charAt(0).toUpperCase() : '');
+          row.cells[d-1] = mark;
+        } else {
+          res.debug.unmatched++;
+        }
+      });
+      return res;
+    }
+
+    function renderMatrixToDOM(result, ym){
+      const wrapEmpty = document.getElementById('laporan-matrix-empty');
+      const wrapTable = document.getElementById('laporan-matrix-table');
+      const resume = document.getElementById('resume-laporan');
+      if (!wrapTable || !wrapEmpty || !resume) return;
+      if (!result || !result.days || !result.rows) { wrapEmpty.classList.remove('hidden'); wrapTable.classList.add('hidden'); resume.innerHTML=''; return; }
+      if (!result.rows.length) { wrapEmpty.classList.remove('hidden'); wrapTable.classList.add('hidden'); resume.innerHTML = `<div class="text-slate-500 p-4">Tidak ada data untuk bulan ${ym}.</div>`; return; }
+      wrapEmpty.classList.add('hidden'); wrapTable.classList.remove('hidden');
+      let html = '<div style="overflow:auto"><table class="min-w-full text-sm border-collapse" style="border:1px solid #e6e9ef"><thead><tr><th style="padding:6px;border:1px solid #e6e9ef">#</th><th style="padding:6px;border:1px solid #e6e9ef">Nama</th>';
+      result.days.forEach(d => html += `<th style="padding:6px;border:1px solid #e6e9ef">${d}</th>`);
+      html += '<th style="padding:6px;border:1px solid #e6e9ef">Hadir</th><th style="padding:6px;border:1px solid #e6e9ef">Lain</th></tr></thead><tbody>';
+      result.rows.forEach((r, idx) => {
+        html += `<tr><td style="padding:6px;border:1px solid #e6e9ef">${idx+1}</td><td style="padding:6px;border:1px solid #e6e9ef">${escapeHtml(r.nama||'')}</td>`;
+        r.cells.forEach(c => html += `<td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${c||''}</td>`);
+        const hadir = r.cells.filter(x=>x==='H').length;
+        const lain = r.cells.filter(x=>x && x!=='H').length;
+        html += `<td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${hadir}</td><td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${lain}</td></tr>`;
+      });
+      html += '</tbody></table></div>';
+      wrapTable.innerHTML = html;
+      const totalGuru = result.rows.length;
+      const totalHadir = result.rows.reduce((s,r)=> s + r.cells.filter(x=>x==='H').length, 0);
+      const totalLain = result.rows.reduce((s,r)=> s + r.cells.filter(x=>x && x!=='H').length, 0);
+      resume.innerHTML = `<div class="p-3 text-sm">Bulan: <strong>${ym}</strong> • Guru: <strong>${totalGuru}</strong> • Total Hadir: <strong>${totalHadir}</strong> • Total Izin/Sakit/Dinas: <strong>${totalLain}</strong></div>`;
+    }
+
+    // wire tombol tampil & export (replace old listeners)
+    (function wireTampilkanAndExport(){
+      const btn = document.getElementById('tampilkanLaporanBtn');
+      if (btn) {
+        const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', async function(){
+          const ym = document.getElementById('bulan')?.value;
+          if (!ym) { window.toast && window.toast('Pilih bulan terlebih dahulu', 'err'); return; }
+          this.disabled = true; const orig = this.innerHTML; this.innerHTML = 'Memuat...';
+          try {
+            const res = await buildMatrixForMonth(ym);
+            console.info('Debug laporan:', res.debug);
+            renderMatrixToDOM(res, ym);
+          } catch(e){ console.error('Gagal build laporan', e); window.toast && window.toast('Gagal buat laporan', 'err'); }
+          finally { this.disabled = false; this.innerHTML = orig; }
+        });
+      }
+      const expBtn = document.getElementById('exportLaporanBtn');
+      if (expBtn) {
+        const newExp = expBtn.cloneNode(true); expBtn.parentNode.replaceChild(newExp, expBtn);
+        newExp.addEventListener('click', async function(){
+          const ym = document.getElementById('bulan')?.value;
+          if (!ym) { window.toast && window.toast('Pilih bulan terlebih dahulu', 'err'); return; }
+          this.disabled = true; const orig = this.innerHTML; this.innerHTML = 'Mengexport...';
+          try {
+            const res = await buildMatrixForMonth(ym);
+            if (!res || !res.rows || !res.rows.length) { window.toast && window.toast('Tidak ada data untuk diexport', 'err'); return; }
+            const days = res.days || [];
+            const header = ['No','Nama', ...days.map(d=>String(d)), 'Hadir','Lain'];
+            const data = res.rows.map((r,idx)=> {
+              const hadir = r.cells.filter(x=>x==='H').length;
+              const lain = r.cells.filter(x=>x && x!=='H').length;
+              return [idx+1, r.nama, ...r.cells.map(c=>c||''), hadir, lain];
+            });
+            if (window.XLSX) {
+              const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
+              XLSX.writeFile(wb, `laporan_${ym}.xlsx`);
+            } else {
+              const rows = [header, ...data].map(r => r.map(cell => `"${String(cell||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+              const blob = new Blob([rows], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = `laporan_${ym}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+            }
+          } catch(e){ console.error('Export failed', e); window.toast && window.toast('Export gagal', 'err'); }
+          finally { this.disabled = false; this.innerHTML = orig; }
+        });
+      }
+    })();
+  } // end laporan installer
+
+  // ---------- Boot: attempt flushPending on initial load (if online) ----------
+  try {
+    setTimeout(() => { try { window.__wh_kirimKehadiran && window.__wh_kirimKehadiran.flushPending && window.__wh_kirimKehadiran.flushPending(); } catch(e){}; }, 1200);
+  } catch(e){}
+
+  console.info('PATCH (kirim kehadiran + laporan & export) installed.');
+})(); // end install_wh_patches
