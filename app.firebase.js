@@ -886,3 +886,181 @@ window.syncFromFirebase = syncFromFirebase;
     }
   });
 })(); // end initCompatAndBoot
+
+// ======= Pasang handler kirim kehadiran (paste di Console atau append ke app.firebase.js) =======
+(function installKirimKehadiran(){
+  // constants (samakan dengan yang ada di file utama)
+  const KEY_PENDING = 'wh_pending_kehadiran';
+  const KEY_GURU = 'wh_guru_list_v1';
+
+  // safe helpers (jika yg asli sudah ada, jangan timpa)
+  if (typeof window.nowFormatted !== 'function') {
+    window.nowFormatted = function(){
+      const d = new Date();
+      const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    };
+  }
+  if (typeof window.timeFormatted !== 'function') {
+    window.timeFormatted = function(){
+      return new Date().toTimeString().split(' ')[0];
+    };
+  }
+  if (typeof window.escapeHtml !== 'function') {
+    window.escapeHtml = function(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); };
+  }
+
+  // pending queue helpers
+  function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
+  function savePending(a){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(a)); } catch(e){} }
+  function pushPending(item){ const arr = loadPending(); arr.push(item); savePending(arr); updatePendingIndicator(); }
+
+  function updatePendingIndicator(){
+    const pending = (loadPending()||[]).length;
+    const statusEl = document.getElementById('kehadiran-status');
+    if (statusEl) statusEl.textContent = pending ? `Pending: ${pending} item${pending>1?'s':''}` : '—';
+  }
+
+  // recent UI helper
+  async function addRecentLocal(entry){
+    const recent = document.getElementById('recent-activity');
+    if (!recent) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'flex items-center gap-3';
+    const txt = document.createElement('div');
+    const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
+    txt.className = 'text-gray-700 text-sm';
+    txt.textContent = `${jam} — ${entry.nama||entry.nip||'(tanpa nama)'} — ${entry.status}`;
+    wrapper.appendChild(txt);
+    recent.prepend(wrapper);
+    // trim
+    const items = recent.querySelectorAll('div.flex');
+    if (items.length > 25) items[items.length-1].remove();
+  }
+
+  // network send (one item)
+  async function sendToFirebaseOnce(item){
+    if (!navigator.onLine) return false;
+    if (!window.db) return false;
+    try {
+      const payload = Object.assign({}, item);
+      if (payload.imageId) delete payload.imageId; // local-only
+      const ref = window.db.ref('kehadiran').push();
+      await ref.set(Object.assign({}, payload, { timestamp: (window.firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+      return true;
+    } catch(err){
+      console.warn('sendToFirebaseOnce failed', err);
+      return false;
+    }
+  }
+
+  // flush pending (best-effort, used when network returns)
+  async function flushPending(){
+    if (!navigator.onLine) return;
+    let arr = loadPending();
+    if (!arr.length) { updatePendingIndicator(); return; }
+    // attempt sequential send
+    while (arr.length){
+      const item = arr[0];
+      const ok = await sendToFirebaseOnce(item);
+      if (!ok) break; // stop trying if server fails
+      // remove first
+      arr.shift();
+      savePending(arr);
+      updatePendingIndicator();
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+
+  // wire online event
+  window.addEventListener('online', () => { try { window.toast && window.toast('Koneksi kembali — mencoba kirim antrian','info'); } catch(e){}; flushPending(); });
+
+  // main submit function
+  async function kirimKehadiranHandler(ev){
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const selVal = document.getElementById('namaGuru')?.value;
+    const status = document.getElementById('statusKehadiran')?.value;
+    if (!selVal) { window.toast ? window.toast('Pilih nama guru terlebih dahulu', 'err') : alert('Pilih nama guru terlebih dahulu.'); return; }
+    if (!status) { window.toast ? window.toast('Pilih status kehadiran', 'err') : alert('Pilih status kehadiran.'); return; }
+
+    const [nip, name] = (selVal||'').split('|');
+    const lokasiVal = document.getElementById('lokasi')?.value || '';
+    const payload = {
+      nip: (nip||'').trim(),
+      nama: (name||'').trim(),
+      status: status,
+      jam: window.timeFormatted(),
+      tanggal: window.nowFormatted(),
+      lokasi: lokasiVal
+    };
+
+    // attach local imageId if present (image cache exposes getAndClearFormImageId)
+    try {
+      if (window.__whImageCache && typeof window.__whImageCache.getAndClearFormImageId === 'function') {
+        const id = window.__whImageCache.getAndClearFormImageId();
+        if (id) payload.imageId = id;
+      }
+    } catch(e){}
+
+    // UI feedback
+    const btn = document.getElementById('kirimKehadiranBtn');
+    const orig = btn ? btn.innerHTML : null;
+    if (btn) { btn.disabled = true; btn.innerHTML = 'Mengirim...'; }
+    try {
+      // optimistic: check duplicate in local pending
+      const today = window.nowFormatted();
+      const pend = loadPending();
+      if (pend.some(p => p.tanggal === today && ((p.nip && payload.nip && p.nip === payload.nip) || (p.nama && payload.nama && p.nama === payload.nama)))) {
+        window.toast && window.toast('Guru sudah absen hari ini (pending)', 'err');
+        return;
+      }
+      // if online & db present -> try send now
+      if (navigator.onLine && window.db) {
+        const ok = await sendToFirebaseOnce(payload);
+        if (ok) {
+          await addRecentLocal(payload);
+          window.toast && window.toast('Kehadiran berhasil dikirim', 'ok');
+          // ensure flushPending will update indicator (no change)
+          updatePendingIndicator();
+          return;
+        }
+      }
+      // fallback: push to local pending
+      pushPending(payload);
+      await addRecentLocal(payload);
+      window.toast && window.toast('Kehadiran tersimpan ke antrian (offline)', 'info');
+    } catch(err){
+      console.error('kirimKehadiranHandler error', err);
+      // best-effort fallback to local save
+      try { pushPending(payload); await addRecentLocal(payload); window.toast && window.toast('Terjadi masalah — disimpan lokal', 'err'); } catch(e){ console.error(e); window.toast && window.toast('Gagal simpan kehadiran', 'err'); }
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+      updatePendingIndicator();
+    }
+  }
+
+  // attach to button, but avoid double-attach: replace node to remove old listeners then attach
+  const oldBtn = document.getElementById('kirimKehadiranBtn');
+  if (oldBtn) {
+    const newBtn = oldBtn.cloneNode(true);
+    oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+    newBtn.addEventListener('click', kirimKehadiranHandler);
+    console.info('Kirim Kehadiran handler terpasang pada #kirimKehadiranBtn');
+  } else {
+    console.warn('#kirimKehadiranBtn tidak ditemukan — handler tidak terpasang');
+  }
+
+  // expose functions for debugging
+  window.__wh_kirimKehadiran = {
+    sendNow: kirimKehadiranHandler,
+    flushPending,
+    loadPending,
+    pushPending,
+    updatePendingIndicator
+  };
+
+  // initial UI update
+  updatePendingIndicator();
+
+})(); // end installer
+
