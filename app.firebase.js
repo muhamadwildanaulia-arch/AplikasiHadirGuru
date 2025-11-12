@@ -13,19 +13,28 @@ const firebaseConfig = {
   measurementId: "G-PK0811G8VJ"
 };
 
+/* ================= Init Firebase (compat) - FIXED SYNTAX ================= */
 let db = null;
 try {
-  if (window.firebase && firebase.initializeApp) {
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    if (firebase.database) db = firebase.database();
-    window.db = db; // <- PENTING: expose ke window supaya modul lain yg cek window.db bekerja
-    else console.warn('Firebase database compat not available.');
+  if (window.firebase && typeof firebase.initializeApp === 'function') {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    if (firebase && typeof firebase.database === 'function') {
+      db = firebase.database();
+      window.db = db; // expose for other modules that check window.db
+    } else {
+      console.warn('Firebase database compat not available.');
+      window.db = null;
+    }
   } else {
     console.warn('Firebase compat SDK tidak ditemukan — operasi DB akan fallback ke localStorage.');
+    window.db = null;
   }
 } catch (e) {
   console.error('Init firebase error', e);
   db = null;
+  window.db = null;
 }
 
 /* ================= constants & helpers ================= */
@@ -51,6 +60,14 @@ function snapshotToArray(obj){
   return Object.keys(obj).map(k => Object.assign({ id: k }, (obj[k] && typeof obj[k] === 'object') ? obj[k] : {}));
 }
 
+/* ================= SAFE DOM helpers ================= */
+function createTextCell(text, className='border p-2') {
+  const td = document.createElement('td');
+  td.className = className;
+  td.textContent = text || '';
+  return td;
+}
+
 /* ================= Render UI: Guru select & table ================= */
 function renderGuruUi(list){
   const sel = document.getElementById('namaGuru');
@@ -74,11 +91,23 @@ function renderGuruUi(list){
       tbody.innerHTML = '';
       list.forEach(g => {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td class="border p-2">${escapeHtml(g.nip||'')}</td>
-                        <td class="border p-2">${escapeHtml(g.nama||g.name||'')}</td>
-                        <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
-                        <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
-                        <td class="border p-2"><button data-id="${escapeHtml(g.id||'')}" class="btn-edit-guru text-xs px-2 py-1 rounded bg-slate-100">Edit</button> <button data-id="${escapeHtml(g.id||'')}" class="btn-del-guru text-xs px-2 py-1 rounded bg-rose-50 text-rose-700">Hapus</button></td>`;
+        tr.appendChild(createTextCell(g.nip||''));
+        tr.appendChild(createTextCell(g.nama||g.name||''));
+        tr.appendChild(createTextCell(g.jabatan||''));
+        tr.appendChild(createTextCell(g.status||'Aktif'));
+        const tdAksi = document.createElement('td');
+        tdAksi.className = 'border p-2';
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'btn-edit-guru text-xs px-2 py-1 rounded bg-slate-100';
+        btnEdit.textContent = 'Edit';
+        btnEdit.setAttribute('data-id', g.id || '');
+        const btnDel = document.createElement('button');
+        btnDel.className = 'btn-del-guru text-xs px-2 py-1 rounded bg-rose-50 text-rose-700 ml-2';
+        btnDel.textContent = 'Hapus';
+        btnDel.setAttribute('data-id', g.id || '');
+        tdAksi.appendChild(btnEdit);
+        tdAksi.appendChild(btnDel);
+        tr.appendChild(tdAksi);
         tbody.appendChild(tr);
       });
     }
@@ -141,6 +170,7 @@ function syncFromFirebase(){
 window.syncFromFirebase = syncFromFirebase;
 
 /* ================= Image cache (IndexedDB) ================= */
+// (kept unchanged)
 (function setupImageCache(){
   const DB_NAME = 'wh_images_db_v1';
   const STORE = 'images';
@@ -376,7 +406,34 @@ window.syncFromFirebase = syncFromFirebase;
 
 })(); // end setupLocation
 
-/* ================= Kehadiran: queue + send + duplicate check ================= */
+/* ================= Attendance key helper & listener management ================= */
+// Use determinisitc key per guru per date to avoid duplicates
+function makeAttendanceKey(payload){
+  // prefer nip, else normalized name
+  const base = (payload.nip && payload.nip.trim() && payload.nip !== '-') ? String(payload.nip).trim()
+               : (payload.nama ? String(payload.nama).trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'') : ('anon_' + Date.now()));
+  return base;
+}
+
+// listener management (attach/detach to avoid duplicates)
+const activeListeners = [];
+function attachListener(ref, ev, cb){
+  if (!ref) return;
+  ref.on(ev, cb);
+  activeListeners.push({ ref, ev, cb });
+}
+function detachAllListeners(){
+  activeListeners.forEach(({ ref, ev, cb }) => {
+    try { ref.off(ev, cb); } catch(e){}
+  });
+  activeListeners.length = 0;
+}
+window.addEventListener('beforeunload', detachAllListeners);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') detachAllListeners();
+});
+
+/* ================= Kehadiran: queue + send + duplicate check (UPDATED) ================= */
 (function setupKehadiran(){
   function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
   function savePending(arr){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(arr)); } catch(e){} }
@@ -384,21 +441,43 @@ window.syncFromFirebase = syncFromFirebase;
   function popPending(){ const a = loadPending(); if (!a.length) return null; const it = a.shift(); savePending(a); updatePendingIndicator(); return it; }
   function updatePendingIndicator(){ const pending = loadPending().length; const statusEl = document.getElementById('kehadiran-status'); if (statusEl) statusEl.textContent = pending ? `Pending: ${pending}` : '—'; }
 
-  async function alreadyCheckedToday(nip, nama){
+  async function alreadyCheckedTodayLocal(nip, nama){
     const today = nowFormatted();
     try {
       const pend = loadPending();
       if (pend.some(p => p.tanggal === today && ((p.nip && nip && p.nip === nip) || (p.nama && nama && p.nama === nama)))) return true;
     } catch(e){}
-    if (navigator.onLine && db) {
-      try {
-        const snap = await db.ref('kehadiran/' + today).orderByChild('tanggal').equalTo(today).once('value');
-        const val = snap.val() || {};
-        const arr = Object.values(val);
-        if (arr.some(x => (x.nip && nip && String(x.nip) === String(nip)) || (x.nama && nama && String(x.nama).trim() === String(nama).trim()))) return true;
-      } catch(err){ console.warn('alreadyCheckedToday query failed', err); }
-    }
     return false;
+  }
+
+  async function alreadyExistsOnServer(dateKey, attKey){
+    if (!navigator.onLine || !db) return false;
+    try {
+      const snap = await db.ref(`kehadiran/${dateKey}/${attKey}`).once('value');
+      return snap.exists();
+    } catch(err){
+      console.warn('alreadyExistsOnServer check failed', err);
+      return false;
+    }
+  }
+
+  async function sendAttendanceToServer(payload){
+    if (!navigator.onLine || !db) return false;
+    const dateKey = payload.tanggal || nowFormatted();
+    const attKey = makeAttendanceKey(payload);
+    try {
+      // If already exists, return false to signal duplicate
+      const exists = await alreadyExistsOnServer(dateKey, attKey);
+      if (exists) {
+        return { ok: false, reason: 'exists' };
+      }
+      const path = `kehadiran/${dateKey}/${attKey}`;
+      await db.ref(path).set(Object.assign({}, payload, { timestamp: (firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
+      return { ok: true, key: attKey };
+    } catch(err){
+      console.error('sendAttendanceToServer failed', err);
+      return { ok: false, reason: 'error', err };
+    }
   }
 
   async function flushOnePending(){
@@ -407,18 +486,33 @@ window.syncFromFirebase = syncFromFirebase;
     if (!item) return false;
     try {
       if (!db) throw new Error('Firebase DB tidak tersedia');
-      const payload = Object.assign({}, item);
-      if (payload.imageId) delete payload.imageId;
-      const dateKey = payload.tanggal || nowFormatted();
-      const ref = db.ref('kehadiran/' + dateKey).push();
-      await ref.set(Object.assign({}, payload, { timestamp: (firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
-      try { window.toast && window.toast('Pending berhasil dikirim', 'ok'); } catch(e){}
-      return true;
+      // attempt send with deterministic key
+      const result = await sendAttendanceToServer(item);
+      if (result && result.ok) {
+        try { window.toast && window.toast('Pending berhasil dikirim', 'ok'); } catch(e){}
+        return true;
+      } else {
+        // requeue if failed or duplicate found
+        const arr = loadPending();
+        arr.unshift(item);
+        savePending(arr);
+        if (result && result.reason === 'exists') {
+          // already exists on server: drop pending (already recorded). still mark as processed locally
+          // remove the just requeued item
+          const a2 = loadPending().filter(p => !(p.tanggal===item.tanggal && (p.nip===item.nip || p.nama===item.nama)));
+          savePending(a2);
+          updatePendingIndicator();
+          try { window.toast && window.toast('Pending ditemukan sudah ada di server — diabaikan', 'info'); } catch(e){}
+          return true;
+        }
+        console.warn('flushOnePending failed — requeued', result && result.err ? result.err : 'unknown');
+        return false;
+      }
     } catch(err){
       const arr = loadPending();
       arr.unshift(item);
       savePending(arr);
-      console.warn('flushOnePending failed — requeued', err);
+      console.warn('flushOnePending exception — requeued', err);
       return false;
     }
   }
@@ -440,27 +534,25 @@ window.syncFromFirebase = syncFromFirebase;
 
   updatePendingIndicator();
 
-  // send helper with improved error messages
+  // send helper with improved error messages (uses determinisitc key)
   async function sendToFirebaseOnce(item){
-    if (!navigator.onLine) return false;
+    if (!navigator.onLine) return { ok: false, reason: 'offline' };
     if (!db) {
       console.warn('sendToFirebaseOnce: Firebase DB tidak tersedia (window.db null)');
-      return false;
+      return { ok: false, reason: 'no-db' };
     }
     try {
-      const payload = Object.assign({}, item);
-      if (payload.imageId) delete payload.imageId;
-      const dateKey = payload.tanggal || nowFormatted();
-      const ref = db.ref('kehadiran/' + dateKey).push();
-      await ref.set(Object.assign({}, payload, { timestamp: (firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
-      return true;
+      const res = await sendAttendanceToServer(item);
+      if (res && res.ok) return { ok: true };
+      if (res && res.reason === 'exists') return { ok: false, reason: 'exists' };
+      return { ok: false, reason: 'error' };
     } catch(err){
       console.error('sendToFirebaseOnce failed:', err);
       try {
         const msg = (err && err.message) ? err.message : (err && err.code) ? String(err.code) : 'Unknown error';
         if (window.toast) window.toast('Gagal kirim: ' + msg, 'err');
       } catch(e){}
-      return false;
+      return { ok: false, reason: 'exception' };
     }
   }
 
@@ -494,21 +586,28 @@ window.syncFromFirebase = syncFromFirebase;
     if (btn) { btn.disabled = true; btn.innerHTML = 'Mengirim...'; }
     try {
       const today = nowFormatted();
-      const pend = loadPending();
-      if (pend.some(p => p.tanggal === today && ((p.nip && p.nip === payload.nip) || (p.nama && payload.nama && p.nama === payload.nama)))) {
+      // check local pending first
+      if (await alreadyCheckedTodayLocal(payload.nip, payload.nama)) {
         window.toast && window.toast('Guru sudah absen hari ini (pending)', 'err');
         return;
       }
 
+      // server check & send
       if (navigator.onLine && window.db) {
-        const ok = await sendToFirebaseOnce(payload);
-        if (ok) {
+        const res = await sendToFirebaseOnce(payload);
+        if (res.ok) {
           await addRecentLocal(payload);
           window.toast && window.toast('Kehadiran berhasil dikirim', 'ok');
           updatePendingIndicator();
           return;
         } else {
-          // send failed for some reason (will queue)
+          if (res.reason === 'exists') {
+            window.toast && window.toast('Guru sudah absen hari ini (server)', 'err');
+            // still add to recent locally but don't queue
+            await addRecentLocal(payload);
+            return;
+          }
+          // other failure -> queue
           pushPending(payload);
           await addRecentLocal(payload);
           window.toast && window.toast('Gagal kirim — disimpan lokal', 'err');
@@ -587,8 +686,8 @@ window.syncFromFirebase = syncFromFirebase;
     const data = dataObj || {};
     const today = nowFormatted();
     const arr = Array.isArray(data) ? data : Object.values(data || {});
-    const hadir = arr.filter(x => x && x.tanggal === today && x.status === 'Hadir').length;
-    const lain = arr.filter(x => x && x.tanggal === today && x.status !== 'Hadir').length;
+    const hadir = arr.filter(x => x && (String(x.tanggal) === today) && x.status === 'Hadir').length;
+    const lain = arr.filter(x => x && (String(x.tanggal) === today) && x.status !== 'Hadir').length;
 
     const totalGuruEl = document.getElementById('totalGuru');
     if (totalGuruEl) {
@@ -605,7 +704,8 @@ window.syncFromFirebase = syncFromFirebase;
     const recent = document.getElementById('recent-activity');
     if (recent) {
       recent.innerHTML = '';
-      const sorted = (Array.isArray(data) ? data : Object.values(data)).filter(Boolean).sort((a,b)=> (b.timestamp||0)-(a.timestamp||0)).slice(0,12);
+      const sorted = (Array.isArray(data) ? data : Object.values(data)).filter(Boolean)
+                     .sort((a,b)=> (b.timestamp||0)-(a.timestamp||0)).slice(0,12);
       if (!sorted.length) recent.innerHTML = '<p class="text-slate-400">Belum ada aktivitas.</p>';
       else sorted.forEach(it => {
         const p = document.createElement('p');
@@ -619,17 +719,25 @@ window.syncFromFirebase = syncFromFirebase;
   if (db) {
     const today = nowFormatted();
     const path = 'kehadiran/' + today;
-    db.ref(path).on('value', snap => {
-      const data = snap.val() || {};
-      updateFromSnapshot(data);
-    });
-    db.ref(path).once('value').then(snap => updateFromSnapshot(snap.val() || {})).catch(()=>{});
+    try {
+      const ref = db.ref(path);
+      attachListener(ref, 'value', snap => {
+        const data = snap.val() || {};
+        updateFromSnapshot(data);
+      });
+      // initial fetch
+      db.ref(path).once('value').then(snap => updateFromSnapshot(snap.val() || {})).catch(()=>{});
+    } catch(e){
+      console.warn('attach today listener failed', e);
+      updateFromSnapshot({});
+    }
   } else {
     updateFromSnapshot({});
   }
 })(); // end initKehadiranListeners
 
 /* ================= Camera capture modal ================= */
+// (kept unchanged)
 (function setupCamera(){
   const btnOpen = document.getElementById('btn-open-camera');
   const modal = document.getElementById('camera-modal');
@@ -886,10 +994,6 @@ window.syncFromFirebase = syncFromFirebase;
 })(); // end initBoot
 
 /* ================= Laporan & Export (client-side, careful with big DB) ================= */
-/*
- Note: this client-side builder reads pending local + can read entire DB when necessary.
- For large DB you should use a server-side aggregator. Kept simple for demo.
-*/
 (function laporanModule(){
   // helpers
   function normalizeDateToYYYYMMDD(raw){
