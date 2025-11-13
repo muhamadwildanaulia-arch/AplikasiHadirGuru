@@ -12,8 +12,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase compat -->
+  <!-- Firebase compat (pastikan versi sesuai kebutuhan) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <!-- ADDED: Auth compat (important if you use firebase.auth() or rules that require auth) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 
   <link rel="icon" type="image/png" href="Logo.png">
@@ -130,7 +132,6 @@
                     </select>
                   </div>
 
-                  <!-- Lokasi otomatis + tombol Gunakan GPS -->
                   <div>
                     <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
                     <div class="flex gap-2">
@@ -176,9 +177,9 @@
                   </div>
                 </div>
               </div>
-
             </div>
           </section>
+
           <!-- Data Guru -->
           <section id="page-guru" class="hidden">
             <div class="flex items-center justify-between mb-4">
@@ -186,19 +187,19 @@
               <div id="admin-controls-placeholder"></div>
             </div>
 
-            <div class="bg-white rounded-xl shadow p-4 overflow-auto">
-              <table class="min-w-full text-sm" role="table" aria-label="Daftar guru">
-                <thead class="bg-rose-50 text-rose-700 font-semibold">
-                  <tr>
-                    <th class="border p-2 text-left">NIP</th>
-                    <th class="border p-2 text-left">Nama Guru</th>
-                    <th class="border p-2 text-left">Jabatan</th>
-                    <th class="border p-2 text-left">Status</th>
-                    <th class="border p-2 text-left">Aksi</th>
+            <div class="card-smooth p-4">
+              <table class="w-full">
+                <thead>
+                  <tr class="text-left">
+                    <th class="p-2">NIP</th>
+                    <th class="p-2">Nama</th>
+                    <th class="p-2">Jabatan</th>
+                    <th class="p-2">Status</th>
+                    <th class="p-2">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="guruTableBody">
-                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat data...</td></tr>
+                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -206,18 +207,19 @@
 
           <!-- Laporan -->
           <section id="page-laporan" class="hidden">
-            <div class="mb-4 flex flex-wrap gap-3 items-center">
-              <input type="month" id="bulan" class="border rounded p-2" aria-label="Pilih bulan laporan" />
-              <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">Tampilkan</button>
-              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
+            <div class="card-smooth p-6">
+              <h2 class="text-xl font-semibold mb-4">📥 Laporan Bulanan</h2>
+              <div class="flex gap-3 items-center">
+                <select id="bulan" class="border p-2 rounded">
+                  <option value="">-- Pilih Bulan --</option>
+                  <!-- contoh value format YYYY-MM -->
+                  <option value="2025-11">November 2025</option>
+                  <option value="2025-10">Oktober 2025</option>
+                </select>
+                <button onclick="downloadLaporan('https://your-cloud-function.example.net/laporan')" class="px-3 py-2 rounded bg-emerald-600 text-white">Download (Admin)</button>
+                <div class="text-xs text-slate-500">Catatan: tombol ini memanggil Cloud Function protected (admin only).</div>
+              </div>
             </div>
-
-            <div id="laporan-matrix-wrap" class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
-              <div id="laporan-matrix-empty" class="text-slate-500 p-6 text-center">Pilih bulan untuk menampilkan laporan matrix kehadiran.</div>
-              <div id="laporan-matrix-table" class="w-full overflow-auto hidden"></div>
-            </div>
-
-            <div id="resume-laporan" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
           </section>
 
         </div>
@@ -225,113 +227,10 @@
     </div>
   </div>
 
-  <!-- Camera modal (getUserMedia) -->
-  <div id="camera-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60">
-    <div class="bg-white rounded p-4 max-w-md w-full">
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="font-semibold">Ambil Foto</h4>
-        <button id="btn-camera-close" class="text-sm px-2">Tutup</button>
-      </div>
-      <video id="camera-video" autoplay playsinline class="w-full rounded bg-black"></video>
-      <div class="flex gap-2 mt-2">
-        <button id="btn-camera-snap" class="px-3 py-2 rounded bg-rose-600 text-white">Tangkap</button>
-        <button id="btn-camera-accept" class="px-3 py-2 rounded bg-emerald-600 text-white hidden">Simpan</button>
-        <button id="btn-camera-retake" class="px-3 py-2 rounded bg-slate-100 hidden">Ulang</button>
-      </div>
-      <canvas id="camera-canvas" class="hidden"></canvas>
-    </div>
-  </div>
+  <!-- Toast container -->
+  <div id="toasts"></div>
 
-  <!-- TOASTS -->
-  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
-
-  <!-- ADMIN MODAL & GURU MODAL -->
-  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
-      <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
-      <div class="space-y-2">
-        <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
-        <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
-        <div class="flex justify-end gap-2">
-          <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
-          <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
-        </div>
-        <p id="admin-msg" class="text-sm text-red-600"></p>
-      </div>
-    </div>
-  </div>
-
-  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40" role="dialog" aria-modal="true">
-    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
-      <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
-      <div class="space-y-2">
-        <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
-        <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
-        <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
-        <div class="flex justify-end gap-2">
-          <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
-          <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <footer class="fixed left-0 right-0 bottom-0 md:static md:mt-8 text-center text-slate-500 text-sm p-3 md:p-6">
-    D.A.N × GPT-5 | 2025
-  </footer>
-
-  <!-- app.firebase.js -->
+  <!-- Your app script -->
   <script src="app.firebase.js"></script>
-
-  <!-- UI small script (nav + toast + admin minimal) -->
-  <script>
-    (function(){
-      const $ = s => document.querySelector(s);
-      const $$ = s => Array.from(document.querySelectorAll(s));
-      const toasts = $('#toasts');
-
-      function makeToast(msg, type='info', timeout=3600){
-        const el = document.createElement('div');
-        el.className = 'toast ' + (type==='ok'?'ok':(type==='err'?'err':'info'));
-        el.textContent = msg;
-        toasts.appendChild(el);
-        requestAnimationFrame(()=> el.classList.add('show'));
-        const t = setTimeout(()=> { el.classList.remove('show'); setTimeout(()=> el.remove(), 220); }, timeout);
-        el.addEventListener('click', ()=> { clearTimeout(t); el.classList.remove('show'); setTimeout(()=> el.remove(), 120); });
-      }
-      window.toast = (m,t) => makeToast(m, t==='ok'?'ok':(t==='err'?'err':'info'));
-
-      function showPage(name){
-        ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
-          const el = document.getElementById('page-'+p);
-          if (!el) return;
-          if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
-        });
-        $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
-      }
-      $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
-
-      // quick admin demo
-      const ADMIN_USER='admin', ADMIN_PASS='admin123';
-      function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
-      function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
-      function injectAdminControls(){ if ($('#admin-controls')) return; const wrap=document.createElement('div'); wrap.id='admin-controls'; wrap.className='flex gap-2 items-center'; wrap.innerHTML='<button id=\"btn-add-guru-admin\" class=\"bg-emerald-600 text-white px-3 py-1 rounded text-sm\">Tambah Guru</button><button id=\"btn-sync-local\" class=\"bg-slate-100 px-3 py-1 rounded text-sm\">Sinkron</button>'; $('#admin-controls-placeholder')?.appendChild(wrap); }
-      function removeAdminControls(){ $('#admin-controls')?.remove(); }
-
-      document.addEventListener('click', (e) => {
-        if (e.target && e.target.id === 'btn-open-admin') { $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
-        if (e.target && e.target.id === 'admin-cancel') $('#admin-modal').classList.add('hidden');
-        if (e.target && e.target.id === 'admin-submit') {
-          const u = $('#admin-username').value.trim(), p = $('#admin-password').value.trim();
-          if (u===ADMIN_USER && p===ADMIN_PASS){ setAdminLocal(true); $('#admin-modal').classList.add('hidden'); injectAdminControls(); $('#admin-badge').classList.remove('hidden'); $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden'); toast('Login Admin berhasil','ok'); } else { $('#admin-msg').textContent='Credential salah.'; }
-        }
-        if (e.target && e.target.id === 'btn-admin-logout') { if(confirm('Keluar sebagai admin?')){ setAdminLocal(false); $('#admin-badge').classList.add('hidden'); $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden'); removeAdminControls(); toast('Logout berhasil','ok'); } }
-        if (e.target && e.target.id === 'btn-add-guru-admin') $('#guru-modal').classList.remove('hidden');
-        if (e.target && e.target.id === 'guru-cancel') $('#guru-modal').classList.add('hidden');
-      });
-
-      if (isAdminLocal()){ $('#admin-badge').classList.remove('hidden'); injectAdminControls(); $('#btn-open-admin').classList.add('hidden'); $('#btn-admin-logout').classList.remove('hidden'); }
-    })();
-  </script>
 </body>
 </html>
