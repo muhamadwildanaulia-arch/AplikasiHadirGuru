@@ -1,1168 +1,672 @@
-// app.firebase.js — final for WebsiteHadir (compat SDK)
-// Replace/overwrite previous file. Assumes index.html loads firebase-app-compat.js and firebase-database-compat.js
+// app.firebase.js
 
-/* ================= FIREBASE CONFIG ================= */
+// --- Konfigurasi Firebase Anda (Telah Diperbarui) ---
 const firebaseConfig = {
-  apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
-  authDomain: "websitehadirsekolah.firebaseapp.com",
-  databaseURL: "https://websitehadirsekolah-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "websitehadirsekolah",
-  storageBucket: "websitehadirsekolah.appspot.com",
-  messagingSenderId: "811289978131",
-  appId: "1:811289978131:web:ad0bd0b113dd1c733a26e6",
-  measurementId: "G-PK0811G8VJ"
+    apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
+    authDomain: "websitehadirsekolah.firebaseapp.com",
+    databaseURL: "https://websitehadirsekolah-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "websitehadirsekolah",
+    storageBucket: "websitehadirsekolah.firebasestorage.app",
+    messagingSenderId: "811289978131",
+    appId: "1:811289978131:web:ad0bd0b113dd1c733a26e6",
+    measurementId: "G-PK0811G8VJ"
 };
 
-/* ================= Init Firebase (compat) - FIXED SYNTAX ================= */
-let db = null;
-try {
-  if (window.firebase && typeof firebase.initializeApp === 'function') {
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    if (firebase && typeof firebase.database === 'function') {
-      db = firebase.database();
-      window.db = db; // expose for other modules that check window.db
-    } else {
-      console.warn('Firebase database compat not available.');
-      window.db = null;
-    }
-  } else {
-    console.warn('Firebase compat SDK tidak ditemukan — operasi DB akan fallback ke localStorage.');
-    window.db = null;
-  }
-} catch (e) {
-  console.error('Init firebase error', e);
-  db = null;
-  window.db = null;
-}
+// Inisialisasi Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore(); // Menggunakan Firestore (asumsi untuk data master guru)
+const rtdb = firebase.database(); // Menggunakan Realtime DB (asumsi untuk data kehadiran real-time)
+const storage = firebase.storage();
 
-/* ================= constants & helpers ================= */
-const KEY_GURU = 'wh_guru_list_v1';
-const KEY_PENDING = 'wh_pending_kehadiran';
-const KEY_LOC_CACHE = 'wh_last_location_name';
+// --- Variabel Global & DOM References ---
+let isAdminLoggedIn = false;
+let currentGuruData = {}; // Cache data guru
+let chartInstance; // Untuk Chart.js
 
-function nowFormatted(){
-  const d = new Date();
-  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
-}
-function timeFormatted(){
-  return new Date().toTimeString().split(' ')[0];
-}
-function escapeHtml(s){ if(s === null || s === undefined) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
+// Elemen DOM
+const navItems = document.querySelectorAll('.nav-item');
+const pageSections = {
+    dashboard: document.getElementById('page-dashboard'),
+    kehadiran: document.getElementById('page-kehadiran'),
+    guru: document.getElementById('page-guru'),
+    laporan: document.getElementById('page-laporan'),
+};
+const btnOpenAdmin = document.getElementById('btn-open-admin');
+const btnAdminLogout = document.getElementById('btn-admin-logout');
+const adminBadge = document.getElementById('admin-badge');
+const namaGuruSelect = document.getElementById('namaGuru');
+const statusKehadiranSelect = document.getElementById('statusKehadiran');
+const lokasiInput = document.getElementById('lokasi');
+const coordsSmall = document.getElementById('coords-small');
+const btnUseGPS = document.getElementById('btn-use-gps');
+const btnGpsLabel = document.getElementById('btn-gps-label');
+const kirimKehadiranBtn = document.getElementById('kirimKehadiranBtn');
+const kehadiranStatusDiv = document.getElementById('kehadiran-status');
+const guruTableBody = document.getElementById('guruTableBody');
+const photoInput = document.getElementById('photoInput');
+const photoPreview = document.getElementById('photoPreview');
+const btnClearPhoto = document.getElementById('btn-clear-photo');
 
-function loadLocalGuru(){ try { return JSON.parse(localStorage.getItem(KEY_GURU) || '[]'); } catch(e){ return []; } }
-function saveGuruListToLocal(list){ try { localStorage.setItem(KEY_GURU, JSON.stringify(list)); } catch(e){ console.warn('saveGuruListToLocal failed', e); } }
+let currentPhotoFile = null; // Menyimpan file foto sementara
 
-function snapshotToArray(obj){
-  if (!obj) return [];
-  return Object.keys(obj).map(k => Object.assign({ id: k }, (obj[k] && typeof obj[k] === 'object') ? obj[k] : {}));
-}
+// --- UTILITY FUNCTIONS ---
 
-/* ================= SAFE DOM helpers ================= */
-function createTextCell(text, className='border p-2') {
-  const td = document.createElement('td');
-  td.className = className;
-  td.textContent = text || '';
-  return td;
-}
+/**
+ * Menampilkan notifikasi Toast
+ * @param {string} message Pesan yang ditampilkan
+ * @param {'ok'|'err'|'info'} type Jenis toast
+ */
+const showToast = (message, type = 'info') => {
+    const toastsContainer = document.getElementById('toasts');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    toastsContainer.appendChild(toast);
 
-/* ================= Render UI: Guru select & table ================= */
-function renderGuruUi(list){
-  const sel = document.getElementById('namaGuru');
-  if (sel) {
-    const curVal = sel.value || '';
-    sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
-    (list||[]).forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = `${g.nip && g.nip!=='-'?g.nip:g.id}|${g.nama||g.name||''}`;
-      opt.textContent = (g.nama||g.name||'') + (g.jabatan ? ' — ' + g.jabatan : '');
-      sel.appendChild(opt);
-    });
-    try { sel.value = curVal; } catch(e){}
-  }
+    setTimeout(() => {
+        toast.classList.add('show');
+    }, 10);
 
-  const tbody = document.getElementById('guruTableBody');
-  if (tbody) {
-    if (!Array.isArray(list) || !list.length){
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>';
-    } else {
-      tbody.innerHTML = '';
-      list.forEach(g => {
-        const tr = document.createElement('tr');
-        tr.appendChild(createTextCell(g.nip||''));
-        tr.appendChild(createTextCell(g.nama||g.name||''));
-        tr.appendChild(createTextCell(g.jabatan||''));
-        tr.appendChild(createTextCell(g.status||'Aktif'));
-        const tdAksi = document.createElement('td');
-        tdAksi.className = 'border p-2';
-        const btnEdit = document.createElement('button');
-        btnEdit.className = 'btn-edit-guru text-xs px-2 py-1 rounded bg-slate-100';
-        btnEdit.textContent = 'Edit';
-        btnEdit.setAttribute('data-id', g.id || '');
-        const btnDel = document.createElement('button');
-        btnDel.className = 'btn-del-guru text-xs px-2 py-1 rounded bg-rose-50 text-rose-700 ml-2';
-        btnDel.textContent = 'Hapus';
-        btnDel.setAttribute('data-id', g.id || '');
-        tdAksi.appendChild(btnEdit);
-        tdAksi.appendChild(btnDel);
-        tr.appendChild(tdAksi);
-        tbody.appendChild(tr);
-      });
-    }
-  }
-}
-window.renderGuruTable = renderGuruUi;
+    setTimeout(() => {
+        toast.classList.remove('show');
+        toast.addEventListener('transitionend', () => {
+            toastsContainer.removeChild(toast);
+        }, { once: true });
+    }, 4000);
+};
 
-/* ================= Firebase CRUD: Gurus ================= */
-async function addGuruFirebase(data){
-  if (!db) throw new Error('Firebase DB tidak tersedia');
-  const ref = db.ref('gurus').push();
-  await ref.set({
-    nip: data.nip || '',
-    nama: data.nama || data.name || '',
-    jabatan: data.jabatan || '',
-    status: data.status || 'Aktif',
-    createdAt: firebase.database.ServerValue.TIMESTAMP
-  });
-  return ref.key;
-}
-async function updateGuruFirebase(id, data){
-  if (!db) throw new Error('Firebase DB tidak tersedia');
-  if (!id) throw new Error('id required');
-  await db.ref('gurus/' + id).update(Object.assign({}, {
-    nip: data.nip,
-    nama: data.nama,
-    jabatan: data.jabatan,
-    status: data.status
-  }));
-}
-async function deleteGuruFirebase(id){
-  if (!db) throw new Error('Firebase DB tidak tersedia');
-  if (!id) throw new Error('id required');
-  await db.ref('gurus/' + id).remove();
-}
-window.addGuruFirebase = addGuruFirebase;
-window.updateGuruFirebase = updateGuruFirebase;
-window.deleteGuruFirebase = deleteGuruFirebase;
-
-/* ================= Sync from Firebase (gurus) ================= */
-function syncFromFirebase(){
-  if (!db) { console.warn('Realtime DB tidak tersedia — syncFromFirebase dibatalkan'); return; }
-  const ref = db.ref('gurus');
-  ref.on('value', snapshot => {
-    const raw = snapshot.val() || {};
-    const list = snapshotToArray(raw).map(it => ({
-      id: it.id,
-      nip: it.nip || it.NIP || '-',
-      nama: it.nama || it.name || '',
-      jabatan: it.jabatan || it.position || '',
-      status: it.status || 'Aktif'
-    }));
-    saveGuruListToLocal(list);
-    try { renderGuruUi(list); } catch(e){ console.warn('renderGuruUi failed', e); }
-    try { window.dispatchEvent(new CustomEvent('gurus-updated', { detail: list })); } catch(e){}
-  }, err => {
-    console.error('Firebase /gurus listen error', err);
-  });
-}
-window.syncFromFirebase = syncFromFirebase;
-
-/* ================= Image cache (IndexedDB) ================= */
-// (kept unchanged)
-(function setupImageCache(){
-  const DB_NAME = 'wh_images_db_v1';
-  const STORE = 'images';
-  const DB_VER = 1;
-  let dbP = null;
-
-  function openDB(){
-    if (dbP) return dbP;
-    dbP = new Promise((res, rej) => {
-      const rq = indexedDB.open(DB_NAME, DB_VER);
-      rq.onupgradeneeded = (e) => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: 'id' });
-      };
-      rq.onsuccess = e => res(e.target.result);
-      rq.onerror = e => rej(e.target.error || new Error('IndexedDB open failed'));
-    });
-    return dbP;
-  }
-
-  function runTx(storeName, mode, fn){
-    return openDB().then(db => new Promise((res, rej) => {
-      const tx = db.transaction(storeName, mode);
-      const store = tx.objectStore(storeName);
-      fn(store, res, rej);
-      tx.oncomplete = () => {};
-      tx.onerror = ev => rej(ev.target.error || new Error('Transaction error'));
-    }));
-  }
-
-  async function fileToDataURLCompressed(file, maxWidth = 1200, quality = 0.75){
-    return new Promise((res, rej) => {
-      const reader = new FileReader();
-      const img = new Image();
-      reader.onload = e => {
-        img.onload = () => {
-          try {
-            const canvas = document.createElement('canvas');
-            const scale = Math.min(1, maxWidth / img.width);
-            canvas.width = Math.round(img.width * scale);
-            canvas.height = Math.round(img.height * scale);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            canvas.toBlob(blob => {
-              if (!blob) return rej(new Error('toBlob failed'));
-              const r2 = new FileReader();
-              r2.onload = ev2 => res(ev2.target.result);
-              r2.onerror = e2 => rej(e2);
-              r2.readAsDataURL(blob);
-            }, 'image/jpeg', quality);
-          } catch(err){ rej(err); }
-        };
-        img.onerror = err => rej(err);
-        img.src = e.target.result;
-      };
-      reader.onerror = err => rej(err);
-      reader.readAsDataURL(file);
-    });
-  }
-
-  async function saveDataURLToDB(dataURL){
-    const id = 'img_' + Date.now() + '_' + Math.floor(Math.random()*9000+1000);
-    await runTx(STORE, 'readwrite', (store, resolve, reject) => {
-      const rec = { id, dataURL, ts: Date.now() };
-      const req = store.add(rec);
-      req.onsuccess = () => resolve(id);
-      req.onerror = e => reject(e.target.error || new Error('add image failed'));
-    });
-    return id;
-  }
-
-  async function saveImageFromFile(file){
-    const dataURL = await fileToDataURLCompressed(file, 1200, 0.75);
-    const id = await saveDataURLToDB(dataURL);
-    return id;
-  }
-
-  async function getImageDataURL(id){
-    if (!id) return null;
-    return await runTx(STORE, 'readonly', (store, resolve, reject) => {
-      const req = store.get(id);
-      req.onsuccess = () => {
-        const val = req.result;
-        resolve(val ? val.dataURL : null);
-      };
-      req.onerror = e => reject(e.target.error || new Error('get image failed'));
-    });
-  }
-
-  async function deleteImage(id){
-    if (!id) return;
-    return await runTx(STORE, 'readwrite', (store, resolve, reject) => {
-      const req = store.delete(id);
-      req.onsuccess = () => resolve(true);
-      req.onerror = e => reject(e.target.error || new Error('delete failed'));
-    });
-  }
-
-  async function clearAllImages(){
-    return await runTx(STORE, 'readwrite', (store, resolve, reject) => {
-      const req = store.clear();
-      req.onsuccess = () => resolve(true);
-      req.onerror = e => reject(e.target.error || new Error('clear failed'));
-    });
-  }
-
-  window.__whImageCache = { saveImageFromFile, getImageDataURL, deleteImage, clearAllImages };
-
-  // UI wiring (file input, preview, clear)
-  try {
-    const input = document.getElementById('photoInput');
-    const preview = document.getElementById('photoPreview');
-    const btnClear = document.getElementById('btn-clear-photo');
-    let currentImageId = null;
-
-    async function showPreviewFromDataURL(dataURL){
-      if (!preview) return;
-      if (dataURL) { preview.src = dataURL; preview.classList.remove('hidden'); }
-      else { preview.src = ''; preview.classList.add('hidden'); }
-    }
-
-    if (input) {
-      input.addEventListener('change', async (ev) => {
-        const f = ev.target.files && ev.target.files[0];
-        if (!f) return;
-        try {
-          const id = await window.__whImageCache.saveImageFromFile(f);
-          currentImageId = id;
-          const d = await window.__whImageCache.getImageDataURL(id);
-          await showPreviewFromDataURL(d);
-          try { window.toast && window.toast('Foto disimpan di cache lokal', 'info'); } catch(e){}
-        } catch(err){
-          console.error('Simpan foto gagal', err);
-          try { window.toast && window.toast('Gagal simpan foto', 'err'); } catch(e){}
+/**
+ * Mengubah halaman yang ditampilkan
+ * @param {string} pageKey Kunci halaman ('kehadiran', 'dashboard', 'guru', 'laporan')
+ */
+const navigateTo = (pageKey) => {
+    Object.keys(pageSections).forEach(key => {
+        const section = pageSections[key];
+        if (section) {
+            section.classList.add('hidden');
         }
-      });
+    });
+
+    const targetSection = pageSections[pageKey];
+    if (targetSection) {
+        targetSection.classList.remove('hidden');
     }
 
-    if (btnClear) {
-      btnClear.addEventListener('click', async (ev) => {
-        ev.preventDefault();
-        if (currentImageId) {
-          try { await window.__whImageCache.deleteImage(currentImageId); } catch(e){}
-          currentImageId = null;
+    navItems.forEach(btn => {
+        btn.classList.remove('font-bold', 'bg-white/20', 'text-white');
+        btn.classList.add('text-red-100'); // Atur default warna
+        if (btn.dataset.page === pageKey) {
+            btn.classList.add('font-bold', 'bg-white/20', 'text-white');
+            btn.classList.remove('text-red-100');
         }
-        if (input) input.value = '';
-        if (preview) { preview.src=''; preview.classList.add('hidden'); }
-        try { if (window.toast) window.toast('Foto dihapus dari cache form', 'info'); } catch(e){}
-      });
+    });
+
+    // Aturan khusus untuk Dashboard (Grid)
+    const dashboardGrid = document.getElementById('page-dashboard');
+    if (pageKey === 'dashboard' && isAdminLoggedIn) {
+        dashboardGrid.classList.remove('hidden');
+    } else if (dashboardGrid) {
+        dashboardGrid.classList.add('hidden');
     }
+};
 
-    window.__whImageCache.getAndClearFormImageId = function(){
-      const id = currentImageId;
-      currentImageId = null;
-      if (input) input.value = '';
-      if (preview) { preview.src=''; preview.classList.add('hidden'); }
-      return id;
-    };
+/**
+ * Update tanggal dan jam
+ */
+const updateDateTime = () => {
+    const now = new Date();
+    const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    
+    const dateStr = now.toLocaleDateString('id-ID', dateOptions);
+    const timeStr = now.toLocaleTimeString('id-ID', timeOptions);
 
-  } catch(e){ console.warn('Image cache UI wiring failed', e); }
+    document.getElementById('current-date-top').textContent = dateStr;
+    document.getElementById('clock-small').textContent = timeStr;
+};
 
-})(); // end setupImageCache
+// --- GPS/LOKASI HANDLING ---
 
-/* ================= Location (GPS + reverse geocode with caching) ================= */
-(function setupLocation(){
-  const lokasiEl = document.getElementById('lokasi');
-  const coordsSmallEl = document.getElementById('coords-small');
-  const btnGps = document.getElementById('btn-use-gps');
-  const CACHE_TTL_MS = 1000 * 60 * 60 * 6;
-
-  function setCoordsText(lat, lng){
-    if (coordsSmallEl) coordsSmallEl.textContent = `Koordinat: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  }
-
-  async function reverseGeocode(lat, lng){
-    try {
-      try {
-        const raw = JSON.parse(localStorage.getItem(KEY_LOC_CACHE) || 'null');
-        if (raw && raw.lat && Math.abs(raw.lat - lat) < 0.0005 && raw.lng && Math.abs(raw.lng - lng) < 0.0005 && (Date.now() - raw._ts) < CACHE_TTL_MS) {
-          return raw.name;
-        }
-      } catch(e){}
-      const emailForNominatim = 'info@sdnmuhara.example'; // <-- GANTI bila perlu
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&accept-language=id&email=${encodeURIComponent(emailForNominatim)}`;
-      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const name = data && data.display_name ? data.display_name : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      try { localStorage.setItem(KEY_LOC_CACHE, JSON.stringify({ name, lat, lng, _ts: Date.now() })); } catch(e){}
-      return name;
-    } catch(err){
-      console.warn('reverseGeocode failed', err);
-      return null;
-    }
-  }
-
-  async function useGpsNow(){
+const getLocation = () => {
     if (!navigator.geolocation) {
-      if (lokasiEl) lokasiEl.value = 'Browser tidak mendukung geolokasi';
-      if (coordsSmallEl) coordsSmallEl.textContent = '';
-      return;
+        showToast('Browser Anda tidak mendukung Geolocation.', 'err');
+        return;
     }
-    if (btnGps) { btnGps.disabled = true; btnGps.querySelector && (btnGps.querySelector('#btn-gps-label') && (btnGps.querySelector('#btn-gps-label').textContent = 'Mencari...')); }
-    try {
-      const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, maximumAge: 60000, timeout: 12000 }));
-      const lat = pos.coords.latitude, lng = pos.coords.longitude;
-      setCoordsText(lat, lng);
-      const name = await reverseGeocode(lat, lng);
-      if (name && lokasiEl) lokasiEl.value = name;
-      try { window.toast && window.toast('Lokasi terdeteksi', 'ok'); } catch(e){}
-    } catch(err){
-      console.warn('useGpsNow error', err);
-      if (err && err.code === 1) { if (lokasiEl) lokasiEl.value = 'Izin lokasi ditolak'; }
-      else if (err && err.code === 3) { if (lokasiEl) lokasiEl.value = 'Timeout saat mendeteksi lokasi'; }
-      else { if (lokasiEl) lokasiEl.value = 'Gagal mendapatkan lokasi'; }
-      try { window.toast && window.toast('Gagal mendeteksi lokasi', 'err'); } catch(e){}
-    } finally {
-      if (btnGps) { btnGps.disabled = false; btnGps.querySelector && (btnGps.querySelector('#btn-gps-label') && (btnGps.querySelector('#btn-gps-label').textContent = 'Gunakan GPS')); }
+
+    btnGpsLabel.textContent = 'Mendeteksi...';
+    btnUseGPS.disabled = true;
+    lokasiInput.value = 'Mendeteksi lokasi...';
+    coordsSmall.textContent = '-';
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            
+            lokasiInput.value = `Koordinat didapatkan: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+            coordsSmall.textContent = `Lat: ${lat}, Lon: ${lon}`;
+            btnGpsLabel.textContent = 'Lokasi Terdeteksi';
+            btnUseGPS.disabled = false;
+            btnUseGPS.classList.remove('bg-rose-600');
+            btnUseGPS.classList.add('bg-green-600');
+            showToast('Lokasi berhasil dideteksi!', 'ok');
+        },
+        (error) => {
+            let errorMessage = 'Gagal mendapatkan lokasi.';
+            if (error.code === error.PERMISSION_DENIED) {
+                errorMessage = 'Izin lokasi ditolak. Aktifkan lokasi di browser/perangkat Anda.';
+            } else if (error.code === error.POSITION_UNAVAILABLE) {
+                errorMessage = 'Informasi lokasi tidak tersedia.';
+            } else if (error.code === error.TIMEOUT) {
+                errorMessage = 'Permintaan waktu habis.';
+            }
+            
+            lokasiInput.value = errorMessage;
+            coordsSmall.textContent = '-';
+            btnGpsLabel.textContent = 'Gunakan GPS';
+            btnUseGPS.disabled = false;
+            btnUseGPS.classList.remove('bg-green-600');
+            btnUseGPS.classList.add('bg-rose-600');
+            showToast(`Gagal Lokasi: ${errorMessage}`, 'err');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+};
+
+btnUseGPS.addEventListener('click', getLocation);
+
+// --- PHOTO/CAMERA HANDLING ---
+
+photoInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        currentPhotoFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoPreview.src = e.target.result;
+            photoPreview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        currentPhotoFile = null;
+        photoPreview.classList.add('hidden');
+        photoPreview.src = '';
     }
-  }
-
-  if (btnGps) btnGps.addEventListener('click', useGpsNow);
-
-  (function tryLoadCached(){
-    try {
-      const c = JSON.parse(localStorage.getItem(KEY_LOC_CACHE) || 'null');
-      if (c && c.name && document.getElementById('lokasi')) {
-        document.getElementById('lokasi').value = c.name;
-        if (coordsSmallEl && c.lat && c.lng) coordsSmallEl.textContent = `Koordinat: ${c.lat.toFixed(5)}, ${c.lng.toFixed(5)} (cached)`;
-      }
-    } catch(e){}
-  })();
-
-})(); // end setupLocation
-
-/* ================= Attendance key helper & listener management ================= */
-// Use determinisitc key per guru per date to avoid duplicates
-function makeAttendanceKey(payload){
-  // prefer nip, else normalized name
-  const base = (payload.nip && payload.nip.trim() && payload.nip !== '-') ? String(payload.nip).trim()
-               : (payload.nama ? String(payload.nama).trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_\-]/g,'') : ('anon_' + Date.now()));
-  return base;
-}
-
-// listener management (attach/detach to avoid duplicates)
-const activeListeners = [];
-function attachListener(ref, ev, cb){
-  if (!ref) return;
-  ref.on(ev, cb);
-  activeListeners.push({ ref, ev, cb });
-}
-function detachAllListeners(){
-  activeListeners.forEach(({ ref, ev, cb }) => {
-    try { ref.off(ev, cb); } catch(e){}
-  });
-  activeListeners.length = 0;
-}
-window.addEventListener('beforeunload', detachAllListeners);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') detachAllListeners();
 });
 
-/* ================= Kehadiran: queue + send + duplicate check (UPDATED) ================= */
-(function setupKehadiran(){
-  function loadPending(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
-  function savePending(arr){ try { localStorage.setItem(KEY_PENDING, JSON.stringify(arr)); } catch(e){} }
-  function pushPending(item){ const a = loadPending(); a.push(item); savePending(a); updatePendingIndicator(); }
-  function popPending(){ const a = loadPending(); if (!a.length) return null; const it = a.shift(); savePending(a); updatePendingIndicator(); return it; }
-  function updatePendingIndicator(){ const pending = loadPending().length; const statusEl = document.getElementById('kehadiran-status'); if (statusEl) statusEl.textContent = pending ? `Pending: ${pending}` : '—'; }
+btnClearPhoto.addEventListener('click', () => {
+    currentPhotoFile = null;
+    photoInput.value = '';
+    photoPreview.classList.add('hidden');
+    photoPreview.src = '';
+});
 
-  async function alreadyCheckedTodayLocal(nip, nama){
-    const today = nowFormatted();
+// --- DATA: Guru Master (Firestore) ---
+
+/**
+ * Mengambil data guru dari Firestore dan mengisi dropdown/tabel
+ */
+const loadGuruData = async () => {
     try {
-      const pend = loadPending();
-      if (pend.some(p => p.tanggal === today && ((p.nip && nip && p.nip === nip) || (p.nama && nama && p.nama === nama)))) return true;
-    } catch(e){}
-    return false;
-  }
-
-  async function alreadyExistsOnServer(dateKey, attKey){
-    if (!navigator.onLine || !db) return false;
-    try {
-      const snap = await db.ref(`kehadiran/${dateKey}/${attKey}`).once('value');
-      return snap.exists();
-    } catch(err){
-      console.warn('alreadyExistsOnServer check failed', err);
-      return false;
-    }
-  }
-
-  async function sendAttendanceToServer(payload){
-    if (!navigator.onLine || !db) return false;
-    const dateKey = payload.tanggal || nowFormatted();
-    const attKey = makeAttendanceKey(payload);
-    try {
-      // If already exists, return false to signal duplicate
-      const exists = await alreadyExistsOnServer(dateKey, attKey);
-      if (exists) {
-        return { ok: false, reason: 'exists' };
-      }
-      const path = `kehadiran/${dateKey}/${attKey}`;
-      await db.ref(path).set(Object.assign({}, payload, { timestamp: (firebase && firebase.database) ? firebase.database.ServerValue.TIMESTAMP : Date.now() }));
-      return { ok: true, key: attKey };
-    } catch(err){
-      console.error('sendAttendanceToServer failed', err);
-      return { ok: false, reason: 'error', err };
-    }
-  }
-
-  async function flushOnePending(){
-    if (!navigator.onLine) return false;
-    const item = popPending();
-    if (!item) return false;
-    try {
-      if (!db) throw new Error('Firebase DB tidak tersedia');
-      // attempt send with deterministic key
-      const result = await sendAttendanceToServer(item);
-      if (result && result.ok) {
-        try { window.toast && window.toast('Pending berhasil dikirim', 'ok'); } catch(e){}
-        return true;
-      } else {
-        // requeue if failed or duplicate found
-        const arr = loadPending();
-        arr.unshift(item);
-        savePending(arr);
-        if (result && result.reason === 'exists') {
-          // already exists on server: drop pending (already recorded). still mark as processed locally
-          // remove the just requeued item
-          const a2 = loadPending().filter(p => !(p.tanggal===item.tanggal && (p.nip===item.nip || p.nama===item.nama)));
-          savePending(a2);
-          updatePendingIndicator();
-          try { window.toast && window.toast('Pending ditemukan sudah ada di server — diabaikan', 'info'); } catch(e){}
-          return true;
-        }
-        console.warn('flushOnePending failed — requeued', result && result.err ? result.err : 'unknown');
-        return false;
-      }
-    } catch(err){
-      const arr = loadPending();
-      arr.unshift(item);
-      savePending(arr);
-      console.warn('flushOnePending exception — requeued', err);
-      return false;
-    }
-  }
-
-  async function flushAllPending(){
-    if (!navigator.onLine) return;
-    let worked = false;
-    while (loadPending().length){
-      const ok = await flushOnePending();
-      if (!ok) break;
-      worked = true;
-      await new Promise(r => setTimeout(r, 200));
-    }
-    if (worked) updatePendingIndicator();
-  }
-
-  window.addEventListener('online', ()=> { try { window.toast && window.toast('Koneksi kembali — mengirim antrian', 'info'); } catch(e){}; flushAllPending(); });
-  window.addEventListener('offline', ()=> { try { window.toast && window.toast('Offline — simpan ke antrian', 'err'); } catch(e){}; updatePendingIndicator(); });
-
-  updatePendingIndicator();
-
-  // send helper with improved error messages (uses determinisitc key)
-  async function sendToFirebaseOnce(item){
-    if (!navigator.onLine) return { ok: false, reason: 'offline' };
-    if (!db) {
-      console.warn('sendToFirebaseOnce: Firebase DB tidak tersedia (window.db null)');
-      return { ok: false, reason: 'no-db' };
-    }
-    try {
-      const res = await sendAttendanceToServer(item);
-      if (res && res.ok) return { ok: true };
-      if (res && res.reason === 'exists') return { ok: false, reason: 'exists' };
-      return { ok: false, reason: 'error' };
-    } catch(err){
-      console.error('sendToFirebaseOnce failed:', err);
-      try {
-        const msg = (err && err.message) ? err.message : (err && err.code) ? String(err.code) : 'Unknown error';
-        if (window.toast) window.toast('Gagal kirim: ' + msg, 'err');
-      } catch(e){}
-      return { ok: false, reason: 'exception' };
-    }
-  }
-
-  // handler for main submit button (bind once)
-  async function kirimHandler(ev){
-    if (ev && ev.preventDefault) ev.preventDefault();
-    const selVal = document.getElementById('namaGuru')?.value;
-    const status = document.getElementById('statusKehadiran')?.value;
-    if (!selVal) { window.toast ? window.toast('Pilih nama guru terlebih dahulu', 'err') : alert('Pilih nama guru'); return; }
-    if (!status) { window.toast ? window.toast('Pilih status kehadiran', 'err') : alert('Pilih status kehadiran'); return; }
-    const [nip, name] = (selVal||'').split('|');
-    const lokasiVal = document.getElementById('lokasi')?.value || '';
-    const payload = {
-      nip: (nip||'').trim(),
-      nama: (name||'').trim(),
-      status: status,
-      jam: timeFormatted(),
-      tanggal: nowFormatted(),
-      lokasi: lokasiVal
-    };
-
-    try {
-      if (window.__whImageCache && typeof window.__whImageCache.getAndClearFormImageId === 'function') {
-        const id = window.__whImageCache.getAndClearFormImageId();
-        if (id) payload.imageId = id;
-      }
-    } catch(e){}
-
-    const btn = document.getElementById('kirimKehadiranBtn');
-    const orig = btn ? btn.innerHTML : null;
-    if (btn) { btn.disabled = true; btn.innerHTML = 'Mengirim...'; }
-    try {
-      const today = nowFormatted();
-      // check local pending first
-      if (await alreadyCheckedTodayLocal(payload.nip, payload.nama)) {
-        window.toast && window.toast('Guru sudah absen hari ini (pending)', 'err');
-        return;
-      }
-
-      // server check & send
-      if (navigator.onLine && window.db) {
-        const res = await sendToFirebaseOnce(payload);
-        if (res.ok) {
-          await addRecentLocal(payload);
-          window.toast && window.toast('Kehadiran berhasil dikirim', 'ok');
-          updatePendingIndicator();
-          return;
-        } else {
-          if (res.reason === 'exists') {
-            window.toast && window.toast('Guru sudah absen hari ini (server)', 'err');
-            // still add to recent locally but don't queue
-            await addRecentLocal(payload);
+        const snapshot = await db.collection('guru').orderBy('nama', 'asc').get();
+        currentGuruData = {}; // Reset cache
+        
+        // Bersihkan dropdown
+        namaGuruSelect.innerHTML = '<option value="">-- Pilih Guru --</option>';
+        
+        // Bersihkan tabel
+        guruTableBody.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat...</td></tr>';
+        
+        if (snapshot.empty) {
+            guruTableBody.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Tidak ada data guru.</td></tr>';
             return;
-          }
-          // other failure -> queue
-          pushPending(payload);
-          await addRecentLocal(payload);
-          window.toast && window.toast('Gagal kirim — disimpan lokal', 'err');
-          return;
         }
-      }
-
-      // offline fallback
-      pushPending(payload);
-      await addRecentLocal(payload);
-      window.toast && window.toast('Kehadiran tersimpan ke antrian (offline)', 'info');
-    } catch(err){
-      console.error('kirimHandler error:', err);
-      try { pushPending(payload); await addRecentLocal(payload); window.toast && window.toast('Gagal kirim — disimpan lokal', 'err'); } catch(e){ console.error(e); }
-    } finally {
-      if (btn) { btn.disabled = false; btn.innerHTML = orig; }
-      updatePendingIndicator();
-    }
-  }
-
-  // attach to button (safe replace)
-  const old = document.getElementById('kirimKehadiranBtn');
-  if (old) {
-    const nb = old.cloneNode(true);
-    old.parentNode.replaceChild(nb, old);
-    nb.addEventListener('click', kirimHandler);
-    console.info('Kirim Kehadiran handler terpasang pada #kirimKehadiranBtn');
-  } else {
-    console.warn('#kirimKehadiranBtn tidak ditemukan — handler tidak terpasang');
-  }
-
-  // recent UI helper
-  async function addRecentLocal(entry){
-    const recent = document.getElementById('recent-activity');
-    if (!recent) return;
-    const wrapper = document.createElement('div');
-    wrapper.className = 'flex items-center gap-3';
-    const txt = document.createElement('div');
-    const jam = entry.jam || new Date().toLocaleTimeString('id-ID');
-    txt.className = 'text-gray-700 text-sm';
-    txt.textContent = `${jam} — ${entry.nama||entry.nip||'(tanpa nama)'} — ${entry.status}`;
-    wrapper.appendChild(txt);
-
-    if (entry.imageId && window.__whImageCache) {
-      const img = document.createElement('img');
-      img.className = 'h-12 w-12 object-cover rounded hidden';
-      img.alt = 'foto';
-      wrapper.appendChild(img);
-      try {
-        const dataURL = await window.__whImageCache.getImageDataURL(entry.imageId);
-        if (dataURL) { img.src = dataURL; img.classList.remove('hidden'); }
-      } catch(e){}
-    }
-    recent.prepend(wrapper);
-    const items = recent.querySelectorAll('div.flex');
-    if (items.length > 25) items[items.length-1].remove();
-  }
-
-  window.flushPendingKehadiran = flushAllPending;
-})(); // end setupKehadiran
-
-/* ================= Chart & real-time listener (today only) ================= */
-(function initKehadiranListeners(){
-  try {
-    const canvas = document.getElementById('chartDashboard');
-    if (canvas && window.Chart) {
-      window.dashboardChart = new Chart(canvas.getContext('2d'), {
-        type: 'doughnut',
-        data: { labels: ['Hadir','Izin/Sakit/Dinas'], datasets: [{ data: [0,0] }] },
-        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'bottom' } } }
-      });
-    }
-  } catch(e){ console.warn('init chart failed', e); }
-
-  function updateFromSnapshot(dataObj){
-    const data = dataObj || {};
-    const today = nowFormatted();
-    const arr = Array.isArray(data) ? data : Object.values(data || {});
-    const hadir = arr.filter(x => x && (String(x.tanggal) === today) && x.status === 'Hadir').length;
-    const lain = arr.filter(x => x && (String(x.tanggal) === today) && x.status !== 'Hadir').length;
-
-    const totalGuruEl = document.getElementById('totalGuru');
-    if (totalGuruEl) {
-      try {
-        const local = loadLocalGuru();
-        totalGuruEl.textContent = String(Array.isArray(local) ? local.length : 0);
-      } catch(e){ totalGuruEl.textContent = '0'; }
-    }
-    const totalHadirEl = document.getElementById('totalHadir'); if (totalHadirEl) totalHadirEl.textContent = String(hadir);
-    const totalLainEl = document.getElementById('totalLain'); if (totalLainEl) totalLainEl.textContent = String(lain);
-
-    try { if (window.dashboardChart) { window.dashboardChart.data.datasets[0].data = [hadir, lain]; window.dashboardChart.update(); } } catch(e){}
-
-    const recent = document.getElementById('recent-activity');
-    if (recent) {
-      recent.innerHTML = '';
-      const sorted = (Array.isArray(data) ? data : Object.values(data)).filter(Boolean)
-                     .sort((a,b)=> (b.timestamp||0)-(a.timestamp||0)).slice(0,12);
-      if (!sorted.length) recent.innerHTML = '<p class="text-slate-400">Belum ada aktivitas.</p>';
-      else sorted.forEach(it => {
-        const p = document.createElement('p');
-        const jam = it.jam || (it.timestamp ? new Date(it.timestamp).toLocaleTimeString('id-ID') : new Date().toLocaleTimeString('id-ID'));
-        p.className = 'text-gray-700 text-sm'; p.textContent = `${jam} — ${it.nama} — ${it.status}`;
-        recent.appendChild(p);
-      });
-    }
-  }
-
-  if (db) {
-    const today = nowFormatted();
-    const path = 'kehadiran/' + today;
-    try {
-      const ref = db.ref(path);
-      attachListener(ref, 'value', snap => {
-        const data = snap.val() || {};
-        updateFromSnapshot(data);
-      });
-      // initial fetch
-      db.ref(path).once('value').then(snap => updateFromSnapshot(snap.val() || {})).catch(()=>{});
-    } catch(e){
-      console.warn('attach today listener failed', e);
-      updateFromSnapshot({});
-    }
-  } else {
-    updateFromSnapshot({});
-  }
-})(); // end initKehadiranListeners
-
-/* ================= Camera capture modal ================= */
-// (kept unchanged)
-(function setupCamera(){
-  const btnOpen = document.getElementById('btn-open-camera');
-  const modal = document.getElementById('camera-modal');
-  const video = document.getElementById('camera-video');
-  const snapBtn = document.getElementById('btn-camera-snap');
-  const acceptBtn = document.getElementById('btn-camera-accept');
-  const retakeBtn = document.getElementById('btn-camera-retake');
-  const closeBtn = document.getElementById('btn-camera-close');
-  const canvas = document.getElementById('camera-canvas');
-
-  let stream = null;
-  let lastBlob = null;
-
-  async function startCamera(){
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-      video.srcObject = stream;
-      await video.play();
-    } catch(err){
-      console.error('startCamera failed', err);
-      window.toast && window.toast('Tidak dapat membuka kamera', 'err');
-      closeModal();
-    }
-  }
-  function stopCamera(){
-    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-    if (video) video.srcObject = null;
-  }
-
-  function openModal(){ if (modal) { modal.classList.remove('hidden'); startCamera(); } }
-  function closeModal(){ if (modal) { modal.classList.add('hidden'); } stopCamera(); resetUI(); }
-
-  function resetUI(){
-    if (acceptBtn) acceptBtn.classList.add('hidden');
-    if (retakeBtn) retakeBtn.classList.add('hidden');
-    if (snapBtn) snapBtn.classList.remove('hidden');
-    if (canvas) { canvas.width = canvas.height = 0; canvas.classList.add('hidden'); }
-    lastBlob = null;
-  }
-
-  async function snap(){
-    if (!video) return;
-    const w = video.videoWidth, h = video.videoHeight;
-    if (!w || !h) return;
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, w, h);
-    canvas.classList.remove('hidden');
-    const blob = await new Promise((res, rej) => canvas.toBlob(b => { if (!b) rej(new Error('toBlob failed')); else res(b); }, 'image/jpeg', 0.85));
-    lastBlob = blob;
-    if (snapBtn) snapBtn.classList.add('hidden');
-    if (acceptBtn) acceptBtn.classList.remove('hidden');
-    if (retakeBtn) retakeBtn.classList.remove('hidden');
-  }
-
-  async function accept(){
-    if (!lastBlob) return;
-    const file = new File([lastBlob], 'photo_'+Date.now()+'.jpg', { type: lastBlob.type });
-    try {
-      if (window.__whImageCache && typeof window.__whImageCache.saveImageFromFile === 'function') {
-        const id = await window.__whImageCache.saveImageFromFile(file);
-        window.__whImageCache._lastFormImageId = id;
-        const preview = document.getElementById('photoPreview');
-        if (preview) {
-          const dataURL = await window.__whImageCache.getImageDataURL(id);
-          if (dataURL) { preview.src = dataURL; preview.classList.remove('hidden'); }
+        
+        let tableHtml = '';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            currentGuruData[doc.id] = data; // Cache data
+            
+            // Isi Dropdown
+            const option = document.createElement('option');
+            option.value = doc.id; // Menggunakan ID dokumen sebagai value
+            option.textContent = data.nama;
+            namaGuruSelect.appendChild(option);
+            
+            // Isi Tabel Guru
+            const statusClass = data.aktif ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700';
+            const statusText = data.aktif ? 'Aktif' : 'Nonaktif';
+            
+            tableHtml += `
+                <tr class="border-b hover:bg-slate-50">
+                    <td class="p-2 text-sm">${data.nip || '-'}</td>
+                    <td class="p-2 font-medium">${data.nama}</td>
+                    <td class="p-2 text-sm">${data.jabatan || '-'}</td>
+                    <td class="p-2"><span class="text-xs px-2 py-1 rounded-full ${statusClass}">${statusText}</span></td>
+                    <td class="p-2">
+                        ${isAdminLoggedIn ? `<button class="text-sm text-red-600 hover:underline" data-guru-id="${doc.id}" onclick="deleteGuru(this)">Hapus</button>` : '—'}
+                    </td>
+                </tr>
+            `;
+        });
+        
+        if (tableHtml) {
+            guruTableBody.innerHTML = tableHtml;
         }
-        window.toast && window.toast('Foto disimpan di cache lokal', 'ok');
-      } else {
-        window.toast && window.toast('Image cache tidak tersedia', 'err');
-      }
-    } catch(err){
-      console.error('save captured image failed', err);
-      window.toast && window.toast('Gagal menyimpan foto', 'err');
-    } finally {
-      closeModal();
+
+    } catch (error) {
+        console.error("Gagal memuat data guru: ", error);
+        showToast("Gagal memuat data guru.", 'err');
     }
-  }
+};
 
-  function retake(){ lastBlob = null; resetUI(); }
-
-  if (btnOpen) btnOpen.addEventListener('click', openModal);
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  if (snapBtn) snapBtn.addEventListener('click', snap);
-  if (retakeBtn) retakeBtn.addEventListener('click', retake);
-  if (acceptBtn) acceptBtn.addEventListener('click', accept);
-
-  (function patchGetAndClear(){
-    if (!window.__whImageCache) return;
-    const orig = window.__whImageCache.getAndClearFormImageId;
-    window.__whImageCache.getAndClearFormImageId = function(){
-      const idCam = window.__whImageCache._lastFormImageId || null;
-      if (idCam) { delete window.__whImageCache._lastFormImageId; try { if (typeof orig === 'function') orig(); } catch(e){} return idCam; }
-      if (typeof orig === 'function') return orig();
-      return null;
-    };
-  })();
-
-})(); // end camera
-
-/* ================= Admin CRUD & handlers ================= */
-(function setupAdminCrud(){
-  document.addEventListener('click', (e) => {
-    if (e.target && e.target.id === 'btn-add-guru-admin') {
-      const m = document.getElementById('guru-modal');
-      if (m) m.classList.remove('hidden');
-      const nameInput = document.getElementById('guru-nama-input');
-      if (nameInput) nameInput.focus();
+/**
+ * Fungsi untuk menghapus guru (Hanya Admin)
+ * @param {HTMLElement} btn Tombol yang diklik
+ */
+window.deleteGuru = async (btn) => {
+    if (!isAdminLoggedIn) {
+        showToast('Akses ditolak. Hanya admin yang dapat menghapus guru.', 'err');
+        return;
     }
-    if (e.target && e.target.id === 'guru-cancel') {
-      const m = document.getElementById('guru-modal'); if (m) m.classList.add('hidden');
-    }
-  });
+    
+    const guruId = btn.dataset.guruId;
+    const guruName = currentGuruData[guruId]?.nama || 'Guru ini';
 
-  const btnSave = document.getElementById('guru-save');
-  if (btnSave) {
-    btnSave.addEventListener('click', async function(ev){
-      ev.preventDefault();
-      const nip = (document.getElementById('guru-nip')?.value || '').trim();
-      const nama = (document.getElementById('guru-nama-input')?.value || '').trim();
-      const jabatan = (document.getElementById('guru-jabatan-input')?.value || '').trim();
-      if (!nama) { window.toast && window.toast('Nama guru harus diisi', 'err'); return; }
-
-      let local = loadLocalGuru();
-      if (nip) {
-        if (local.find(x => x.nip && String(x.nip).trim() === String(nip).trim())) { window.toast && window.toast('NIP sudah terdaftar', 'err'); return; }
-      }
-      if (local.find(x => x.nama && x.nama.trim().toLowerCase() === nama.trim().toLowerCase())) { window.toast && window.toast('Nama sudah terdaftar', 'err'); return; }
-
-      const newGuru = { nip: nip || '-', nama, jabatan, status: 'Aktif' };
-      const orig = this.innerHTML; this.disabled = true; this.innerHTML = 'Menyimpan...';
-      try {
-        if (db) {
-          try {
-            const newKey = await addGuruFirebase(newGuru);
-            local = loadLocalGuru();
-            local.push(Object.assign({ id: newKey }, newGuru));
-            saveGuruListToLocal(local);
-            renderGuruUi(local);
-            window.toast && window.toast('Guru tersimpan di server', 'ok');
-          } catch(err){
-            console.warn('addGuruFirebase failed', err);
-            const id = 'local_' + Date.now();
-            local = loadLocalGuru();
-            local.push(Object.assign({ id }, newGuru));
-            saveGuruListToLocal(local);
-            renderGuruUi(local);
-            window.toast && window.toast('Server error — guru disimpan lokal', 'err');
-          }
-        } else {
-          const id = 'local_' + Date.now();
-          local = loadLocalGuru();
-          local.push(Object.assign({ id }, newGuru));
-          saveGuruListToLocal(local);
-          renderGuruUi(local);
-          window.toast && window.toast('Guru disimpan (lokal)', 'info');
-        }
-        const m = document.getElementById('guru-modal'); if (m) m.classList.add('hidden');
-        document.getElementById('guru-nip') && (document.getElementById('guru-nip').value='');
-        document.getElementById('guru-nama-input') && (document.getElementById('guru-nama-input').value='');
-        document.getElementById('guru-jabatan-input') && (document.getElementById('guru-jabatan-input').value='');
-      } finally {
-        this.disabled = false; this.innerHTML = orig;
-      }
-    });
-  }
-
-  document.addEventListener('click', async (e) => {
-    const delBtn = e.target.closest && e.target.closest('.btn-del-guru');
-    if (delBtn) {
-      const id = delBtn.getAttribute('data-id');
-      if (!id) return;
-      if (!confirm('Hapus data guru ini?')) return;
-      try {
-        if (db && id && !id.startsWith('local_')) {
-          await deleteGuruFirebase(id);
-          window.toast && window.toast('Guru dihapus dari server', 'ok');
-        }
-      } catch(err){ console.warn('deleteGuruFirebase failed', err); }
-      let local = loadLocalGuru();
-      local = local.filter(x => x.id !== id);
-      saveGuruListToLocal(local);
-      renderGuruUi(local);
-    }
-
-    const editBtn = e.target.closest && e.target.closest('.btn-edit-guru');
-    if (editBtn) {
-      const id = editBtn.getAttribute('data-id');
-      if (!id) return;
-      const local = loadLocalGuru();
-      const g = local.find(x => x.id === id);
-      if (!g) { window.toast && window.toast('Data tidak ditemukan', 'err'); return; }
-      const m = document.getElementById('guru-modal'); if (m) m.classList.remove('hidden');
-      document.getElementById('guru-nip').value = g.nip || '';
-      document.getElementById('guru-nama-input').value = g.nama || '';
-      document.getElementById('guru-jabatan-input').value = g.jabatan || '';
-      const saveBtn = document.getElementById('guru-save');
-      if (!saveBtn) return;
-      const handler = async function saveEdit(ev){
-        ev.preventDefault();
-        const nip = (document.getElementById('guru-nip')?.value || '').trim();
-        const nama = (document.getElementById('guru-nama-input')?.value || '').trim();
-        const jab = (document.getElementById('guru-jabatan-input')?.value || '').trim();
-        if (!nama) { window.toast && window.toast('Nama harus diisi', 'err'); return; }
+    if (confirm(`Yakin ingin menghapus data ${guruName}? Aksi ini TIDAK dapat dibatalkan!`)) {
         try {
-          if (db && g.id && !g.id.startsWith('local_')) {
-            await updateGuruFirebase(g.id, { nip, nama, jabatan: jab, status: g.status });
-            window.toast && window.toast('Data guru diperbarui (server)', 'ok');
-          }
-        } catch(err){ console.warn('updateGuruFirebase failed', err); window.toast && window.toast('Update server gagal — update lokal saja', 'err'); }
-        let localList = loadLocalGuru();
-        const idx = localList.findIndex(x => x.id === g.id);
-        if (idx !== -1) localList[idx] = Object.assign({ id: g.id }, { nip: nip||'-', nama, jabatan: jab, status: g.status||'Aktif' });
-        saveGuruListToLocal(localList);
-        renderGuruUi(localList);
-        saveBtn.removeEventListener('click', handler);
-        const m2 = document.getElementById('guru-modal'); if (m2) m2.classList.add('hidden');
-        document.getElementById('guru-nip').value=''; document.getElementById('guru-nama-input').value=''; document.getElementById('guru-jabatan-input').value='';
-      };
-      saveBtn.addEventListener('click', handler);
-    }
-  });
-
-})(); // end admin/crud
-
-/* ================= Boot: initial render & sync ================= */
-(function initBoot(){
-  document.addEventListener('DOMContentLoaded', () => {
-    try {
-      try {
-        const local = loadLocalGuru();
-        if (local && local.length) {
-          renderGuruUi(local);
-          console.info('Rendered guru from localStorage (count:', local.length, ')');
+            await db.collection('guru').doc(guruId).delete();
+            showToast(`Data ${guruName} berhasil dihapus.`, 'ok');
+            loadGuruData(); // Reload data
+        } catch (error) {
+            console.error("Gagal menghapus guru: ", error);
+            showToast("Gagal menghapus guru: " + error.message, 'err');
         }
-      } catch(e){ console.warn('initial render local failed', e); }
+    }
+};
 
-      try { if (db) syncFromFirebase(); } catch(e){ console.warn('syncFromFirebase error', e); }
+// --- DATA: Kehadiran (Realtime DB) ---
 
-      try { if (navigator.onLine) { window.flushPendingKehadiran && window.flushPendingKehadiran(); } } catch(e){}
+/**
+ * Mengirim data kehadiran ke Realtime Database
+ */
+kirimKehadiranBtn.addEventListener('click', async () => {
+    const guruId = namaGuruSelect.value;
+    const status = statusKehadiranSelect.value;
+    const lokasi = lokasiInput.value;
+    const coords = coordsSmall.textContent;
+    
+    if (!guruId || !status || lokasi.includes('Gagal') || lokasi.includes('Tekan')) {
+        showToast('Lengkapi Nama Guru, Status, dan Lokasi (Gunakan GPS).', 'err');
+        return;
+    }
 
-      try {
-        const def = 'kehadiran';
-        const pages = ['kehadiran','dashboard','guru','laporan'];
-        pages.forEach(p => {
-          const el = document.getElementById('page-'+p);
-          if (!el) return;
-          if (p === def) el.classList.remove('hidden'); else el.classList.add('hidden');
+    const guruName = currentGuruData[guruId].nama;
+    const dateKey = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
+    const timeStamp = firebase.database.ServerValue.TIMESTAMP;
+    
+    kirimKehadiranBtn.disabled = true;
+    kehadiranStatusDiv.textContent = 'Mengirim...';
+
+    try {
+        let photoUrl = null;
+        if (currentPhotoFile) {
+            // Upload foto ke Storage
+            const storageRef = storage.ref(`kehadiran_photos/${dateKey}/${guruId}_${Date.now()}`);
+            const snapshot = await storageRef.put(currentPhotoFile);
+            photoUrl = await snapshot.ref.getDownloadURL();
+        }
+
+        const dataKehadiran = {
+            guruId: guruId,
+            nama: guruName,
+            status: status,
+            lokasi: lokasi,
+            coords: coords,
+            timestamp: timeStamp,
+            tanggal: dateKey,
+            photoUrl: photoUrl,
+        };
+        
+        // Simpan ke Realtime DB dengan key YYYY-MM-DD/GuruID
+        await rtdb.ref(`kehadiran/${dateKey}/${guruId}`).set(dataKehadiran);
+
+        showToast(`${guruName} berhasil mengirim kehadiran: ${status}!`, 'ok');
+        kehadiranStatusDiv.textContent = `Terakhir: ${new Date().toLocaleTimeString()} - Berhasil`;
+        
+        // Reset form
+        namaGuruSelect.value = '';
+        statusKehadiranSelect.value = '';
+        lokasiInput.value = 'Tekan \'Gunakan GPS\' untuk mendeteksi lokasi';
+        coordsSmall.textContent = '-';
+        btnClearPhoto.click(); // Reset foto
+        btnUseGPS.classList.remove('bg-green-600');
+        btnUseGPS.classList.add('bg-rose-600');
+        btnGpsLabel.textContent = 'Gunakan GPS';
+
+    } catch (error) {
+        console.error("Gagal mengirim kehadiran: ", error);
+        showToast("Gagal mengirim kehadiran: " + error.message, 'err');
+    } finally {
+        kirimKehadiranBtn.disabled = false;
+    }
+});
+
+/**
+ * Mendengarkan data kehadiran hari ini untuk Dashboard/Grafik/Aktivitas
+ */
+const listenToDailyAttendance = () => {
+    const dateKey = new Date().toLocaleDateString('en-CA'); // Format YYYY-MM-DD
+    const ref = rtdb.ref(`kehadiran/${dateKey}`);
+    
+    ref.off(); // Hentikan listener lama
+    ref.on('value', (snapshot) => {
+        const rawData = snapshot.val();
+        updateDashboard(rawData);
+    }, (error) => {
+        console.error("Gagal mendengarkan kehadiran harian: ", error);
+        showToast("Gagal memuat data kehadiran harian.", 'err');
+    });
+};
+
+/**
+ * Update UI Dashboard dan Grafik
+ * @param {object} rawData Data kehadiran hari ini dari RTDB
+ */
+const updateDashboard = (rawData) => {
+    const counts = { Hadir: 0, Izin: 0, Sakit: 0, 'Dinas Luar': 0, Total: 0 };
+    const activities = [];
+    
+    if (rawData) {
+        Object.values(rawData).forEach(data => {
+            counts.Total++;
+            if (counts[data.status] !== undefined) {
+                counts[data.status]++;
+            } else {
+                counts.Izin++; // Default untuk status yang tidak terdaftar
+            }
+
+            const time = new Date(data.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            activities.push(`
+                <div class="flex justify-between items-center border-b pb-1">
+                    <span class="font-medium">${data.nama}</span>
+                    <span class="text-sm text-slate-500">${time}</span>
+                    <span class="text-xs px-2 py-0.5 rounded ${data.status === 'Hadir' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">${data.status}</span>
+                </div>
+            `);
         });
-      } catch(e){}
-    } catch(err){
-      console.error('initBoot error', err);
     }
-  });
-})(); // end initBoot
 
-/* ================= Laporan & Export (client-side, careful with big DB) ================= */
-(function laporanModule(){
-  // helpers
-  function normalizeDateToYYYYMMDD(raw){
-    if (raw === null || raw === undefined) return null;
-    if (typeof raw === 'number') {
-      const ms = raw < 1e12 ? raw*1000 : raw;
-      const d = new Date(ms); if (!isNaN(d)) return d.toISOString().slice(0,10); return null;
-    }
-    if (typeof raw === 'string') {
-      const s = raw.trim();
-      const m = s.match(/(\d{4}-\d{2}-\d{2})/);
-      if (m) return m[1];
-      const d = new Date(s); if (!isNaN(d)) return d.toISOString().slice(0,10);
-      return null;
-    }
-    if (raw && raw._date) return normalizeDateToYYYYMMDD(raw._date);
-    return null;
-  }
-  function normalizeStatus(raw){
-    if (raw === null || raw === undefined) return '';
-    const s = String(raw).trim().toLowerCase();
-    if (!s) return '';
-    if (s.includes('hadir') || s==='h') return 'H';
-    if (s.includes('izin') || s==='i') return 'I';
-    if (s.includes('sakit') || s==='s') return 'S';
-    if (s.includes('dinas') || s==='d') return 'D';
-    const first = s.charAt(0).toUpperCase();
-    return /[HISD]/.test(first) ? first : first;
-  }
-
-  function loadLocalGuruSimple(){ try { return JSON.parse(localStorage.getItem(KEY_GURU) || '[]'); } catch(e){ return []; } }
-  function loadPendingLocal(){ try { return JSON.parse(localStorage.getItem(KEY_PENDING) || '[]'); } catch(e){ return []; } }
-
-  async function loadKehadiranAll(){
-    const out = [];
-    const pend = loadPendingLocal() || [];
-    out.push(...pend);
-    if (window.db) {
-      try {
-        const snap = await window.db.ref('kehadiran').once('value');
-        const val = snap.val() || {};
-        // val is object keyed by date -> pushId -> record
-        Object.keys(val).forEach(dateKey => {
-          const group = val[dateKey] || {};
-          Object.values(group).forEach(x => out.push(x));
-        });
-      } catch(e){ console.warn('loadKehadiranAll: firebase read failed', e); }
+    // Update Header Cards (hanya terlihat jika isAdminLoggedIn)
+    document.getElementById('totalGuru').textContent = Object.keys(currentGuruData).length;
+    document.getElementById('totalHadir').textContent = counts.Hadir;
+    document.getElementById('totalLain').textContent = counts.Izin + counts.Sakit + counts['Dinas Luar'];
+    
+    // Update Recent Activity
+    const recentActivityDiv = document.getElementById('recent-activity');
+    if (activities.length > 0) {
+        // Balik urutan agar yang terbaru di atas
+        recentActivityDiv.innerHTML = activities.reverse().slice(0, 5).join('');
     } else {
-      console.info('loadKehadiranAll: firebase not available on page (offline).');
+        recentActivityDiv.innerHTML = '<p class="text-slate-400">Belum ada kehadiran hari ini.</p>';
     }
-    return out;
-  }
 
-  async function buildMatrixForMonth(ym){
-    const res = { days: [], rows: [], debug: { processed:0, matched:0, unmatched:0 } };
-    if (!ym || !/^\d{4}-\d{2}$/.test(ym)) return res;
-    const [y,mm] = ym.split('-').map(Number);
-    const daysInMonth = new Date(y, mm, 0).getDate();
-    res.days = Array.from({length:daysInMonth}, (_,i)=> i+1);
-    const gurus = loadLocalGuruSimple();
-    res.rows = gurus.map(g => ({
-      id: g.id, nip: g.nip, nama: g.nama, jabatan: g.jabatan,
-      key: (g.nip && String(g.nip).trim() && String(g.nip).trim() !== '-') ? String(g.nip).trim() : (g.nama||'').toString().trim().toLowerCase(),
-      cells: Array(daysInMonth).fill('')
-    }));
-    const entries = await loadKehadiranAll();
-    entries.forEach(e => {
-      res.debug.processed++;
-      const dateStr = normalizeDateToYYYYMMDD(e.tanggal || e.date || e.tgl || e.createdAt || e.timestamp);
-      if (!dateStr) { res.debug.unmatched++; return; }
-      const parts = dateStr.split('-'); if (parts.length < 3) { res.debug.unmatched++; return; }
-      const ym0 = `${parts[0]}-${parts[1]}`; if (ym0 !== ym) return;
-      const d = Number(parts[2]); if (!d || d < 1 || d > daysInMonth) { res.debug.unmatched++; return; }
-      const stat = normalizeStatus(e.status || e.keterangan || e.ket || e.ket_status);
-      const nipRaw = e.nip ? String(e.nip).trim() : '';
-      const matchKey = (nipRaw && nipRaw !== '-') ? nipRaw : (e.nama||e.name||'').toString().trim().toLowerCase();
-      let row = res.rows.find(r => r.key === matchKey);
-      if (!row && matchKey) row = res.rows.find(r => (r.nama||'').toString().trim().toLowerCase() === matchKey);
-      if (!row && e.nama) {
-        const nm = (e.nama||'').toString().trim().toLowerCase();
-        row = res.rows.find(r => (r.nama||'').toString().trim().toLowerCase().includes(nm) || nm.includes((r.nama||'').toString().trim().toLowerCase()));
-      }
-      if (row) {
-        res.debug.matched++;
-        const mark = stat || (e.status ? String(e.status).trim().charAt(0).toUpperCase() : '');
-        row.cells[d-1] = mark;
-      } else {
-        res.debug.unmatched++;
-      }
+    // Update Chart
+    renderChart(counts);
+};
+
+/**
+ * Membuat atau memperbarui Chart Kehadiran
+ * @param {object} counts Objek hitungan kehadiran
+ */
+const renderChart = (counts) => {
+    const ctx = document.getElementById('chartDashboard').getContext('2d');
+    
+    const data = {
+        labels: ['Hadir', 'Izin', 'Sakit', 'Dinas Luar'],
+        datasets: [{
+            data: [counts.Hadir, counts.Izin, counts.Sakit, counts['Dinas Luar']],
+            backgroundColor: ['#10b981', '#f59e0b', '#f87171', '#3b82f6'], // green, amber, red, blue
+            hoverOffset: 4
+        }]
+    };
+
+    if (chartInstance) {
+        chartInstance.data = data;
+        chartInstance.update();
+    } else {
+        chartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: data,
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    title: {
+                        display: false,
+                    }
+                }
+            }
+        });
+    }
+};
+
+// --- ADMIN LOGIN/LOGOUT ---
+
+btnOpenAdmin.addEventListener('click', () => {
+    const email = prompt("Masukkan Email Admin:");
+    const password = prompt("Masukkan Password Admin:");
+
+    if (email && password) {
+        auth.signInWithEmailAndPassword(email, password)
+            .then(() => {
+                // `auth.onAuthStateChanged` akan memverifikasi apakah ini akun admin
+                showToast("Mencoba Login Admin...", 'info');
+            })
+            .catch((error) => {
+                console.error("Login Admin Gagal: ", error);
+                showToast(`Login Gagal: ${error.message}`, 'err');
+            });
+    }
+});
+
+btnAdminLogout.addEventListener('click', () => {
+    auth.signOut()
+        .then(() => {
+            showToast("Logout Admin Berhasil.", 'info');
+        })
+        .catch((error) => {
+            console.error("Logout Admin Gagal: ", error);
+        });
+});
+
+// --- AUTH STATE LISTENER (Menentukan Admin atau Guru) ---
+
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        // User is signed in. Kita cek apakah dia benar-benar Admin.
+        // Ganti 'admin@sekolah.com' dengan email admin yang sebenarnya
+        if (user.email === 'admin@sekolah.com') {
+            isAdminLoggedIn = true;
+        } else {
+            isAdminLoggedIn = false;
+            // Jika bukan admin (meski login), paksa logout karena dashboard hanya untuk admin
+            auth.signOut(); 
+            return;
+        }
+        
+        // Tampilan Admin
+        adminBadge.classList.remove('hidden');
+        btnOpenAdmin.classList.add('hidden');
+        btnAdminLogout.classList.remove('hidden');
+        
+        // Tampilkan Dashboard Grid
+        document.getElementById('page-dashboard').classList.remove('hidden');
+        document.getElementById('admin-controls-placeholder').innerHTML = `
+            <button id="btnAddGuru" class="px-3 py-1 rounded bg-rose-600 text-white text-sm">➕ Tambah Guru</button>
+        `;
+        document.getElementById('btnAddGuru').addEventListener('click', addGuru);
+        
+        // Muat ulang data saat admin masuk
+        loadGuruData(); 
+        listenToDailyAttendance();
+        navigateTo('dashboard'); // Arahkan ke dashboard admin
+        
+    } else {
+        // User is signed out.
+        isAdminLoggedIn = false;
+        adminBadge.classList.add('hidden');
+        btnOpenAdmin.classList.remove('hidden');
+        btnAdminLogout.classList.add('hidden');
+        document.getElementById('page-dashboard').classList.add('hidden'); // Sembunyikan Grid
+        document.getElementById('admin-controls-placeholder').innerHTML = '';
+        
+        // Muat data guru (tanpa akses admin)
+        loadGuruData(); 
+        listenToDailyAttendance();
+        navigateTo('kehadiran'); // Kembali ke form kehadiran
+    }
+});
+
+// --- ADMIN FUNCTION: Tambah Guru ---
+const addGuru = async () => {
+    if (!isAdminLoggedIn) {
+        showToast('Akses ditolak. Hanya admin yang dapat menambah guru.', 'err');
+        return;
+    }
+    const nama = prompt("Masukkan Nama Lengkap Guru:");
+    if (!nama) return;
+
+    const nip = prompt("Masukkan NIP (opsional):");
+    const jabatan = prompt("Masukkan Jabatan (opsional):");
+
+    try {
+        await db.collection('guru').add({
+            nama: nama,
+            nip: nip || '',
+            jabatan: jabatan || 'Guru',
+            aktif: true,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        showToast(`Guru ${nama} berhasil ditambahkan.`, 'ok');
+        loadGuruData();
+    } catch (error) {
+        console.error("Gagal menambah guru: ", error);
+        showToast("Gagal menambah guru: " + error.message, 'err');
+    }
+};
+
+// --- INIT APP & EVENT LISTENERS ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Navigasi
+    document.querySelectorAll('.nav-item, .md\\:hidden button').forEach(button => {
+        button.addEventListener('click', (e) => {
+            navigateTo(e.currentTarget.dataset.page);
+        });
     });
-    return res;
-  }
 
-  function renderMatrixToDOM(result, ym){
-    const wrapEmpty = document.getElementById('laporan-matrix-empty');
-    const wrapTable = document.getElementById('laporan-matrix-table');
-    const resume = document.getElementById('resume-laporan');
-    if (!wrapTable || !wrapEmpty || !resume) return;
-    if (!result || !result.days || !result.rows) { wrapEmpty.classList.remove('hidden'); wrapTable.classList.add('hidden'); resume.innerHTML=''; return; }
-    if (!result.rows.length) { wrapEmpty.classList.remove('hidden'); wrapTable.classList.add('hidden'); resume.innerHTML = `<div class="text-slate-500 p-4">Tidak ada data untuk bulan ${ym}.</div>`; return; }
-    wrapEmpty.classList.add('hidden'); wrapTable.classList.remove('hidden');
-    let html = '<div style="overflow:auto"><table class="min-w-full text-sm border-collapse" style="border:1px solid #e6e9ef"><thead><tr><th style="padding:6px;border:1px solid #e6e9ef">#</th><th style="padding:6px;border:1px solid #e6e9ef">Nama</th>';
-    result.days.forEach(d => html += `<th style="padding:6px;border:1px solid #e6e9ef">${d}</th>`);
-    html += '<th style="padding:6px;border:1px solid #e6e9ef">Hadir</th><th style="padding:6px;border:1px solid #e6e9ef">Lain</th></tr></thead><tbody>';
-    result.rows.forEach((r, idx) => {
-      html += `<tr><td style="padding:6px;border:1px solid #e6e9ef">${idx+1}</td><td style="padding:6px;border:1px solid #e6e9ef">${escapeHtml(r.nama||'')}</td>`;
-      r.cells.forEach(c => html += `<td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${c||''}</td>`);
-      const hadir = r.cells.filter(x=>x==='H').length;
-      const lain = r.cells.filter(x=>x && x!=='H').length;
-      html += `<td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${hadir}</td><td style="padding:6px;border:1px solid #e6e9ef;text-align:center">${lain}</td></tr>`;
+    // Toggle Sidebar (Mobile)
+    document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+        const sidebar = document.querySelector('.sidebar');
+        sidebar.classList.toggle('hidden');
+        sidebar.classList.toggle('absolute'); 
+        sidebar.classList.toggle('z-50');
     });
-    html += '</tbody></table></div>';
-    wrapTable.innerHTML = html;
-    const totalGuru = result.rows.length;
-    const totalHadir = result.rows.reduce((s,r)=> s + r.cells.filter(x=>x==='H').length, 0);
-    const totalLain = result.rows.reduce((s,r)=> s + r.cells.filter(x=>x && x!=='H').length, 0);
-    resume.innerHTML = `<div class="p-3 text-sm">Bulan: <strong>${ym}</strong> • Guru: <strong>${totalGuru}</strong> • Total Hadir: <strong>${totalHadir}</strong> • Total Izin/Sakit/Dinas: <strong>${totalLain}</strong></div>`;
-  }
 
-  (function wire(){
-    const btn = document.getElementById('tampilkanLaporanBtn');
-    if (btn) {
-      const newBtn = btn.cloneNode(true); btn.parentNode.replaceChild(newBtn, btn);
-      newBtn.addEventListener('click', async function(){
-        const ym = document.getElementById('bulan')?.value;
-        if (!ym) { window.toast && window.toast('Pilih bulan terlebih dahulu', 'err'); return; }
-        this.disabled = true; const orig = this.innerHTML; this.innerHTML = 'Memuat...';
-        try {
-          const res = await buildMatrixForMonth(ym);
-          console.info('Debug laporan:', res.debug);
-          renderMatrixToDOM(res, ym);
-        } catch(e){ console.error('Gagal build laporan', e); window.toast && window.toast('Gagal buat laporan', 'err'); }
-        finally { this.disabled = false; this.innerHTML = orig; }
-      });
+    // Inisialisasi tampilan default
+    updateDateTime();
+    setInterval(updateDateTime, 1000); // Update jam setiap detik
+    
+    // Default: tampilkan form kehadiran
+    navigateTo('kehadiran'); 
+});
+
+// --- XLSX/Laporan (Export Lokal) ---
+
+/**
+ * Fungsi untuk mendownload laporan (Export lokal menggunakan XLSX.js)
+ */
+window.downloadLaporan = async () => {
+    if (!isAdminLoggedIn) {
+        showToast('Akses ditolak. Hanya admin yang dapat mendownload laporan.', 'err');
+        return;
     }
-    const expBtn = document.getElementById('exportLaporanBtn');
-    if (expBtn) {
-      const newExp = expBtn.cloneNode(true); expBtn.parentNode.replaceChild(newExp, expBtn);
-      newExp.addEventListener('click', async function(){
-        const ym = document.getElementById('bulan')?.value;
-        if (!ym) { window.toast && window.toast('Pilih bulan terlebih dahulu', 'err'); return; }
-        this.disabled = true; const orig = this.innerHTML; this.innerHTML = 'Mengexport...';
-        try {
-          const res = await buildMatrixForMonth(ym);
-          if (!res || !res.rows || !res.rows.length) { window.toast && window.toast('Tidak ada data untuk diexport', 'err'); return; }
-          const days = res.days || [];
-          const header = ['No','Nama', ...days.map(d=>String(d)), 'Hadir','Lain'];
-          const data = res.rows.map((r,idx)=> {
-            const hadir = r.cells.filter(x=>x==='H').length;
-            const lain = r.cells.filter(x=>x && x!=='H').length;
-            return [idx+1, r.nama, ...r.cells.map(c=>c||''), hadir, lain];
-          });
-          if (window.XLSX) {
-            const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
-            XLSX.writeFile(wb, `laporan_${ym}.xlsx`);
-          } else {
-            const rows = [header, ...data].map(r => r.map(cell => `"${String(cell||'').replace(/"/g,'""')}"`).join(',')).join('\n');
-            const blob = new Blob([rows], { type: 'text/csv' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `laporan_${ym}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-          }
-        } catch(e){ console.error('Export failed', e); window.toast && window.toast('Export gagal', 'err'); }
-        finally { this.disabled = false; this.innerHTML = orig; }
-      });
+    
+    const bulan = document.getElementById('bulan').value;
+    if (!bulan) {
+        showToast('Pilih bulan yang ingin didownload.', 'err');
+        return;
     }
-  })();
 
-})(); // end laporanModule
+    showToast('Membuat laporan... (Tunggu sebentar)', 'info');
 
-// End of app.firebase.js
+    const [year, month] = bulan.split('-');
+    // Realtime DB Key: YYYY-MM-DD. Kita perlu rentang tanggal dalam format ini.
+    // Dapatkan hari pertama dan terakhir bulan
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0); 
+    
+    // Konversi ke format key (YYYY-MM-DD)
+    const startDateKey = startDate.toLocaleDateString('en-CA');
+    const endDateKey = endDate.toLocaleDateString('en-CA');
+    
+    try {
+        // Ambil semua data kehadiran bulan ini (Realtime DB)
+        // Kita menggunakan `orderByKey` dan `startAt`/`endAt` untuk rentang waktu.
+        const snapshot = await rtdb.ref('kehadiran')
+            .orderByKey()
+            .startAt(startDateKey)
+            .endAt(endDateKey)
+            .once('value');
+
+        const allKehadiran = snapshot.val();
+        
+        if (!allKehadiran) {
+            showToast('Tidak ada data kehadiran untuk bulan ini.', 'err');
+            return;
+        }
+
+        const exportData = [];
+        // Header
+        exportData.push(['Tanggal', 'Nama Guru', 'Status', 'Waktu', 'Lokasi', 'Koordinat', 'Photo URL']);
+
+        // Flatten data
+        Object.keys(allKehadiran).forEach(date => {
+            // Pastikan data di bawah tanggal valid
+            if (typeof allKehadiran[date] === 'object' && allKehadiran[date] !== null) {
+                 Object.values(allKehadiran[date]).forEach(data => {
+                    const time = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('id-ID') : '-';
+                    exportData.push([
+                        data.tanggal || date,
+                        data.nama || '-',
+                        data.status || 'Tidak Diketahui',
+                        time,
+                        data.lokasi || '-',
+                        data.coords || '-',
+                        data.photoUrl || '-'
+                    ]);
+                });
+            }
+        });
+
+        if (exportData.length <= 1) { // Hanya header
+            showToast('Tidak ada data kehadiran untuk bulan ini.', 'err');
+            return;
+        }
+
+        // Buat file Excel
+        const ws = XLSX.utils.aoa_to_sheet(exportData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Laporan Kehadiran");
+        XLSX.writeFile(wb, `Laporan_Kehadiran_${bulan}.xlsx`);
+        
+        showToast(`Laporan bulan ${bulan} berhasil dibuat.`, 'ok');
+
+    } catch (error) {
+        console.error("Gagal membuat laporan: ", error);
+        showToast("Gagal membuat laporan: " + error.message, 'err');
+    }
+};
