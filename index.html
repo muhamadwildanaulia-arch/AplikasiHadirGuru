@@ -1,219 +1,532 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebsiteHadir — SDN Muhara (Dashboard)</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WebsiteHadir — SDN Muhara (Dashboard)</title>
 
-       <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <!-- Tailwind (CDN, dev) -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-  <link rel="icon" type="image/png" href="Logo.png">
+  <!-- Chart.js & XLSX -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <style>
-    .sidebar { background: linear-gradient(180deg,#7f1d1d,#b91c1c); }
-    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc);
-      border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
-    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60;
-      display: flex; flex-direction: column; gap: 8px; pointer-events:none; }
-    .toast { pointer-events:auto; padding:10px 14px; border-radius:10px;
-      box-shadow:0 6px 18px rgba(2,6,23,0.12); transition: all .2s;
-      opacity:0; transform:translateY(8px) scale(.98); }
-    .toast.show{opacity:1;transform:none;}
-    .toast.ok{background:#ecfdf5;color:#065f46;}
-    .toast.err{background:#fff1f2;color:#9f1239;}
-    .toast.info{background:#f8fafc;color:#0f172a;}
-  </style>
+  <!-- Firebase compat scripts (required by app.firebase.js) -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
+  <link rel="icon" type="image/png" href="Logo.png">
+
+  <style>
+    /* small visual tweaks */
+    .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
+    .sidebar .nav-item { color: rgba(255,255,255,0.92); }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    /* toast */
+    #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
+  </style>
 </head>
 <body class="antialiased bg-slate-50 text-slate-800">
-  <div class="min-h-screen flex">
-        <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
-      <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" alt="Logo SDN Muhara" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
-        <div>
-          <h1 class="text-white font-bold">SDN Muhara</h1>
-          <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
-        </div>
-      </div>
-      <nav class="mt-6 flex-1">
-        <ul class="space-y-1">
-          <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
-          <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
-          <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">👩‍🏫 Data Guru</button></li>
-          <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📅 Laporan Bulanan</button></li>
-        </ul>
-      </nav>
-      <div class="mt-auto text-sm text-red-100 px-3">Versi demo • 2025</div>
-    </aside>
 
-        <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/95 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
-      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
-      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
-      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
-      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
-    </div>
-        <div class="flex-1 min-w-0">
+  <div class="min-h-screen flex">
 
-            <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
-        <div class="flex items-center gap-4">
-          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
-          <div>
-            <div class="text-sm text-slate-500" id="current-date-top"></div>
-            <div class="text-lg font-semibold">Dashboard Kehadiran</div>
-          </div>
-        </div>
+    <!-- SIDEBAR -->
+    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
+      <div class="flex items-center gap-3 mb-6">
+        <img src="Logo.png" alt="logo" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
+        <div>
+          <h1 class="text-white font-bold">SDN Muhara</h1>
+          <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
+        </div>
+      </div>
 
-        <div class="flex items-center gap-4">
-          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm">Admin Aktif</div>
-          <div class="flex items-center gap-3">
-            <div id="clock-small" class="text-sm text-slate-600"></div>
-            <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
-            <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
-          </div>
-        </div>
-      </header>
+      <nav class="mt-6 flex-1">
+        <ul class="space-y-1">
+          <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
+          <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
+          <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">👩‍🏫 Data Guru</button></li>
+          <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📅 Laporan Bulanan</button></li>
+        </ul>
+      </nav>
 
-      <main class="p-6">
-        <div class="max-w-7xl mx-auto">
+      <div class="mt-auto text-sm text-red-100">
+        <div class="px-3">Versi demo • 2025</div>
+      </div>
+    </aside>
 
-                    <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
-            <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Total Guru</div>
-              <div id="totalGuru" class="text-3xl font-bold text-slate-800 mt-2">0</div>
-              </div>
-              <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Hadir Hari Ini</div>
-              <div id="totalHadir" class="text-3xl font-bold text-green-600 mt-2">0</div>
-              </div>
-              <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Izin / Sakit / Dinas</div>
-              <div id="totalLain" class="text-3xl font-bold text-amber-600 mt-2">0</div>
-            </div>
-          </div>
+    <!-- MOBILE NAV (bottom) -->
+    <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/90 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
+      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
+      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
+      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
+      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
+    </div>
 
-                    <section id="page-kehadiran" class="">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div class="card-smooth p-6">
-                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran Guru</h2>
-                <p class="text-sm text-slate-500 mb-4">Pilih nama lalu kirim kehadiran. Tetap tanpa login untuk guru biasa.</p>
+    <!-- MAIN CONTENT -->
+    <div class="flex-1 min-w-0">
 
-                <div class="space-y-4">
-                  <div>
-                    <label for="namaGuru" class="block text-sm text-slate-700 mb-1">Nama Guru</label>
-                    <select id="namaGuru" class="w-full border rounded p-2" aria-label="Pilih nama guru">
-                      <option value="">-- Pilih Guru --</option>
-                    </select>
-                  </div>
+      <!-- TOPBAR -->
+      <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
+        <div class="flex items-center gap-4">
+          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
+          <div>
+            <div class="text-sm text-slate-500" id="current-date-top"></div>
+            <div class="text-lg font-semibold">Dashboard Kehadiran</div>
+          </div>
+        </div>
 
-                  <div>
-                    <label for="statusKehadiran" class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
-                    <select id="statusKehadiran" class="w-full border rounded p-2" aria-label="Pilih status kehadiran">
-                      <option value="">-- Pilih Status --</option>
-                      <option value="Hadir">Hadir</option>
-                      <option value="Izin">Izin</option>
-                      <option value="Sakit">Sakit</option>
-                      <option value="Dinas Luar">Dinas Luar</option>
-                    </select>
-                  </div>
+        <div class="flex items-center gap-4">
+          <div id="admin-badge" class="hidden items-center gap-2 bg-red-50 text-red-700 px-2 py-1 rounded text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 1.104-.895 2-2 2s-2-.896-2-2 .895-2 2-2 2 .896 2 2z" />
+            </svg>
+            Admin Aktif
+          </div>
 
-                  <div>
-                    <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
-                    <div class="flex gap-2">
-                      <input id="lokasi" readonly class="flex-1 border rounded p-2 bg-slate-50 text-slate-600" placeholder="Tekan 'Gunakan GPS' untuk mendeteksi lokasi" />
-                      <button id="btn-use-gps" class="px-3 py-2 rounded bg-rose-600 text-white text-sm flex items-center gap-2" title="Gunakan GPS">
-                        <span id="btn-gps-icon">📍</span>
-                        <span id="btn-gps-label">Gunakan GPS</span>
-                      </button>
-                    </div>
-                    <div id="coords-small" class="text-xs text-slate-400 mt-1">—</div>
-                  </div>
+          <div class="flex items-center gap-3">
+            <div id="clock-small" class="text-sm text-slate-600"></div>
+            <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
+            <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
+          </div>
+        </div>
+      </header>
 
-                                    <div>
-                    <label class="block text-sm text-slate-700 mb-1">Foto (opsional, disimpan lokal)</label>
-                    <div class="flex gap-2 items-center">
-                      <input id="photoInput" accept="image/*" capture="environment" type="file" class="text-sm" />
-                      <button id="btn-open-camera" class="px-3 py-2 rounded bg-sky-600 text-white text-sm">📷 Kamera</button>
-                      <button id="btn-clear-photo" class="px-2 py-1 rounded bg-slate-100 text-sm">Hapus</button>
-                    </div>
-                    <div class="mt-2">
-                      <img id="photoPreview" src="" alt="Preview foto" class="max-h-36 rounded border hidden" />
-                      <div id="photoHint" class="text-xs text-slate-400 mt-1">Foto hanya tersimpan di perangkat Anda (IndexedDB).</div>
-                    </div>
-                  </div>
+      <main class="p-6">
+        <div class="max-w-7xl mx-auto">
 
-                  <div class="flex gap-3 items-center">
-                    <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
-                    <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
-                  </div>
-                </div>
-              </div>
+          <!-- GRID / HEADER CARDS -->
+          <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Total Guru</div>
+              <div id="totalGuru" class="text-3xl font-bold text-slate-800 mt-2">0</div>
+            </div>
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Hadir Hari Ini</div>
+              <div id="totalHadir" class="text-3xl font-bold text-green-600 mt-2">0</div>
+            </div>
+            <div class="card-smooth p-5">
+              <div class="text-sm text-slate-500">Izin / Sakit / Dinas</div>
+              <div id="totalLain" class="text-3xl font-bold text-amber-600 mt-2">0</div>
+            </div>
+          </div>
 
-              <div class="card-smooth p-6">
-                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
-                <div class="mt-4">
-                  <canvas id="chartDashboard" height="180"></canvas>
-                </div>
-                <div class="mt-6">
-                  <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
-                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
-                    <p class="text-slate-400">Memuat data...</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          <!-- Kehadiran Form -->
+          <section id="page-kehadiran" class="">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="card-smooth p-6">
+                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran Guru</h2>
+                <p class="text-sm text-slate-500 mb-4">Pilih nama lalu kirim kehadiran. Tetap tanpa login untuk guru biasa.</p>
 
-                    <section id="page-guru" class="hidden">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
-              <div id="admin-controls-placeholder"></div>
-            </div>
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Nama Guru</label>
+                    <select id="namaGuru" class="w-full border rounded p-2"></select>
+                  </div>
 
-            <div class="card-smooth p-4">
-              <table class="w-full">
-                <thead>
-                  <tr class="text-left">
-                    <th class="p-2">NIP</th>
-                    <th class="p-2">Nama</th>
-                    <th class="p-2">Jabatan</th>
-                    <th class="p-2">Status</th>
-                    <th class="p-2">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody id="guruTableBody">
-                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
+                    <select id="statusKehadiran" class="w-full border rounded p-2">
+                      <option value="">-- Pilih Status --</option>
+                      <option value="Hadir">Hadir</option>
+                      <option value="Izin">Izin</option>
+                      <option value="Sakit">Sakit</option>
+                      <option value="Dinas Luar">Dinas Luar</option>
+                    </select>
+                  </div>
 
-                    <section id="page-laporan" class="hidden">
-            <div class="card-smooth p-6">
-              <h2 class="text-xl font-semibold mb-4">📥 Laporan Bulanan</h2>
-              <div class="flex gap-3 items-center">
-                <select id="bulan" class="border p-2 rounded">
-                  <option value="">-- Pilih Bulan --</option>
-                                    <option value="2025-11">November 2025</option>
-                  <option value="2025-10">Oktober 2025</option>
-                </select>
-                <button onclick="downloadLaporan()" class="px-3 py-2 rounded bg-emerald-600 text-white">Download (Admin)</button>
-                <div class="text-xs text-slate-500">Catatan: tombol ini memanggil fungsi export lokal data Realtime DB.</div>
-              </div>
-            </div>
-          </section>
+                  <div>
+                    <label class="block text-sm text-slate-700 mb-1">Nama Tempat (opsional)</label>
+                    <input id="placeName" class="w-full border rounded p-2" placeholder="Contoh: SDN Muhara — tap Simpan lokasi atau gunakan GPS" />
+                    <div class="mt-2">
+                      <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis — tampilkan nama bila tersedia)</label>
+                      <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
+                      <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
+                    </div>
+                  </div>
 
-        </div>
-      </main>
-    </div>
-  </div>
+                  <div class="flex gap-3 items-center">
+                    <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
+                    <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
+                  </div>
+                </div>
+              </div>
 
-    <div id="toasts"></div>
+              <div class="card-smooth p-6">
+                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
+                <div class="mt-4">
+                  <canvas id="chartDashboard" height="180"></canvas>
+                </div>
+                <div class="mt-6">
+                  <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
+                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
+                    <p class="text-slate-400">Memuat data...</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
 
-  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script> <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-storage-compat.js"></script>
+          <!-- Data Guru -->
+          <section id="page-guru" class="hidden">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
+              <div id="admin-controls-placeholder"></div>
+            </div>
 
-  <script src="app.firebase.js"></script>
+            <div class="bg-white rounded-xl shadow p-4 overflow-auto">
+              <table class="min-w-full text-sm">
+                <thead class="bg-rose-50 text-rose-700 font-semibold">
+                  <tr>
+                    <th class="border p-2 text-left">NIP</th>
+                    <th class="border p-2 text-left">Nama Guru</th>
+                    <th class="border p-2 text-left">Jabatan</th>
+                    <th class="border p-2 text-left">Status</th>
+                    <th class="border p-2 text-left">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="guruTableBody">
+                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Laporan -->
+          <section id="page-laporan" class="hidden">
+            <div class="mb-4 flex flex-wrap gap-3 items-center">
+              <input type="month" id="bulan" class="border rounded p-2" />
+              <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">Tampilkan</button>
+              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
+              <table class="min-w-full text-sm">
+                <thead class="bg-rose-50 text-rose-700 font-semibold">
+                  <tr>
+                    <th class="border p-2">Tanggal</th>
+                    <th class="border p-2">Nama Guru</th>
+                    <th class="border p-2">Jam</th>
+                    <th class="border p-2">Lokasi</th>
+                    <th class="border p-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="laporanTableBody">
+                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="resume-laporan" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ADMIN MODAL & GURU MODAL (keperluan UI) -->
+  <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
+      <div class="space-y-2">
+        <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
+        <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
+        <div class="flex justify-end gap-2">
+          <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+          <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
+        </div>
+        <p id="admin-msg" class="text-sm text-red-600"></p>
+      </div>
+    </div>
+  </div>
+
+  <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-96">
+      <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
+      <div class="space-y-2">
+        <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
+        <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
+        <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
+        <div class="flex justify-end gap-2">
+          <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+          <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="fixed left-0 right-0 bottom-0 md:static md:mt-8 text-center text-slate-500 text-sm p-3 md:p-6">
+    D.A.N × GPT-5 | 2025
+  </footer>
+
+  <!-- app.firebase.js (harus ada di repo) -->
+  <script type="module" src="app.firebase.js"></script>
+
+  <!-- UI + Admin script (Firebase-aware) -->
+  <script>
+  (function(){
+    // UI helpers
+    const $ = s => document.querySelector(s);
+    const $$ = s => Array.from(document.querySelectorAll(s));
+    const toasts = $('#toasts');
+
+    function toast(msg, type='info', timeout=3800){
+      const el = document.createElement('div');
+      el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
+      el.style.minWidth = '220px';
+      if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
+      else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
+      else el.classList.add('bg-slate-100','text-slate-800');
+      el.textContent = msg;
+      toasts.appendChild(el);
+      setTimeout(()=> { el.classList.add('opacity-0'); setTimeout(()=>el.remove(),300); }, timeout);
+    }
+
+    // nav logic (sidebar & mobile buttons)
+    function showPage(name){
+      ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
+        const el = document.getElementById('page-'+p);
+        if (!el) return;
+        if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
+      });
+      // highlight buttons (sidebar)
+      $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
+    }
+    // attach nav
+    $$( '[data-page]' ).forEach(btn => btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }));
+
+    // top date & clock
+    function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
+    function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
+    setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
+
+    // toggle sidebar on mobile
+    $('#btn-toggle-sidebar')?.addEventListener('click', ()=> {
+      const aside = document.querySelector('aside');
+      if (!aside) return;
+      aside.classList.toggle('hidden');
+    });
+
+    // keep required IDs for firebase script:
+    // namaGuru, statusKehadiran, lokasi, kirimKehadiranBtn, guruTableBody, totalGuru,totalHadir,totalLain, chartDashboard, recent-activity, laporan elements
+
+    // Admin login modal
+    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
+    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+
+    // admin credentials (demo)
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'admin123';
+
+    function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
+    function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
+
+    // inject admin controls (in header area of Data Guru)
+    function injectAdminControls(){
+      const placeholder = $('#admin-controls-placeholder');
+      if (!placeholder) return;
+      if ($('#admin-controls')) return;
+      const wrap = document.createElement('div');
+      wrap.id = 'admin-controls';
+      wrap.className = 'flex gap-2 items-center';
+      wrap.innerHTML = `
+        <button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>
+        <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>
+      `;
+      placeholder.appendChild(wrap);
+    }
+    function removeAdminControls(){ $('#admin-controls')?.remove(); }
+
+    // open/close guru modal
+    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden'); }
+    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; $('#guru-modal').classList.remove('hidden'); }
+    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
+
+    // render functions used when Firebase dispatches 'gurus-updated' (app.firebase.js will dispatch)
+    function renderGuruTable(list){
+      const tb = $('#guruTableBody'); if (!tb) return;
+      if (!Array.isArray(list) || list.length===0){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect(list||[]); return; }
+      tb.innerHTML = '';
+      list.forEach(g => {
+        const tr = document.createElement('tr');
+        tr.className = 'align-top';
+        tr.innerHTML = `
+          <td class="border p-2">${g.nip||''}</td>
+          <td class="border p-2">${escapeHtml(g.nama||g.name||'')}</td>
+          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+          <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
+          <td class="border p-2">
+            ${ isAdminLocal() ? `<button data-id="${g.id}" class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
+                                 <button data-id="${g.id}" class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-slate-400">—</span>'}
+          </td>
+        `;
+        tb.appendChild(tr);
+      });
+      // wire up handlers
+      $$('.btn-edit').forEach(b => b.onclick = async (ev) => {
+        const id = ev.currentTarget.dataset.id;
+        const listCached = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+        const g = (listCached||[]).find(x=>x.id===id);
+        if (g) openGuruModalEdit(g);
+        else toast('Data guru tidak ditemukan', 'err');
+      });
+      $$('.btn-del').forEach(b => b.onclick = async (ev) => {
+        const id = ev.currentTarget.dataset.id;
+        if (!confirm('Hapus guru ini?')) return;
+        try {
+          if (window.deleteGuruFirebase) await window.deleteGuruFirebase(id);
+          else {
+            // local fallback remove
+            const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]').filter(x=>x.id!==id);
+            localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+            renderGuruTable(list);
+          }
+          toast('Guru dihapus', 'ok');
+        } catch(err){ console.error(err); toast('Gagal hapus: '+(err&&err.message?err.message:err), 'err'); }
+      });
+    }
+
+    function populateNamaSelect(list){
+      const sel = $('#namaGuru'); if (!sel) return;
+      sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
+      (list||[]).forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = `${g.nip||g.id}|${g.nama||g.name||''}`;
+        opt.textContent = (g.nama||g.name||'') + (g.jabatan ? ' — ' + g.jabatan : '');
+        sel.appendChild(opt);
+      });
+    }
+
+    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
+
+    // listen for firebase-driven update event (app.firebase.js dispatches 'gurus-updated')
+    window.addEventListener('gurus-updated', (ev) => {
+      const list = ev.detail || [];
+      window.__latest_guru_list = list;
+      localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+      renderGuruTable(list);
+      populateNamaSelect(list);
+      // set totals
+      $('#totalGuru') && ( $('#totalGuru').textContent = String(list.length) );
+      toast('Daftar guru diperbarui (Realtime)', 'info', 1800);
+    });
+
+    // Admin modal events
+    document.addEventListener('click', async (e) => {
+      // open admin modal
+      if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
+      if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
+      if (e.target && e.target.id === 'admin-submit') {
+        const u = $('#admin-username').value.trim();
+        const p = $('#admin-password').value.trim();
+        if (u === ADMIN_USER && p === ADMIN_PASS) {
+          setAdminLocal(true);
+          closeAdminModal();
+          injectAdminControls();
+          $('#admin-badge').classList.remove('hidden');
+          $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
+          // show admin controls in Data Guru
+          injectAdminControls();
+          // render current list as admin
+          const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+          renderGuruTable(list);
+          toast('Login Admin berhasil', 'ok');
+        } else {
+          $('#admin-msg').textContent = 'Credential salah.';
+        }
+      }
+
+      if (e.target && e.target.id === 'btn-admin-logout') {
+        if (!confirm('Keluar sebagai admin?')) return;
+        setAdminLocal(false);
+        $('#admin-badge').classList.add('hidden');
+        $('#btn-admin-logout').classList.add('hidden'); $('#btn-open-admin').classList.remove('hidden');
+        removeAdminControls();
+        const list = window.__latest_guru_list || JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+        renderGuruTable(list);
+        toast('Logout berhasil', 'ok');
+      }
+
+      // add guru button
+      if (e.target && e.target.id === 'btn-add-guru-admin') openGuruModalCreate();
+      if (e.target && e.target.id === 'guru-cancel') closeGuruModal();
+
+      // save guru (create/update)
+      if (e.target && e.target.id === 'guru-save') {
+        const editId = e.target.dataset.editId || '';
+        const nip = $('#guru-nip').value.trim();
+        const nama = $('#guru-nama-input').value.trim();
+        const jab = $('#guru-jabatan-input').value.trim();
+        if (!nama) return toast('Masukkan nama guru', 'err');
+        try {
+          if (editId) {
+            if (window.updateGuruFirebase) {
+              await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
+            } else {
+              // local fallback
+              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+              const idx = list.findIndex(x=>x.id===editId);
+              if (idx>=0){ list[idx] = Object.assign({}, list[idx], { nip, nama, jabatan: jab }); localStorage.setItem('wh_guru_list_v1', JSON.stringify(list)); renderGuruTable(list); }
+            }
+            toast('Perubahan disimpan', 'ok');
+          } else {
+            if (window.addGuruFirebase) {
+              await window.addGuruFirebase({ nip, nama, jabatan: jab });
+            } else {
+              // local fallback
+              const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+              const id = 'g' + Date.now();
+              list.push({ id, nip, nama, jabatan: jab });
+              localStorage.setItem('wh_guru_list_v1', JSON.stringify(list));
+              renderGuruTable(list);
+            }
+            toast('Guru tersimpan', 'ok');
+          }
+        } catch(err){ console.error(err); toast('Gagal menyimpan guru: '+(err&&err.message?err.message:err), 'err'); }
+        closeGuruModal();
+      }
+
+      // trigger sync
+      if (e.target && e.target.id === 'btn-sync-local') {
+        if (window.syncFromFirebase) { try { window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu', 'info'); } catch(e){ toast('Sinkron gagal: '+e.message,'err'); } }
+        else { const list = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]'); renderGuruTable(list); toast('Menggunakan data lokal', 'info'); }
+      }
+    });
+
+    // initial boot: show default page
+    showPage('kehadiran');
+
+    // Admin badge initial
+    if (isAdminLocal()) {
+      $('#admin-badge').classList.remove('hidden'); $('#btn-admin-logout').classList.remove('hidden'); $('#btn-open-admin').classList.add('hidden');
+      injectAdminControls();
+    } else {
+      $('#admin-badge').classList.add('hidden');
+    }
+
+    // Replace native alerts used in older scripts by toasts where appropriate:
+    // Keep compatibility — older code (app.firebase.js) may still call alert(); that's fine.
+    // But our admin/add UI uses toast above.
+
+    // ensure nama select is populated with localStorage fallback quickly
+    const local = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+    if (local && local.length) { renderGuruTable(local); populateNamaSelect(local); }
+
+    // Kehadiran button feedback (this works together with app.firebase.js's handler)
+    $('#kirimKehadiranBtn')?.addEventListener('click', () => {
+      // small UI change: show status
+      $('#kehadiran-status').textContent = 'Mengirim...';
+      setTimeout(()=>{ $('#kehadiran-status').textContent = '—'; }, 1200);
+      // actual send is handled in app.firebase.js (which listens same button)
+    });
+
+  })();
+  </script>
+
+  <!-- end -->
 </body>
 </html>
