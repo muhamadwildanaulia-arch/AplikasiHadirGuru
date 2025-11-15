@@ -1,14 +1,13 @@
 // app.firebase.js
-// Menggunakan Firebase compat scripts yang sudah dimuat di index.html:
-// <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
-// <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
-//
-// File ini memasang listener realtime ke /gurus dan /attendances,
-// menyediakan fungsi CRUD yang dipanggil dari index.html, dan
-// menyimpan data hasil sync ke localStorage agar UI tetap bekerja offline.
+// Realtime Database (compat) + Auth (compat) integration for WebsiteHadir
+// Place this file in the same folder as index.html and ensure index.html loads:
+//  - firebase-app-compat.js
+//  - firebase-database-compat.js
+//  - firebase-auth-compat.js
+// BEFORE loading this file.
 
 (function(){
-  // ---------- CONFIG: diisi dari input pengguna ----------
+  // ---------- CONFIG: paste your firebaseConfig here ----------
   const firebaseConfig = {
     apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
     authDomain: "websitehadirsekolah.firebaseapp.com",
@@ -21,27 +20,22 @@
   };
   // -----------------------------------------------------------------------
 
-  // init
+  // initialize
   try {
     firebase.initializeApp(firebaseConfig);
   } catch(e){
-    console.warn('Firebase init warning (may be already initialized):', e && e.message ? e.message : e);
+    console.warn('Firebase init warning:', e && e.message ? e.message : e);
   }
+
   const db = firebase.database();
+  const auth = firebase.auth();
 
-  // helpers
-  function now() { return Date.now(); }
-  function uid() { return db.ref().push().key; } // generate key
-
-  // read/write localStorage keys used in UI
+  // localStorage keys used by UI (keep consistent with index.html)
   const LS_GURU = 'wh_demo_guru_v1';
   const LS_ATT = 'wh_demo_att_v1';
 
-  // ----- Firebase listeners & sync -----
-  let gurusListener = null;
-  let attListener = null;
-
-  // Convert snapshot children to array with id
+  // Helpers
+  function now(){ return Date.now(); }
   function snapToArray(snap){
     const out = [];
     snap.forEach(ch => {
@@ -52,33 +46,34 @@
     return out;
   }
 
-  // start realtime listeners
+  // ------------------ Realtime DB listeners ------------------
+  let gurusListener = null;
+  let attListener = null;
+
   function startListeners(){
-    // attach if not yet
-    if (!gurusListener) {
+    // /gurus
+    if (!gurusListener){
       const refG = db.ref('/gurus');
       gurusListener = refG.on('value', (snap) => {
         const arr = snapToArray(snap);
-        // normalize fields: ensure nama, nip, jabatan, status exist
-        const normalized = arr.map(g => ({ id: g.id, nip: g.nip||'', nama: g.nama||g.name||'', jabatan: g.jabatan||'', status: g.status||'Aktif' }));
+        const normalized = arr.map(g => ({ id: g.id, nip: g.nip||'', nama: g.nama||g.name||'', jabatan: g.jabatan||'', status: g.status||'Aktif', createdAt: g.createdAt||0 }));
         try { localStorage.setItem(LS_GURU, JSON.stringify(normalized)); } catch(e){}
-        // dispatch event for UI
         window.__latest_guru_list = normalized;
         window.dispatchEvent(new CustomEvent('gurus-updated', { detail: normalized }));
       }, (err) => { console.error('gurus listener error', err); });
     }
 
-    if (!attListener) {
+    // /attendances
+    if (!attListener){
       const refA = db.ref('/attendances');
       attListener = refA.on('value', (snap) => {
         const arr = snapToArray(snap);
-        // normalize attendance fields (idGuru, namaGuru, status, tanggal, jam, lokasiLabel, placeName, createdAt, yearMonth)
         const normalized = arr.map(a => ({
           id: a.id,
           idGuru: a.idGuru || '',
           namaGuru: a.namaGuru || a.name || '',
           status: a.status || '',
-          tanggal: a.tanggal || '',        // 'YYYY-MM-DD'
+          tanggal: a.tanggal || '',
           jam: a.jam || '',
           lokasiLabel: a.lokasiLabel || a.location || '',
           placeName: a.placeName || '',
@@ -86,18 +81,17 @@
           yearMonth: a.yearMonth || ((a.tanggal||'').slice(0,7) || '')
         }));
         try { localStorage.setItem(LS_ATT, JSON.stringify(normalized)); } catch(e){}
-        // dispatch event for attendance update
         window.__latest_att_list = normalized;
         window.dispatchEvent(new CustomEvent('attendances-updated', { detail: normalized }));
       }, (err) => { console.error('attendances listener error', err); });
     }
   }
 
-  // public: trigger a manual one-shot sync (read once and store)
+  // manual one-shot sync (reads & stores into localStorage)
   async function syncFromFirebase(){
     try {
       const [gSnap, aSnap] = await Promise.all([ db.ref('/gurus').once('value'), db.ref('/attendances').once('value') ]);
-      const gArr = snapToArray(gSnap).map(g => ({ id: g.id, nip: g.nip||'', nama: g.nama||g.name||'', jabatan: g.jabatan||'', status: g.status||'Aktif' }));
+      const gArr = snapToArray(gSnap).map(g => ({ id: g.id, nip: g.nip||'', nama: g.nama||g.name||'', jabatan: g.jabatan||'', status: g.status||'Aktif', createdAt: g.createdAt||0 }));
       const aArr = snapToArray(aSnap).map(a => ({
         id: a.id,
         idGuru: a.idGuru || '',
@@ -123,19 +117,12 @@
     }
   }
 
-  // ---------- CRUD functions for Gurus ----------
+  // ------------------ CRUD: Gurus ------------------
   async function addGuruFirebase(g){
-    // g: { nip, nama, jabatan }
     if (!g || !g.nama) throw new Error('Nama guru diperlukan');
     const ref = db.ref('/gurus').push();
     const id = ref.key;
-    const payload = {
-      nip: g.nip || '',
-      nama: g.nama,
-      jabatan: g.jabatan || '',
-      status: g.status || 'Aktif',
-      createdAt: now()
-    };
+    const payload = { nip: g.nip||'', nama: g.nama, jabatan: g.jabatan||'', status: g.status||'Aktif', createdAt: now() };
     await ref.set(payload);
     return Object.assign({ id }, payload);
   }
@@ -154,8 +141,8 @@
     return true;
   }
 
-  // ---------- Attendance (Kehadiran) ----------
-  // payload should contain: idGuru, namaGuru, status, tanggal (YYYY-MM-DD), jam (HH:MM), lokasiLabel, placeName
+  // ------------------ CRUD: Attendances ------------------
+  // payload: { idGuru, namaGuru, status, tanggal, jam, lokasiLabel, placeName }
   async function addAttendanceFirebase(payload){
     if (!payload || !payload.tanggal) throw new Error('Payload attendance harus berisi tanggal');
     const ref = db.ref('/attendances').push();
@@ -166,7 +153,7 @@
     return Object.assign({ id }, p);
   }
 
-  // convenience: get monthly report directly from firebase (filtered by yearMonth)
+  // query monthly report from server efficiently (orderByChild + equalTo on yearMonth)
   async function getMonthlyReportFirebase(yearMonth){
     if (!yearMonth) throw new Error('yearMonth diperlukan (format YYYY-MM)');
     const ref = db.ref('/attendances');
@@ -187,20 +174,68 @@
     return arr;
   }
 
-  // ---------- Expose functions on window for index.html to call ----------
+  // ------------------ Auth (email/password) ------------------
+  // Ensure firebase-auth-compat.js loaded in index.html
+  // Expose signInWithEmail & signOut, and dispatch 'auth-changed' events with admin claim
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      window.dispatchEvent(new CustomEvent('auth-changed', { detail: null }));
+      window.__WH_FIREBASE = window.__WH_FIREBASE || {};
+      window.__WH_FIREBASE.currentUser = null;
+      return;
+    }
+    try {
+      const idTokenResult = await user.getIdTokenResult(true);
+      const claims = idTokenResult.claims || {};
+      const isAdmin = !!claims.admin;
+      const detail = { uid: user.uid, email: user.email, admin: isAdmin };
+      window.__WH_FIREBASE = window.__WH_FIREBASE || {};
+      window.__WH_FIREBASE.currentUser = detail;
+      window.dispatchEvent(new CustomEvent('auth-changed', { detail }));
+    } catch(err){
+      console.error('getIdTokenResult error', err);
+      const detail = { uid: user.uid, email: user.email, admin: false };
+      window.__WH_FIREBASE = window.__WH_FIREBASE || {};
+      window.__WH_FIREBASE.currentUser = detail;
+      window.dispatchEvent(new CustomEvent('auth-changed', { detail }));
+    }
+  });
+
+  async function signInWithEmail(email, password){
+    if (!email || !password) throw new Error('Email & password diperlukan');
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    const idTokenResult = await cred.user.getIdTokenResult(true);
+    const isAdmin = !!(idTokenResult.claims && idTokenResult.claims.admin);
+    const detail = { uid: cred.user.uid, email: cred.user.email, admin: isAdmin };
+    window.__WH_FIREBASE = window.__WH_FIREBASE || {};
+    window.__WH_FIREBASE.currentUser = detail;
+    window.dispatchEvent(new CustomEvent('auth-changed', { detail }));
+    return detail;
+  }
+
+  async function signOutFirebase(){
+    await auth.signOut();
+    window.__WH_FIREBASE = window.__WH_FIREBASE || {};
+    window.__WH_FIREBASE.currentUser = null;
+    window.dispatchEvent(new CustomEvent('auth-changed', { detail: null }));
+    return true;
+  }
+
+  // ------------------ Expose functions to window ------------------
   window.addGuruFirebase = addGuruFirebase;
   window.updateGuruFirebase = updateGuruFirebase;
   window.deleteGuruFirebase = deleteGuruFirebase;
   window.addAttendanceFirebase = addAttendanceFirebase;
   window.getMonthlyReportFirebase = getMonthlyReportFirebase;
   window.syncFromFirebase = syncFromFirebase;
+  window.signInWithEmail = signInWithEmail;
+  window.signOutFirebase = signOutFirebase;
 
-  // auto-start listeners
+  // start listeners immediately
   startListeners();
 
-  // For debugging: attach db reference
-  window.__WH_FIREBASE = { dbRef: db, startListeners };
+  // expose debug object
+  window.__WH_FIREBASE = Object.assign(window.__WH_FIREBASE||{}, { dbRef: db, authRef: auth, startListeners });
 
-  console.log('app.firebase.js initialized (Realtime DB compat). Listeners started.');
-
+  console.log('app.firebase.js initialized — DB listeners & auth handlers active.');
 })();
