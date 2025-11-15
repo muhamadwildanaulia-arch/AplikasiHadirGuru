@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebsiteHadir — SDN Muhara (Online)</title>
+  <title>WebsiteHadir — SDN Muhara (Full Online + Auth)</title>
 
   <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,9 +12,10 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
-  <!-- Firebase compat (required by app.firebase.js) -->
+  <!-- Firebase compat (APP, DB, AUTH) -->
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 
   <link rel="icon" type="image/png" href="Logo.png">
 
@@ -22,16 +23,16 @@
     .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
     .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
     #toasts { position: fixed; right: 20px; bottom: 20px; z-index: 60; display: flex; flex-direction: column; gap: 8px; }
-    .badge { padding: 4px 8px; border-radius: 999px; font-size: 12px; }
   </style>
 </head>
-<body class="antialiased bg-slate-50 text-slate-800">
 
+<body class="antialiased bg-slate-50 text-slate-800">
   <div class="min-h-screen flex">
+    
     <!-- SIDEBAR -->
     <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
       <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" alt="logo" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
+        <img src="Logo.png" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
         <div>
           <h1 class="text-white font-bold">SDN Muhara</h1>
           <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
@@ -40,17 +41,17 @@
 
       <nav class="mt-6 flex-1">
         <ul class="space-y-1">
-          <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10 text-white">📥 Isi Kehadiran</button></li>
-          <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10 text-white">📊 Dashboard</button></li>
-          <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10 text-white">👩‍🏫 Data Guru</button></li>
-          <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10 text-white">📅 Laporan</button></li>
+          <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📥 Isi Kehadiran</button></li>
+          <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📊 Dashboard</button></li>
+          <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">👩‍🏫 Data Guru</button></li>
+          <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">📅 Laporan Bulanan</button></li>
         </ul>
       </nav>
 
-      <div class="mt-auto text-sm text-red-100 px-3">Versi online • 2025</div>
+      <div class="mt-auto text-sm text-red-100 px-3">Versi Online • 2025</div>
     </aside>
 
-    <!-- MOBILE NAV (bottom) -->
+    <!-- MOBILE NAV -->
     <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/90 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
       <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
       <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
@@ -60,6 +61,7 @@
 
     <!-- MAIN CONTENT -->
     <div class="flex-1 min-w-0">
+
       <!-- TOPBAR -->
       <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
         <div class="flex items-center gap-4">
@@ -71,30 +73,21 @@
         </div>
 
         <div class="flex items-center gap-4">
-          <!-- Sync / Network indicator -->
-          <div id="sync-indicator" class="flex items-center gap-3 text-sm">
-            <div id="net-dot" class="w-3 h-3 rounded-full bg-green-500" title="Status jaringan"></div>
-            <div id="net-status" class="text-slate-600">Online</div>
-            <div id="pending-count" class="badge bg-amber-100 text-amber-800 hidden"></div>
-            <div id="last-sync" class="text-xs text-slate-400 hidden"></div>
-          </div>
+          <div id="clock-small" class="text-sm text-slate-600"></div>
 
-          <div class="flex items-center gap-3">
-            <div id="clock-small" class="text-sm text-slate-600"></div>
-            <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white hidden md:inline">Login Admin</button>
-            <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden md:inline">Logout</button>
-          </div>
+          <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white">Login Admin</button>
+          <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden">Logout</button>
         </div>
       </header>
 
       <main class="p-6">
         <div class="max-w-7xl mx-auto">
 
-          <!-- GRID / HEADER CARDS -->
+          <!-- DASHBOARD CARDS -->
           <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
             <div class="card-smooth p-5">
               <div class="text-sm text-slate-500">Total Guru</div>
-              <div id="totalGuru" class="text-3xl font-bold text-slate-800 mt-2">0</div>
+              <div id="totalGuru" class="text-3xl font-bold mt-2">0</div>
             </div>
             <div class="card-smooth p-5">
               <div class="text-sm text-slate-500">Hadir Hari Ini</div>
@@ -106,12 +99,14 @@
             </div>
           </div>
 
-          <!-- Kehadiran Form -->
+          <!-- FORM KEHADIRAN -->
           <section id="page-kehadiran" class="">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              <!-- FORM -->
               <div class="card-smooth p-6">
-                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran Guru</h2>
-                <p class="text-sm text-slate-500 mb-4">Pilih nama lalu kirim kehadiran. Sistem akan kirim ke server (Firebase) — bila offline, enqueued untuk retry.</p>
+                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran</h2>
+                <p class="text-sm text-slate-500 mb-4">Pilih nama guru, pilih status, lokasi otomatis terisi.</p>
 
                 <div class="space-y-4">
                   <div>
@@ -121,49 +116,49 @@
 
                   <div>
                     <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
-                    <select id="statusKehadiran" class="w-full border rounded p-2">
-                      <option value="">-- Pilih Status --</option>
-                      <option value="Hadir">Hadir</option>
-                      <option value="Izin">Izin</option>
-                      <option value="Sakit">Sakit</option>
-                      <option value="Dinas Luar">Dinas Luar</option>
-                    </select>
+                    <div class="grid grid-cols-2 gap-3">
+                      <button class="status-btn p-3 border rounded text-center" data-status="Hadir">Hadir</button>
+                      <button class="status-btn p-3 border rounded text-center" data-status="Izin">Izin</button>
+                      <button class="status-btn p-3 border rounded text-center" data-status="Sakit">Sakit</button>
+                      <button class="status-btn p-3 border rounded text-center" data-status="Dinas Luar">Dinas Luar</button>
+                    </div>
                   </div>
 
                   <div>
-                    <label class="block text-sm text-slate-700 mb-1">Nama Tempat (opsional)</label>
-                    <input id="placeName" class="w-full border rounded p-2" placeholder="Contoh: SDN Muhara — tap Ambil Lokasi" />
-                    <div class="mt-2">
-                      <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis — tampilkan nama bila tersedia)</label>
-                      <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600" placeholder="Menunggu lokasi..." />
-                      <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
-                    </div>
+                    <label class="block text-sm text-slate-700 mb-1">Nama Tempat (otomatis)</label>
+                    <input id="placeName" class="w-full border rounded p-2" placeholder="Mengambil lokasi..." />
+
+                    <label class="block text-sm text-slate-700 mt-2 mb-1">Lokasi Koordinat</label>
+                    <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50" placeholder="Menunggu..." />
+                    <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
+
+                    <button id="ambilLokasiBtn" class="mt-3 bg-sky-600 text-white px-3 py-2 rounded">📍 Ambil Lokasi</button>
                   </div>
 
                   <div class="flex gap-3 items-center">
                     <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">🚀 Kirim Kehadiran</button>
                     <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
-                    <button id="btn-get-loc" class="ml-auto px-3 py-1 rounded bg-sky-600 text-white text-sm">Ambil Lokasi</button>
                   </div>
                 </div>
               </div>
 
+              <!-- GRAFIK + AKTIVITAS -->
               <div class="card-smooth p-6">
                 <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
-                <div class="mt-4">
-                  <canvas id="chartDashboard" height="180"></canvas>
-                </div>
+                <canvas id="chartDashboard" height="180" class="mt-4"></canvas>
+
                 <div class="mt-6">
                   <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
                   <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
-                    <p class="text-slate-400">Memuat data...</p>
+                    <p class="text-slate-400">Menunggu data...</p>
                   </div>
                 </div>
               </div>
+
             </div>
           </section>
 
-          <!-- Data Guru -->
+          <!-- DATA GURU -->
           <section id="page-guru" class="hidden">
             <div class="flex items-center justify-between mb-4">
               <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
@@ -188,588 +183,573 @@
             </div>
           </section>
 
-          <!-- Laporan (pivot) -->
+          <!-- LAPORAN -->
           <section id="page-laporan" class="hidden">
-            <div class="mb-4 flex flex-wrap gap-3 items-center">
+            <div class="flex flex-wrap gap-3 items-center mb-4">
               <input type="month" id="bulan" class="border rounded p-2" />
               <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">Tampilkan</button>
-              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Export Excel</button>
-              <button id="exportCsvBtn" class="bg-slate-100 px-4 py-2 rounded">Export CSV</button>
+              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">📥 Excel</button>
             </div>
 
             <div class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
-              <table class="min-w-full text-sm" id="laporanPivotTable">
+              <table class="min-w-full text-sm">
                 <thead id="laporanPivotHead" class="bg-rose-50 text-rose-700 font-semibold"></thead>
                 <tbody id="laporanPivotBody">
-                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>
+                  <tr><td class="text-center p-6 text-slate-500">Pilih bulan terlebih dahulu.</td></tr>
                 </tbody>
               </table>
             </div>
 
-            <div id="resume-laporan" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
+            <div id="laporan-summary" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
           </section>
 
         </div>
       </main>
+
     </div>
   </div>
 
-  <!-- TOASTS -->
-  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- ADMIN MODAL & GURU MODAL -->
+  <!-- TOAST AREA -->
+  <div id="toasts"></div>
+
+  <!-- ADMIN LOGIN MODAL -->
   <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
     <div class="bg-white rounded-xl shadow-lg p-6 w-96">
       <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
-      <div class="space-y-2">
-        <input id="admin-username" class="border p-2 rounded w-full" placeholder="Username" />
-        <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
-        <div class="flex justify-end gap-2">
-          <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
-          <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
-        </div>
-        <p id="admin-msg" class="text-sm text-red-600"></p>
+      <input id="admin-username" class="border p-2 rounded w-full mb-2" placeholder="Email admin" />
+      <input id="admin-password" type="password" class="border p-2 rounded w-full mb-2" placeholder="Password admin" />
+      <div class="flex justify-end gap-2">
+        <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+        <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
       </div>
+      <p id="admin-msg" class="text-sm text-red-600"></p>
     </div>
   </div>
 
+  <!-- GURU CRUD MODAL -->
   <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
     <div class="bg-white rounded-xl shadow-lg p-6 w-96">
       <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
-      <div class="space-y-2">
-        <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
-        <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
-        <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
-        <div class="flex justify-end gap-2">
-          <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
-          <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
-        </div>
+      <input id="guru-nip" class="border p-2 rounded w-full mb-2" placeholder="NIP (opsional)" />
+      <input id="guru-nama-input" class="border p-2 rounded w-full mb-2" placeholder="Nama lengkap" />
+      <input id="guru-jabatan-input" class="border p-2 rounded w-full mb-2" placeholder="Jabatan/Mapel" />
+      <div class="flex justify-end gap-2">
+        <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
+        <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
       </div>
     </div>
   </div>
 
   <footer class="fixed left-0 right-0 bottom-0 md:static md:mt-8 text-center text-slate-500 text-sm p-3 md:p-6">
-    D.A.N × GPT-5 | 2025
+    D.A.N × GPT-5 | Full Online Version 2025
   </footer>
+<script>
+(function(){
+  // --- Helpers ---
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  function toast(msg, type='info', timeout=3600){
+    const toasts = document.getElementById('toasts');
+    if (!toasts) return console.log('TOAST:', msg);
+    const el = document.createElement('div');
+    el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
+    el.style.minWidth = '220px';
+    if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
+    else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
+    else el.classList.add('bg-slate-100','text-slate-800');
+    el.textContent = msg;
+    toasts.appendChild(el);
+    setTimeout(()=>{ el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
+  }
 
-  <!-- app.firebase.js must exist and include firebaseConfig -->
-  <script type="module" src="app.firebase.js"></script>
+  function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
 
-  <!-- UI + Firebase-aware script -->
-  <script>
-  (function(){
-    // Small helpers
-    const $ = s => document.querySelector(s);
-    const $$ = s => Array.from(document.querySelectorAll(s));
-    function toast(msg, type='info', timeout=3500){
-      const toasts = $('#toasts');
-      const el = document.createElement('div');
-      el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
-      el.style.minWidth = '220px';
-      if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
-      else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
-      else el.classList.add('bg-slate-100','text-slate-800');
-      el.textContent = msg;
-      toasts.appendChild(el);
-      setTimeout(()=>{ el.classList.add('opacity-0'); setTimeout(()=>el.remove(),300); }, timeout);
-    }
+  // --- UI state elements ---
+  const netDot = nullSafe('#net-dot');
+  const netStatus = nullSafe('#net-status');
+  const pendingBadge = nullSafe('#pending-count');
+  const lastSyncEl = nullSafe('#last-sync');
+  const coordsSmall = nullSafe('#coords-small');
 
-    // Date & clock
-    function setTopDate(){ $('#current-date-top').textContent = new Date().toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
-    function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
-    setTopDate(); setClockSmall(); setInterval(()=>setClockSmall(),1000);
+  function nullSafe(sel){ return document.querySelector(sel) || { classList: { add(){}, remove(){} }, textContent:'', style: {} }; }
 
-    // Nav
-    function showPage(name){
-      ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
-        const el = document.getElementById('page-'+p);
-        if (!el) return;
-        el.classList.toggle('hidden', p!==name);
-      });
-      $$('[data-page]').forEach(b => b.classList.toggle('font-semibold', b.dataset.page===name));
-    }
-    $$('[data-page]').forEach(b => b.addEventListener('click', (e)=>{ e.preventDefault(); showPage(b.dataset.page); }));
+  // --- LocalStorage keys ---
+  const LS_GURU = 'wh_demo_guru_v1';
+  const LS_ATT = 'wh_demo_att_v1';
+  const LS_QUEUE = 'wh_queue_v1';
+  const LS_GEOCACHE = 'wh_geo_cache_v1';
 
-    // Sync indicator elements
-    const netDot = $('#net-dot');
-    const netStatus = $('#net-status');
-    const pendingBadge = $('#pending-count');
-    const lastSyncEl = $('#last-sync');
+  // --- Queue helpers ---
+  function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_QUEUE)||'[]'); } catch(e){ return []; } }
+  function writeQueue(q){ localStorage.setItem(LS_QUEUE, JSON.stringify(q)); setPendingCount(q.length); }
+  function enqueueOp(op){ // op: {type, payload, ts}
+    const q = readQueue(); q.push(op); writeQueue(q); toast('Operasi dimasukkan antrian', 'info', 2000);
+  }
+  function clearQueue(){ localStorage.removeItem(LS_QUEUE); setPendingCount(0); }
+  function setPendingCount(n){ const el = document.querySelector('#pending-count'); if (!el) return; if (!n || n<=0){ el.classList.add('hidden'); el.textContent=''; } else { el.classList.remove('hidden'); el.textContent = n + ' pending'; } }
+  function setLastSync(ts){ const el = document.querySelector('#last-sync'); if (!el) return; if (!ts){ el.classList.add('hidden'); el.textContent=''; } else { el.classList.remove('hidden'); el.textContent = 'Last sync: ' + new Date(ts).toLocaleString('id-ID'); } }
 
-    function setOnlineUI(isOnline){
-      if (isOnline){
-        netDot.classList.remove('bg-rose-600'); netDot.classList.add('bg-green-500');
-        netStatus.textContent = 'Online';
-      } else {
-        netDot.classList.remove('bg-green-500'); netDot.classList.add('bg-rose-600');
-        netStatus.textContent = 'Offline';
-      }
-    }
-    function setPendingCount(n){
-      if (!n || n<=0){ pendingBadge.classList.add('hidden'); pendingBadge.textContent=''; }
-      else { pendingBadge.classList.remove('hidden'); pendingBadge.textContent = n + ' pending'; }
-    }
-    function setLastSync(ts){
-      if (!ts){ lastSyncEl.classList.add('hidden'); lastSyncEl.textContent=''; }
-      else { lastSyncEl.classList.remove('hidden'); lastSyncEl.textContent = 'Last sync: ' + new Date(ts).toLocaleTimeString('id-ID'); }
-    }
+  // --- Network indicator ---
+  function updateNetworkUI(){
+    const dot = document.querySelector('#net-dot');
+    const txt = document.querySelector('#net-status');
+    if (!dot || !txt) return;
+    if (navigator.onLine){ dot.classList.remove('bg-rose-600'); dot.classList.add('bg-green-500'); txt.textContent='Online'; }
+    else { dot.classList.remove('bg-green-500'); dot.classList.add('bg-rose-600'); txt.textContent='Offline'; }
+  }
+  window.addEventListener('online', ()=> { updateNetworkUI(); flushQueue(); toast('Koneksi kembali — mencoba sinkronisasi', 'info'); });
+  window.addEventListener('offline', ()=> { updateNetworkUI(); toast('Perangkat offline', 'err'); });
+  updateNetworkUI();
 
-    // Queue (for failed ops) stored in LS
-    const LS_QUEUE = 'wh_queue_v1';
-    function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_QUEUE) || '[]'); } catch(e){ return []; } }
-    function writeQueue(q){ localStorage.setItem(LS_QUEUE, JSON.stringify(q)); setPendingCount(q.length); }
-    function enqueueOp(op){ // op: {type:'attendance'|'guru_add'|'guru_update'|'guru_delete', payload: {...}, ts: Date.now()}
-      const q = readQueue(); q.push(op); writeQueue(q); toast('Operasi dimasukkan antrian (offline)', 'info', 2200); }
-    function popQueue(){ const q = readQueue(); if (!q.length) return null; const first = q.shift(); writeQueue(q); return first; }
+  // --- read/write caches ---
+  function loadGuruList(){ try { return JSON.parse(localStorage.getItem(LS_GURU)||'[]'); } catch(e){ return []; } }
+  function saveGuruList(list){ localStorage.setItem(LS_GURU, JSON.stringify(list)); }
+  function loadAtt(){ try { return JSON.parse(localStorage.getItem(LS_ATT)||'[]'); } catch(e){ return []; } }
+  function saveAtt(list){ localStorage.setItem(LS_ATT, JSON.stringify(list)); }
 
-    // Try flush queue
-    let isFlushing = false;
-    async function flushQueue(){
-      if (isFlushing) return;
-      const q = readQueue();
-      if (!q.length) { setPendingCount(0); return; }
-      if (!navigator.onLine) return;
-      if (!window.addAttendanceFirebase && !window.addGuruFirebase) return; // firebase lib missing
-      isFlushing = true;
-      for (let i=0;i<q.length; i++){
-        const op = q[i];
-        try {
-          if (op.type === 'attendance'){
-            await window.addAttendanceFirebase(op.payload);
-          } else if (op.type === 'guru_add'){
-            await window.addGuruFirebase(op.payload);
-          } else if (op.type === 'guru_update'){
-            await window.updateGuruFirebase(op.payload.id, op.payload.updates);
-          } else if (op.type === 'guru_delete'){
-            await window.deleteGuruFirebase(op.payload.id);
-          }
-          // success -> continue (we'll remove later)
-        } catch(err){
-          console.warn('flushQueue item failed, will retry later', err);
-          // stop further processing this cycle to avoid repeated failures
-          isFlushing = false;
-          return;
-        }
-      }
-      // if reached here, all succeeded; clear queue
-      localStorage.removeItem(LS_QUEUE);
-      setPendingCount(0);
-      toast('Antrian berhasil disinkronkan.', 'ok', 2200);
-      isFlushing = false;
-    }
-
-    // Bind online/offline
-    window.addEventListener('online', ()=> { setOnlineUI(true); flushQueue(); });
-    window.addEventListener('offline', ()=> { setOnlineUI(false); });
-
-    setOnlineUI(navigator.onLine);
-
-    // Local cache keys used by UI (kept in sync by app.firebase.js)
-    const LS_GURU = 'wh_demo_guru_v1';
-    const LS_ATT = 'wh_demo_att_v1';
-
-    // Render functions (read from local cache - updated by firebase listeners or fallback)
-    function loadGuruList(){ try { return JSON.parse(localStorage.getItem(LS_GURU) || '[]'); } catch(e){ return []; } }
-    function loadAtt(){ try { return JSON.parse(localStorage.getItem(LS_ATT) || '[]'); } catch(e){ return []; } }
-
-    function renderGuruTable(){
-      const tb = $('#guruTableBody');
-      const list = loadGuruList();
-      if (!list.length){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect([]); return; }
-      tb.innerHTML = '';
-      list.forEach(g => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td class="border p-2">${g.nip||''}</td>
-          <td class="border p-2">${escapeHtml(g.nama||'')}</td>
-          <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
-          <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
-          <td class="border p-2">
-            <button data-id="${g.id}" class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
-            <button data-id="${g.id}" class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm">Hapus</button>
-          </td>
-        `;
-        tb.appendChild(tr);
-      });
-      $$('.btn-edit').forEach(b => b.onclick = (ev) => {
-        const id = ev.currentTarget.dataset.id;
-        const g = loadGuruList().find(x=>x.id===id);
-        if (g) openGuruModalEdit(g);
-        else toast('Data guru tidak ditemukan','err');
-      });
-      $$('.btn-del').forEach(b => b.onclick = async (ev) => {
-        const id = ev.currentTarget.dataset.id;
-        if (!confirm('Hapus guru ini?')) return;
-        // try delete via Firebase
-        try {
-          if (window.deleteGuruFirebase) {
-            await window.deleteGuruFirebase(id);
-            toast('Guru dihapus (server)','ok');
-          } else {
-            // fallback local-only
-            const list = loadGuruList().filter(x=>x.id!==id);
-            localStorage.setItem(LS_GURU, JSON.stringify(list));
-            renderGuruTable();
-            populateNamaSelect();
-            toast('Guru dihapus (lokal)','ok');
-          }
-        } catch(err){
-          console.error('deleteGuru error', err);
-          enqueueOp({ type:'guru_delete', payload:{ id }, ts: Date.now() });
-        }
-      });
-      $('#totalGuru').textContent = String(list.length);
-    }
-
-    function populateNamaSelect(list){
-      const sel = $('#namaGuru'); if (!sel) return;
-      sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
-      (list||loadGuruList()||[]).forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = `${g.id}||${g.nama||''}`;
-        opt.textContent = (g.nama||'') + (g.jabatan ? ' — ' + g.jabatan : '');
-        sel.appendChild(opt);
-      });
-    }
-
-    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
-
-    // admin controls (local demo)
-    const ADMIN_USER = 'admin', ADMIN_PASS = 'admin123';
-    function injectAdminControls(){
-      const placeholder = $('#admin-controls-placeholder');
-      if (!placeholder) return;
-      if ($('#admin-controls')) return;
-      const wrap = document.createElement('div');
-      wrap.id = 'admin-controls';
-      wrap.className = 'flex gap-2 items-center';
-      wrap.innerHTML = `<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>`;
-      placeholder.appendChild(wrap);
-      $('#btn-add-guru-admin') && ($('#btn-add-guru-admin').onclick = ()=> openGuruModalCreate());
-    }
-    function removeAdminControls(){ $('#admin-controls')?.remove(); }
-
-    // modals
-    function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); $('#admin-msg').textContent=''; }
-    function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-username').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
-    function openGuruModalCreate(){ $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden'); }
-    function openGuruModalEdit(g){ $('#guru-modal-title').textContent='Edit Guru'; $('#guru-nip').value=g.nip||''; $('#guru-nama-input').value=g.nama||g.name||''; $('#guru-jabatan-input').value=g.jabatan||''; $('#guru-save').dataset.editId=g.id; $('#guru-modal').classList.remove('hidden'); }
-    function closeGuruModal(){ $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
-
-    // admin demo login handlers
-    document.addEventListener('click', async (e) => {
-      if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
-      if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
-      if (e.target && e.target.id === 'admin-submit') {
-        const u = $('#admin-username').value.trim();
-        const p = $('#admin-password').value.trim();
-        if (u === ADMIN_USER && p === ADMIN_PASS) {
-          localStorage.setItem('wh_admin_logged','1');
-          closeAdminModal();
-          injectAdminControls();
-          $('#admin-badge') && $('#admin-badge').classList.remove('hidden');
-          toast('Login admin berhasil','ok');
-        } else $('#admin-msg').textContent = 'Credential salah.';
-      }
+  // --- Render Guru Table & Select ---
+  function renderGuruTable(){
+    const tb = $('#guruTableBody');
+    const list = loadGuruList();
+    if (!tb) return;
+    if (!list.length){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect([]); return; }
+    tb.innerHTML = '';
+    list.forEach(g => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="border p-2">${escapeHtml(g.nip||'')}</td>
+        <td class="border p-2">${escapeHtml(g.nama||'')}</td>
+        <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+        <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
+        <td class="border p-2">
+          <button class="btn-edit px-2 py-1 rounded bg-yellow-400 text-sm mr-2" data-id="${g.id}">Edit</button>
+          <button class="btn-del px-2 py-1 rounded bg-rose-600 text-white text-sm" data-id="${g.id}">Hapus</button>
+        </td>
+      `;
+      tb.appendChild(tr);
     });
-
-    // open/close guru modal save
-    $('#btn-open-add-guru')?.addEventListener('click', openGuruModalCreate);
-    $('#guru-cancel').addEventListener('click', closeGuruModal);
-
-    $('#guru-save').addEventListener('click', async ()=> {
-      const editId = $('#guru-save').dataset.editId || '';
-      const nip = $('#guru-nip').value.trim();
-      const nama = $('#guru-nama-input').value.trim();
-      const jab = $('#guru-jabatan-input').value.trim();
-      if (!nama) return toast('Masukkan nama guru','err');
+    // attach handlers
+    $$('.btn-edit').forEach(b => b.onclick = (e)=> {
+      const id = e.currentTarget.dataset.id;
+      const g = loadGuruList().find(x=>x.id===id);
+      if (!g) return toast('Data guru tidak ditemukan','err');
+      $('#guru-modal-title').textContent = 'Edit Guru';
+      $('#guru-nip').value = g.nip || '';
+      $('#guru-nama-input').value = g.nama || '';
+      $('#guru-jabatan-input').value = g.jabatan || '';
+      $('#guru-save').dataset.editId = g.id;
+      $('#guru-modal').classList.remove('hidden');
+    });
+    $$('.btn-del').forEach(b => b.onclick = async (e)=> {
+      const id = e.currentTarget.dataset.id;
+      if (!confirm('Hapus guru ini?')) return;
       try {
-        if (editId){
-          // update
-          if (window.updateGuruFirebase) {
-            await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
-            toast('Perubahan tersimpan (server)','ok');
-          } else {
-            // fallback: modify localStorage
-            const list = loadGuruList().map(x => x.id===editId ? Object.assign({}, x, { nip, nama, jabatan: jab }) : x);
-            localStorage.setItem(LS_GURU, JSON.stringify(list));
-            renderGuruTable(); populateNamaSelect();
-            toast('Perubahan tersimpan (lokal)','ok');
-          }
+        if (window.deleteGuruFirebase) {
+          // if user not admin, firebase will reject — catch and enqueue
+          await window.deleteGuruFirebase(id);
+          toast('Permintaan hapus dikirim ke server', 'ok');
         } else {
-          // create
-          if (window.addGuruFirebase) {
-            await window.addGuruFirebase({ nip, nama, jabatan: jab });
-            toast('Guru disimpan (server)','ok');
-          } else {
-            // fallback: local
-            const list = loadGuruList();
-            const id = 'g' + Date.now();
-            list.push({ id, nip, nama, jabatan: jab, status:'Aktif' });
-            localStorage.setItem(LS_GURU, JSON.stringify(list));
-            renderGuruTable(); populateNamaSelect();
-            toast('Guru disimpan (lokal)','ok');
-          }
+          const list = loadGuruList().filter(x=>x.id!==id); saveGuruList(list); renderGuruTable(); populateNamaSelect();
+          toast('Guru dihapus (lokal)', 'ok');
         }
       } catch(err){
-        console.error('guru save error', err);
-        // enqueue op for retry
-        if (!editId) enqueueOp({ type:'guru_add', payload:{ nip, nama, jabatan: jab }, ts: Date.now() });
-        else enqueueOp({ type:'guru_update', payload:{ id: editId, updates:{ nip, nama, jabatan: jab } }, ts: Date.now() });
-      } finally { closeGuruModal(); }
-    });
-
-    // Seed fallback sample (only when local storage empty)
-    function seedSample(){
-      if (!localStorage.getItem(LS_GURU)) {
-        const sample = [
-          { id:'g1', nip:'198812', nama:'Sri Aminah', jabatan:'Guru Kelas', status:'Aktif' },
-          { id:'g2', nip:'199003', nama:'Budi Santoso', jabatan:'Guru Matematika', status:'Aktif' },
-          { id:'g3', nip:'199212', nama:'Siti Nur', jabatan:'Guru Bahasa', status:'Aktif' }
-        ];
-        localStorage.setItem(LS_GURU, JSON.stringify(sample));
-      }
-      if (!localStorage.getItem(LS_ATT)) localStorage.setItem(LS_ATT, JSON.stringify([]));
-    }
-    seedSample();
-
-    // Recent activity & chart using cached attendance list
-    function refreshRecentActivity(){
-      const container = $('#recent-activity'); container.innerHTML = '';
-      const rows = loadAtt().slice().reverse().slice(0,12);
-      if (!rows.length) { container.innerHTML = '<div class="text-slate-400">Belum ada aktivitas.</div>'; return; }
-      rows.forEach(r=>{
-        const el = document.createElement('div'); el.className='p-1 rounded border border-dashed border-slate-100 bg-white';
-        el.textContent = `${r.namaGuru} — ${r.status} (${r.jam || ''})`;
-        container.appendChild(el);
-      });
-      const today = new Date().toISOString().slice(0,10);
-      const todays = loadAtt().filter(x=>x.tanggal===today);
-      $('#totalHadir').textContent = String(todays.filter(x=>x.status==='Hadir').length || 0);
-      $('#totalLain').textContent = String(todays.filter(x=>['Izin','Sakit','Dinas Luar'].includes(x.status)).length || 0);
-    }
-    refreshRecentActivity();
-
-    // Chart
-    let chart;
-    function renderChart(){
-      const ctx = document.getElementById('chartDashboard').getContext('2d');
-      const today = new Date().toISOString().slice(0,10);
-      const rows = loadAtt().filter(x=>x.tanggal===today);
-      const counts = { Hadir:0, Izin:0, Sakit:0, 'Dinas Luar':0 };
-      rows.forEach(r => { if (counts[r.status]!==undefined) counts[r.status]++; });
-      const labels = Object.keys(counts);
-      const data = labels.map(l=>counts[l]);
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[{ label:'Jumlah', data }] }, options:{ responsive:true, plugins:{legend:{display:false}} }});
-    }
-    renderChart();
-
-    // Geolocation + reverse geocode (Nominatim) with cache
-    const LS_GEOCACHE = 'wh_geo_cache_v1';
-    function readGeoCache(){ try{return JSON.parse(localStorage.getItem(LS_GEOCACHE)||'{}'); }catch(e){return{}}}
-    function writeGeoCache(o){ localStorage.setItem(LS_GEOCACHE, JSON.stringify(o)); }
-    function cacheKeyForCoords(lat,lon){ return `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`; }
-
-    async function reverseGeocode(lat, lon){
-      const cache = readGeoCache(); const key = cacheKeyForCoords(lat,lon);
-      if (cache[key]) return cache[key];
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { headers:{'Accept':'application/json'} });
-        if (!res.ok) throw new Error(res.status);
-        const data = await res.json();
-        cache[key]=data; try{writeGeoCache(cache);}catch(e){}
-        return data;
-      } catch(err){ console.warn('reverse geocode fail', err); return null; }
-    }
-
-    async function captureLocation(){
-      if (!navigator.geolocation) { toast('Geolocation tidak tersedia','err'); return null; }
-      const btn = $('#btn-get-loc'); const old = btn.textContent; btn.disabled=true; btn.textContent='Mengambil...';
-      try {
-        const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:12000 }));
-        const { latitude, longitude } = pos.coords;
-        $('#lokasi').value = `Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)}`;
-        $('#coords-small').textContent = `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-        const geo = await reverseGeocode(latitude, longitude);
-        if (geo && geo.display_name) {
-          const current = ($('#placeName').value||'').trim();
-          if (!current) { $('#placeName').value = geo.display_name; toast('Nama tempat diisi otomatis','ok',1600); }
-        }
-        return { latitude, longitude };
-      } catch(err){ toast('Gagal ambil lokasi: '+(err.message||err),'err'); return null; }
-      finally { btn.disabled=false; btn.textContent=old; }
-    }
-
-    $('#btn-get-loc').addEventListener('click', ()=> captureLocation());
-
-    // Status select
-    // allow either select or dropdown we have
-    // send attendance: always try Firebase first, fallback to enqueuing if fails
-    $('#kirimKehadiranBtn').addEventListener('click', async () => {
-      const sel = $('#namaGuru').value;
-      if (!sel) return toast('Pilih nama guru terlebih dahulu','err');
-      const status = $('#statusKehadiran').value;
-      if (!status) return toast('Pilih status kehadiran','err');
-      const [id, name] = sel.split('||');
-      const placeName = ($('#placeName').value||'').trim();
-      const lokasiLabel = ($('#lokasi').value||'').trim();
-      const jam = new Date().toLocaleTimeString('id-ID');
-      const tanggal = new Date().toISOString().slice(0,10);
-      const payload = { idGuru:id, namaGuru:name, status, placeName, lokasiLabel, jam, tanggal };
-
-      const btn = $('#kirimKehadiranBtn');
-      const prevText = btn.textContent; btn.disabled=true; btn.textContent='Mengirim...';
-      try {
-        if (window.addAttendanceFirebase) {
-          try {
-            await window.addAttendanceFirebase(payload);
-            toast('Kehadiran dikirim ke server','ok',1500);
-          } catch(err){
-            console.warn('addAttendanceFirebase failed', err);
-            // enqueue for retry
-            enqueueOp({ type:'attendance', payload, ts: Date.now() });
-            toast('Gagal kirim — masuk antrian', 'err', 2400);
-          }
-        } else {
-          // firebase not available -> enqueue
-          enqueueOp({ type:'attendance', payload, ts: Date.now() });
-        }
-        // optimistic local update (so UI feels responsive). Real listener will reconcile when server updates.
-        const arr = loadAtt(); arr.push(Object.assign({}, payload, { createdAt: Date.now() })); localStorage.setItem(LS_ATT, JSON.stringify(arr));
-        refreshRecentActivity(); renderChart();
-      } finally {
-        btn.disabled=false; btn.textContent=prevText; $('#kehadiran-status').textContent='Terkirim'; setTimeout(()=>$('#kehadiran-status').textContent='—',1200);
+        console.error('deleteGuru err', err);
+        enqueueOp({ type:'guru_delete', payload:{ id }, ts: Date.now() });
+        toast('Gagal hapus dari server — masuk antrian', 'err', 3000);
       }
     });
+    $('#totalGuru') && ($('#totalGuru').textContent = String(list.length));
+  }
 
-    // Queue UI init
-    setPendingCount(readQueue().length);
-
-    // Flush queue periodically if online
-    setInterval(()=> { if (navigator.onLine) flushQueue(); }, 60000);
-
-    // Laporan pivot functions (abbreviations H/I/S/D)
-    const STATUS_ABBR = { 'Hadir':'H', 'Izin':'I', 'Sakit':'S', 'Dinas Luar':'D' };
-    function statusToAbbr(s){ if(!s) return ''; return STATUS_ABBR[s] || s.charAt(0).toUpperCase(); }
-    function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
-
-    function getRowsForMonth(yyyymm){
-      if (!yyyymm) return [];
-      return loadAtt().filter(r => (r.tanggal||'').slice(0,7) === yyyymm);
-    }
-
-    function buildPivot(rows, year, month){
-      const gurus = loadGuruList();
-      const days = daysInMonth(year, month);
-      const pivot = {};
-      gurus.forEach(g => { pivot[g.id] = { id:g.id, nama:g.nama, cells:{} }; for(let d=1;d<=days;d++) pivot[g.id].cells[String(d).padStart(2,'0')] = ''; });
-      rows.forEach(r => {
-        const day = (r.tanggal||'').slice(8,10);
-        const gid = r.idGuru || ('unknown_'+(r.namaGuru||'').replace(/\s+/g,'_'));
-        if (!pivot[gid]) { pivot[gid] = { id:gid, nama: r.namaGuru||'—', cells:{} }; for(let d=1;d<=days;d++) pivot[gid].cells[String(d).padStart(2,'0')] = ''; }
-        const ab = statusToAbbr(r.status);
-        const prev = pivot[gid].cells[day];
-        if (!prev) pivot[gid].cells[day] = ab;
-        else if (prev !== 'H' && ab === 'H') pivot[gid].cells[day] = 'H';
-      });
-      return Object.values(pivot).sort((a,b)=> (a.nama||'').localeCompare(b.nama||''));
-    }
-
-    function renderPivotTableForMonth(yyyymm){
-      const head = $('#laporanPivotHead'); const body = $('#laporanPivotBody');
-      if (!yyyymm) { head.innerHTML=''; body.innerHTML='<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>'; return; }
-      const [yStr,mStr] = yyyymm.split('-'); const y=Number(yStr), m=Number(mStr);
-      const days = daysInMonth(y,m);
-      let th = '<tr><th class="p-2 border text-left">Nama Guru</th>'; for(let d=1;d<=days;d++) th += `<th class="p-2 border text-center">${d}</th>`; th += '</tr>'; head.innerHTML = th;
-
-      const rows = getRowsForMonth(yyyymm); const pivot = buildPivot(rows,y,m);
-      if (!pivot.length) { body.innerHTML = '<tr><td colspan="'+(days+1)+'" class="text-center p-6 text-slate-500">Tidak ada data untuk bulan ini.</td></tr>'; $('#resume-laporan').textContent='Tidak ada data.'; return; }
-      body.innerHTML = pivot.map(r => {
-        let cells = `<td class="p-2 border">${escapeHtml(r.nama||'—')}</td>`;
-        for(let d=1;d<=days;d++){
-          const k=String(d).padStart(2,'0'); const v=r.cells[k]||''; let cls='text-center p-1';
-          if (v==='H') cls += ' text-green-700'; else if (v==='I') cls += ' text-amber-700'; else if (v==='S') cls += ' text-rose-600'; else if (v==='D') cls += ' text-sky-600';
-          cells += `<td class="p-2 border ${cls}">${v || '-'}</td>`;
-        }
-        return `<tr>${cells}</tr>`;
-      }).join('');
-      const totalEntries = rows.length; const hadir = rows.filter(r=>r.status==='Hadir').length; const pct = totalEntries?Math.round(hadir/totalEntries*100):0;
-      $('#resume-laporan').innerHTML = `<strong>Total entri:</strong> ${totalEntries} &middot; <strong>Hadir:</strong> ${hadir} &middot; <strong>% Kehadiran:</strong> ${pct}%`;
-    }
-
-    $('#tampilkanLaporanBtn').addEventListener('click', ()=> {
-      const val = $('#bulan').value; if (!val) return toast('Pilih bulan terlebih dahulu','err'); renderPivotTableForMonth(val);
+  function populateNamaSelect(listOverride){
+    const sel = $('#namaGuru'); if (!sel) return;
+    const list = (listOverride && Array.isArray(listOverride)) ? listOverride : loadGuruList();
+    sel.innerHTML = '<option value="">-- Pilih Guru --</option>';
+    list.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = `${g.id}||${g.nama||''}`;
+      opt.textContent = `${g.nama || ''}${g.jabatan ? ' — ' + g.jabatan : ''}`;
+      sel.appendChild(opt);
     });
+  }
 
-    $('#exportLaporanBtn').addEventListener('click', ()=> {
-      const val = $('#bulan').value; if (!val) return toast('Pilih bulan terlebih dahulu','err');
-      const [y,m] = val.split('-').map(Number); const days = daysInMonth(y,m);
-      const rows = getRowsForMonth(val); const pivot = buildPivot(rows,y,m);
-      if (!pivot.length) return toast('Tidak ada data untuk diexport','err');
-      const header = ['Nama Guru']; for(let d=1;d<=days;d++) header.push(String(d));
-      const aoa = [header]; pivot.forEach(r => { const row=[r.nama||'']; for(let d=1;d<=days;d++) row.push(r.cells[String(d).padStart(2,'0')]||''); aoa.push(row); });
-      const ws = XLSX.utils.aoa_to_sheet(aoa); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'LaporanPivot'); XLSX.writeFile(wb, `laporan-pivot-${val}.xlsx`);
-      toast('Export Excel selesai','ok');
+  // --- Recent Activity & Chart ---
+  function refreshRecentActivity(){
+    const container = $('#recent-activity'); if (!container) return;
+    const rows = loadAtt().slice().reverse().slice(0,12);
+    container.innerHTML = '';
+    if (!rows.length) { container.innerHTML = '<div class="text-slate-400">Belum ada aktivitas.</div>'; return; }
+    rows.forEach(r => {
+      const el = document.createElement('div'); el.className = 'p-1 rounded border border-dashed border-slate-100 bg-white';
+      el.textContent = `${r.namaGuru} — ${r.status} (${r.jam || ''})`;
+      container.appendChild(el);
     });
+    const today = new Date().toISOString().slice(0,10);
+    const todays = loadAtt().filter(x=>x.tanggal===today);
+    $('#totalHadir') && ($('#totalHadir').textContent = String(todays.filter(x=>x.status==='Hadir').length || 0));
+    $('#totalLain') && ($('#totalLain').textContent = String(todays.filter(x=>['Izin','Sakit','Dinas Luar'].includes(x.status)).length || 0));
+  }
 
-    $('#exportCsvBtn').addEventListener('click', ()=> {
-      const val = $('#bulan').value; if (!val) return toast('Pilih bulan terlebih dahulu','err');
-      const [y,m] = val.split('-').map(Number); const days = daysInMonth(y,m);
-      const rows = getRowsForMonth(val); const pivot = buildPivot(rows,y,m);
-      if (!pivot.length) return toast('Tidak ada data untuk diexport','err');
-      const header = ['Nama Guru'].concat(Array.from({length:days},(_,i)=>String(i+1)));
-      const lines = [header.join(',')];
-      pivot.forEach(r => {
-        const cols = [`"${(r.nama||'').replace(/"/g,'""')}"`];
-        for(let d=1;d<=days;d++){ const v = r.cells[String(d).padStart(2,'0')]||''; cols.push(`"${v.replace(/"/g,'""')}"`); }
-        lines.push(cols.join(','));
-      });
-      const blob = new Blob([lines.join('\n')], {type:'text/csv'}); const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download=`laporan-pivot-${val}.csv`; a.click(); URL.revokeObjectURL(url);
-      toast('Export CSV selesai','ok');
+  let chart = null;
+  function renderChart(){
+    const ctxEl = document.getElementById('chartDashboard');
+    if (!ctxEl) return;
+    const ctx = ctxEl.getContext('2d');
+    const today = new Date().toISOString().slice(0,10);
+    const rows = loadAtt().filter(x=>x.tanggal===today);
+    const counts = { Hadir:0, Izin:0, Sakit:0, 'Dinas Luar':0 };
+    rows.forEach(r => { if (counts[r.status]!==undefined) counts[r.status]++; });
+    const labels = Object.keys(counts);
+    const data = labels.map(l => counts[l]);
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label:'Jumlah', data }] },
+      options: { responsive:true, plugins:{ legend:{ display:false } } }
     });
+  }
 
-    // Firebase listeners: app.firebase.js will store data into LS and dispatch events
-    window.addEventListener('gurus-updated', (ev)=>{ renderGuruTable(); populateNamaSelect(loadGuruList()); });
-    window.addEventListener('attendances-updated', (ev)=>{ refreshRecentActivity(); renderChart(); });
+  // --- Geolocation + Reverse Geocode (Nominatim) with cache ---
+  function readGeoCache(){ try { return JSON.parse(localStorage.getItem(LS_GEOCACHE)||'{}'); } catch(e){ return {}; } }
+  function writeGeoCache(o){ try { localStorage.setItem(LS_GEOCACHE, JSON.stringify(o)); } catch(e){} }
+  function cacheKeyForCoords(lat, lon){ return `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`; }
 
-    // When app.firebase.js exists, syncFromFirebase available
-    async function doInitialSync(){
-      if (window.syncFromFirebase) {
+  async function reverseGeocode(lat, lon){
+    const cache = readGeoCache(); const key = cacheKeyForCoords(lat, lon);
+    if (cache[key]) return cache[key];
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { headers: { 'Accept':'application/json' }});
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      cache[key] = data; writeGeoCache(cache);
+      return data;
+    } catch(err){
+      console.warn('reverseGeocode error', err);
+      return null;
+    }
+  }
+
+  async function captureLocationAndFill(){
+    if (!navigator.geolocation) { toast('Geolocation tidak tersedia pada perangkat ini', 'err'); return null; }
+    const btn = $('#ambilLokasiBtn');
+    const orig = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Mengambil...'; }
+    try {
+      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:12000 }));
+      const { latitude, longitude } = pos.coords;
+      const coordLabel = `Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)}`;
+      $('#lokasi').value = coordLabel;
+      coordsSmall.textContent = `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+      const geo = await reverseGeocode(latitude, longitude);
+      if (geo && geo.display_name) {
+        if (!$('#placeName').value) { $('#placeName').value = geo.display_name; toast('Nama tempat diisi otomatis', 'ok', 1600); }
+      } else {
+        toast('Lokasi terdeteksi — nama tempat tidak ditemukan', 'info', 1600);
+      }
+      return { latitude, longitude, coordLabel };
+    } catch(err){
+      toast('Gagal ambil lokasi: '+(err.message||err), 'err', 2600);
+      return null;
+    } finally {
+      if (btn) { btn.disabled=false; btn.textContent = orig; }
+    }
+  }
+
+  $('#ambilLokasiBtn') && $('#ambilLokasiBtn').addEventListener('click', ()=> captureLocationAndFill());
+
+  // --- Status buttons (for alternate UI) ---
+  let selectedStatus = '';
+  $$('.status-btn').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      $$('.status-btn').forEach(x=>x.classList.remove('bg-rose-100','ring-4'));
+      b.classList.add('bg-rose-100','ring-4');
+      selectedStatus = b.dataset.status;
+      // also set dropdown for compatibility
+      const sel = $('#statusKehadiran'); if (sel) sel.value = selectedStatus;
+    });
+  });
+
+  // Ensure dropdown exists (part earlier used buttons; if not present, create)
+  if (!$('#statusKehadiran')){
+    const select = document.createElement('select'); select.id='statusKehadiran'; select.className='hidden';
+    select.innerHTML = '<option value="">--</option><option value="Hadir">Hadir</option><option value="Izin">Izin</option><option value="Sakit">Sakit</option><option value="Dinas Luar">Dinas Luar</option>';
+    document.body.appendChild(select);
+  }
+
+  // --- Send attendance (try Firebase, else enqueue) ---
+  $('#kirimKehadiranBtn') && $('#kirimKehadiranBtn').addEventListener('click', async ()=>{
+    const sel = $('#namaGuru').value;
+    if (!sel) return toast('Pilih nama guru terlebih dahulu','err');
+    // status: either from selectedStatus (buttons) or dropdown
+    const status = selectedStatus || ($('#statusKehadiran')&&$('#statusKehadiran').value) || '';
+    if (!status) return toast('Pilih status kehadiran','err');
+    const [id, name] = sel.split('||');
+    const placeName = ($('#placeName').value||'').trim();
+    const lokasiLabel = ($('#lokasi').value||'').trim();
+    const jam = new Date().toLocaleTimeString('id-ID');
+    const tanggal = new Date().toISOString().slice(0,10);
+    const payload = { idGuru:id, namaGuru:name, status, placeName, lokasiLabel, jam, tanggal };
+
+    const btn = $('#kirimKehadiranBtn'); const prevText = btn.textContent; btn.disabled=true; btn.textContent='Mengirim...';
+    try {
+      if (window.addAttendanceFirebase) {
         try {
-          const res = await window.syncFromFirebase();
-          setLastSync(Date.now());
-          setLastSync = (ts)=> setLastSync(ts); // noop to avoid eslint
-        } catch(err){ console.warn('initial sync failed', err); }
+          await window.addAttendanceFirebase(payload);
+          toast('Kehadiran dikirim ke server', 'ok', 1500);
+        } catch(err){
+          console.warn('addAttendanceFirebase failed', err);
+          enqueueOp({ type:'attendance', payload, ts: Date.now() });
+          toast('Gagal kirim — masuk antrian', 'err', 2400);
+        }
+      } else {
+        enqueueOp({ type:'attendance', payload, ts: Date.now() });
+        toast('Firebase belum tersedia — masuk antrian', 'info', 2000);
       }
-      // update UI from LS
-      renderGuruTable(); populateNamaSelect(loadGuruList()); refreshRecentActivity(); renderChart();
+      // optimistic local update
+      const arr = loadAtt(); arr.push(Object.assign({}, payload, { createdAt: Date.now() })); saveAtt(arr);
+      refreshRecentActivity(); renderChart();
+    } finally {
+      btn.disabled=false; btn.textContent=prevText; $('#kehadiran-status').textContent='Terkirim';
+      setTimeout(()=> $('#kehadiran-status').textContent='—', 1200);
+      selectedStatus=''; $$('.status-btn').forEach(x=>x.classList.remove('bg-rose-100','ring-4'));
     }
-    // small wrapper to set last sync UI
-    function setLastSync(ts){ setLastSyncUI(ts); }
-    function setLastSyncUI(ts){ setLastSync(ts); lastSyncEl.textContent = 'Last sync: ' + new Date(ts).toLocaleString('id-ID'); lastSyncEl.classList.remove('hidden'); }
+  });
 
-    // Periodic attempt to flush queue and update pending count
-    setInterval(()=> { setPendingCount(readQueue().length); if (navigator.onLine) flushQueue(); }, 5000);
+  // --- Queue flushing (process ops in order) ---
+  let flushing = false;
+  async function flushQueue(){
+    if (flushing) return;
+    const q = readQueue();
+    if (!q.length) { setPendingCount(0); return; }
+    if (!navigator.onLine) return;
+    if (!window.addAttendanceFirebase && !window.addGuruFirebase) return;
+    flushing = true;
+    for (let i=0;i<q.length;i++){
+      const op = q[i];
+      try {
+        if (op.type === 'attendance'){
+          await window.addAttendanceFirebase(op.payload);
+        } else if (op.type === 'guru_add'){
+          await window.addGuruFirebase(op.payload);
+        } else if (op.type === 'guru_update'){
+          await window.updateGuruFirebase(op.payload.id, op.payload.updates);
+        } else if (op.type === 'guru_delete'){
+          await window.deleteGuruFirebase(op.payload.id);
+        }
+        // continue
+      } catch(err){
+        console.warn('flushQueue failed on op:', op, err);
+        // stop trying now to avoid tight loop — will retry later
+        flushing = false;
+        return;
+      }
+    }
+    // all succeeded -> clear queue
+    clearQueue();
+    setLastSync(Date.now());
+    toast('Antrian berhasil disinkronkan ke server', 'ok', 2000);
+    flushing = false;
+  }
 
-    // initial UI
-    showPage('kehadiran');
+  // attempt flush periodically
+  setInterval(()=> { if (navigator.onLine) flushQueue(); setPendingCount(readQueue().length); }, 15000);
+
+  // --- Laporan Pivot (H/I/S/D) ---
+  const STATUS_ABBR = { 'Hadir':'H', 'Izin':'I', 'Sakit':'S', 'Dinas Luar':'D' };
+  function statusToAbbr(s){ if (!s) return ''; return STATUS_ABBR[s] || s.charAt(0).toUpperCase(); }
+  function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+
+  function getRowsForMonth(yyyymm){
+    if (!yyyymm) return [];
+    return loadAtt().filter(r => (r.tanggal||'').slice(0,7) === yyyymm);
+  }
+
+  function buildPivot(rows, year, month){
+    const gurus = loadGuruList();
+    const days = daysInMonth(year, month);
+    const pivot = {};
+    gurus.forEach(g => { pivot[g.id] = { id:g.id, nama:g.nama, cells:{} }; for(let d=1; d<=days; d++) pivot[g.id].cells[String(d).padStart(2,'0')] = ''; });
+    rows.forEach(r => {
+      const day = (r.tanggal||'').slice(8,10);
+      const gid = r.idGuru || ('unknown_'+(r.namaGuru||'').replace(/\s+/g,'_'));
+      if (!pivot[gid]) { pivot[gid] = { id: gid, nama: r.namaGuru || '—', cells:{} }; for(let d=1; d<=days; d++) pivot[gid].cells[String(d).padStart(2,'0')] = ''; }
+      const ab = statusToAbbr(r.status);
+      const prev = pivot[gid].cells[day];
+      if (!prev) pivot[gid].cells[day] = ab;
+      else if (prev !== 'H' && ab === 'H') pivot[gid].cells[day] = 'H';
+    });
+    return Object.values(pivot).sort((a,b)=> (a.nama||'').localeCompare(b.nama||''));
+  }
+
+  function renderPivotTableForMonth(yyyymm){
+    const head = $('#laporanPivotHead'), body = $('#laporanPivotBody');
+    if (!yyyymm) { if (head) head.innerHTML=''; if (body) body.innerHTML='<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>'; return; }
+    const [yStr, mStr] = yyyymm.split('-'); const y = Number(yStr), m = Number(mStr);
+    const days = daysInMonth(y,m);
+    let th = '<tr><th class="p-2 border text-left">Nama Guru</th>';
+    for (let d=1; d<=days; d++) th += `<th class="p-2 border text-center">${d}</th>`;
+    th += '</tr>'; if (head) head.innerHTML = th;
+
+    const rows = getRowsForMonth(yyyymm); const pivot = buildPivot(rows, y, m);
+    if (!pivot.length) { if (body) body.innerHTML = `<tr><td colspan="${days+1}" class="text-center p-6 text-slate-500">Tidak ada data untuk bulan ini.</td></tr>`; $('#laporan-summary').textContent = 'Tidak ada data.'; return; }
+    if (body) body.innerHTML = pivot.map(r => {
+      let cells = `<td class="p-2 border">${escapeHtml(r.nama||'—')}</td>`;
+      for (let d=1; d<=days; d++){
+        const k = String(d).padStart(2,'0'); const v = r.cells[k] || ''; let cls = 'text-center p-1';
+        if (v==='H') cls += ' text-green-700'; else if (v==='I') cls += ' text-amber-700'; else if (v==='S') cls += ' text-rose-600'; else if (v==='D') cls += ' text-sky-600';
+        cells += `<td class="p-2 border ${cls}">${v || '-'}</td>`;
+      }
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    const totalEntries = rows.length, hadir = rows.filter(r=>r.status==='Hadir').length;
+    $('#laporan-summary').innerHTML = `<strong>Total entri:</strong> ${totalEntries} &middot; <strong>Hadir:</strong> ${hadir} &middot; <strong>% Kehadiran:</strong> ${ (totalEntries?Math.round(hadir/totalEntries*100):0) }%`;
+  }
+
+  $('#tampilkanLaporanBtn') && $('#tampilkanLaporanBtn').addEventListener('click', ()=> {
+    const val = $('#bulan').value; if (!val) return toast('Pilih bulan terlebih dahulu','err'); renderPivotTableForMonth(val);
+  });
+
+  // Exports
+  $('#exportLaporanBtn') && $('#exportLaporanBtn').addEventListener('click', ()=> {
+    const val = $('#bulan').value; if (!val) return toast('Pilih bulan terlebih dahulu','err');
+    const [y,m] = val.split('-').map(Number); const days = daysInMonth(y,m);
+    const rows = getRowsForMonth(val); const pivot = buildPivot(rows,y,m);
+    if (!pivot.length) return toast('Tidak ada data untuk diexport','err');
+    const header = ['Nama Guru']; for (let d=1; d<=days; d++) header.push(String(d));
+    const aoa = [header];
+    pivot.forEach(r => {
+      const row = [ r.nama || '' ];
+      for (let d=1; d<=days; d++) row.push(r.cells[String(d).padStart(2,'0')] || '');
+      aoa.push(row);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'LaporanPivot');
+    XLSX.writeFile(wb, `laporan-pivot-${val}.xlsx`);
+    toast('Export Excel selesai', 'ok');
+  });
+
+  // --- Firebase event listeners (UI reacts to app.firebase.js) ---
+  window.addEventListener('gurus-updated', (ev) => {
+    // app.firebase.js stores latest into localStorage; render from there
     renderGuruTable();
     populateNamaSelect(loadGuruList());
-    refreshRecentActivity();
-    renderChart();
-    setPendingCount(readQueue().length);
-    if (navigator.onLine) { setOnlineUI(true); flushQueue(); } else setOnlineUI(false);
+  });
+  window.addEventListener('attendances-updated', (ev) => {
+    refreshRecentActivity(); renderChart(); setLastSync(Date.now());
+  });
 
-    // attempt initial sync after small delay to allow app.firebase.js to initialize
-    setTimeout(()=> doInitialSync(), 900);
+  // --- Admin auth wiring (listen to auth-changed) ---
+  window.addEventListener('auth-changed', (ev) => {
+    const user = ev.detail;
+    if (!user) {
+      $('#btn-open-admin') && $('#btn-open-admin').classList.remove('hidden');
+      $('#btn-admin-logout') && $('#btn-admin-logout').classList.add('hidden');
+      document.getElementById('admin-controls')?.remove();
+      toast('Tidak terautentikasi', 'info');
+      return;
+    }
+    if (user.admin) {
+      $('#btn-open-admin') && $('#btn-open-admin').classList.add('hidden');
+      $('#btn-admin-logout') && $('#btn-admin-logout').classList.remove('hidden');
+      // add admin controls if missing
+      if (!document.getElementById('admin-controls')){
+        const ph = document.getElementById('admin-controls-placeholder');
+        if (ph){
+          const wrap = document.createElement('div'); wrap.id = 'admin-controls'; wrap.className = 'flex gap-2 items-center';
+          wrap.innerHTML = `<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>`;
+          ph.appendChild(wrap);
+          document.getElementById('btn-add-guru-admin').addEventListener('click', ()=> {
+            $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden');
+          });
+        }
+      }
+      toast('Admin terautentikasi: ' + (user.email||''), 'ok', 1600);
+    } else {
+      $('#btn-open-admin') && $('#btn-open-admin').classList.add('hidden');
+      $('#btn-admin-logout') && $('#btn-admin-logout').classList.remove('hidden');
+      toast('Signed in (bukan admin)', 'info', 1500);
+    }
+  });
 
-    // Expose some helpers to console
-    window.__WH_UI = { enqueueOp, flushQueue, readQueue, renderGuruTable };
+  // Admin modal submit -> signInWithEmail (provided by app.firebase.js)
+  document.addEventListener('click', async (e) => {
+    if (e.target && e.target.id === 'btn-open-admin') { $('#admin-modal').classList.remove('hidden'); $('#admin-username').focus(); }
+    if (e.target && e.target.id === 'admin-cancel') { $('#admin-modal').classList.add('hidden'); $('#admin-msg').textContent=''; }
+    if (e.target && e.target.id === 'admin-submit') {
+      const email = ($('#admin-username').value||'').trim(); const pass = ($('#admin-password').value||'').trim();
+      if (!email || !pass) { $('#admin-msg').textContent = 'Masukkan email & password.'; return; }
+      $('#admin-submit').disabled = true; $('#admin-msg').textContent = 'Menghubungkan...';
+      try {
+        if (window.signInWithEmail) {
+          await window.signInWithEmail(email, pass);
+          $('#admin-modal').classList.add('hidden'); $('#admin-msg').textContent=''; $('#admin-username').value=''; $('#admin-password').value='';
+        } else {
+          $('#admin-msg').textContent = 'Auth belum siap.';
+        }
+      } catch(err){
+        console.error('auth err', err);
+        $('#admin-msg').textContent = 'Gagal login: ' + (err && err.message ? err.message : String(err));
+      } finally { $('#admin-submit').disabled = false; }
+    }
 
-  })();
-  </script>
+    if (e.target && e.target.id === 'btn-admin-logout') {
+      if (window.signOutFirebase) {
+        await window.signOutFirebase();
+        toast('Logout berhasil', 'ok');
+      } else {
+        window.dispatchEvent(new CustomEvent('auth-changed', { detail: null }));
+      }
+    }
+  });
 
+  // --- Guru save (create/update) ---
+  $('#guru-save') && $('#guru-save').addEventListener('click', async ()=>{
+    const editId = $('#guru-save').dataset.editId || '';
+    const nip = ($('#guru-nip').value||'').trim(); const nama = ($('#guru-nama-input').value||'').trim(); const jab = ($('#guru-jabatan-input').value||'').trim();
+    if (!nama) return toast('Masukkan nama guru','err');
+    try {
+      if (editId){
+        if (window.updateGuruFirebase) {
+          await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab });
+          toast('Perubahan dikirim ke server', 'ok');
+        } else {
+          const list = loadGuruList().map(x => x.id===editId?Object.assign({}, x, { nip, nama, jabatan: jab }):x);
+          saveGuruList(list); renderGuruTable(); populateNamaSelect();
+          toast('Perubahan disimpan lokal', 'ok');
+        }
+      } else {
+        if (window.addGuruFirebase) {
+          await window.addGuruFirebase({ nip, nama, jabatan: jab });
+          toast('Guru ditambahkan di server', 'ok');
+        } else {
+          const list = loadGuruList(); const id = 'g' + Date.now();
+          list.push({ id, nip, nama, jabatan: jab, status:'Aktif' }); saveGuruList(list); renderGuruTable(); populateNamaSelect();
+          toast('Guru ditambahkan lokal', 'ok');
+        }
+      }
+    } catch(err){
+      console.error('guru save err', err);
+      if (!editId) enqueueOp({ type:'guru_add', payload:{ nip, nama, jabatan: jab }, ts: Date.now() });
+      else enqueueOp({ type:'guru_update', payload:{ id: editId, updates:{ nip, nama, jabatan: jab } }, ts: Date.now() });
+      toast('Gagal simpan ke server — antrian dibuat', 'err');
+    } finally {
+      $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId='';
+    }
+  });
+
+  // --- Initial UI boot ---
+  function initialBoot(){
+    // populate quick UI from local caches
+    renderGuruTable(); populateNamaSelect(loadGuruList()); refreshRecentActivity(); renderChart(); setPendingCount(readQueue().length);
+    // try initial sync if function available
+    setTimeout(async ()=> { if (window.syncFromFirebase) { try { await window.syncFromFirebase(); setLastSync(Date.now()); toast('Sinkron awal selesai', 'ok'); } catch(e){ console.warn('initial sync failed', e); } } }, 800);
+  }
+  initialBoot();
+
+  // Expose control helpers for console
+  window.__WH_UI = { flushQueue, enqueueOp, readQueue, renderGuruTable, populateNamaSelect, refreshRecentActivity };
+
+})();
+</script>
 </body>
 </html>
