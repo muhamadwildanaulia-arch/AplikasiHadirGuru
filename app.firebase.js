@@ -3,19 +3,21 @@
 // <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 // <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
 //
-// 1) Isi firebaseConfig di bawah dengan konfigurasi proyekmu.
-// 2) Simpan file sebagai app.firebase.js dan pastikan index.html memuatnya.
+// File ini memasang listener realtime ke /gurus dan /attendances,
+// menyediakan fungsi CRUD yang dipanggil dari index.html, dan
+// menyimpan data hasil sync ke localStorage agar UI tetap bekerja offline.
 
 (function(){
-  // ---------- CONFIG: ganti dengan konfigurasi Firebase projectmu ----------
+  // ---------- CONFIG: diisi dari input pengguna ----------
   const firebaseConfig = {
-    apiKey: "REPLACE_ME",
-    authDomain: "REPLACE_ME.firebaseapp.com",
-    databaseURL: "https://REPLACE_ME-default-rtdb.firebaseio.com",
-    projectId: "REPLACE_ME",
-    storageBucket: "REPLACE_ME.appspot.com",
-    messagingSenderId: "REPLACE_ME",
-    appId: "REPLACE_ME"
+    apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
+    authDomain: "websitehadirsekolah.firebaseapp.com",
+    databaseURL: "https://websitehadirsekolah-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "websitehadirsekolah",
+    storageBucket: "websitehadirsekolah.firebasestorage.app",
+    messagingSenderId: "811289978131",
+    appId: "1:811289978131:web:ad0bd0b113dd1c733a26e6",
+    measurementId: "G-PK0811G8VJ"
   };
   // -----------------------------------------------------------------------
 
@@ -84,9 +86,8 @@
           yearMonth: a.yearMonth || ((a.tanggal||'').slice(0,7) || '')
         }));
         try { localStorage.setItem(LS_ATT, JSON.stringify(normalized)); } catch(e){}
-        // you can dispatch other events if needed
+        // dispatch event for attendance update
         window.__latest_att_list = normalized;
-        // optionally dispatch a global event for attendance update
         window.dispatchEvent(new CustomEvent('attendances-updated', { detail: normalized }));
       }, (err) => { console.error('attendances listener error', err); });
     }
@@ -166,11 +167,9 @@
   }
 
   // convenience: get monthly report directly from firebase (filtered by yearMonth)
-  // NOTE: Realtime DB supports orderByChild + equalTo, so we store yearMonth on each attendance record.
   async function getMonthlyReportFirebase(yearMonth){
     if (!yearMonth) throw new Error('yearMonth diperlukan (format YYYY-MM)');
     const ref = db.ref('/attendances');
-    // query where yearMonth === provided
     const q = ref.orderByChild('yearMonth').equalTo(yearMonth);
     const snap = await q.once('value');
     const arr = snapToArray(snap).map(a => ({
