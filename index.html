@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebsiteHadir — SDN Muhara (Full Online)</title>
+  <title>WebsiteHadir — SDN Muhara (Fixed)</title>
 
-  <!-- Tailwind CSS (CDN Production Demo) -->
+  <!-- Tailwind CSS (CDN demo) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Chart.js & XLSX -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <!-- Firebase compat scripts (APP, DB, AUTH) -->
@@ -20,274 +20,189 @@
   <link rel="icon" type="image/png" href="Logo.png">
 
   <style>
-    .sidebar { 
-        background: linear-gradient(180deg,#7f1d1d, #b91c1c);
-    }
-    .card-smooth { 
-        background: linear-gradient(180deg,#fff,#f8fafc); 
-        border-radius:12px; 
-        box-shadow:0 6px 22px rgba(15,23,42,0.06); 
-    }
-    #toasts { 
-        position: fixed; 
-        right: 20px; 
-        bottom: 20px; 
-        z-index: 60; 
-        display: flex; 
-        flex-direction: column; 
-        gap: 8px; 
-    }
+    /* small visual tweaks */
+    .sidebar { background: linear-gradient(180deg,#7f1d1d, #b91c1c); }
+    .sidebar .nav-item { color: rgba(255,255,255,0.92); }
+    .card-smooth { background: linear-gradient(180deg,#fff,#f8fafc); border-radius:12px; box-shadow:0 6px 22px rgba(15,23,42,0.06); }
+    /* toast container will be added in Part C */
+    /* ensure status buttons clickable above any overlays */
+    .status-btn { position: relative; z-index: 20; cursor: pointer; user-select: none; }
   </style>
 </head>
 
 <body class="antialiased bg-slate-50 text-slate-800">
   <div class="min-h-screen flex">
+<!-- MAIN CONTENT BODY -->
+<main class="p-6">
+  <div class="max-w-7xl mx-auto">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar hidden md:flex md:flex-col md:w-64 md:py-6 md:px-4">
-      <div class="flex items-center gap-3 mb-6">
-        <img src="Logo.png" class="h-12 w-12 rounded-md shadow-sm bg-white p-1" />
-        <div>
-          <h1 class="text-white font-bold">SDN Muhara</h1>
-          <div class="text-sm text-red-200 italic">WebsiteHadir • Dashboard</div>
+    <!-- DASHBOARD CARDS -->
+    <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
+      <div class="card-smooth p-5">
+        <div class="text-sm text-slate-500">Total Guru</div>
+        <div id="totalGuru" class="text-3xl font-bold text-slate-800 mt-2">0</div>
+      </div>
+      <div class="card-smooth p-5">
+        <div class="text-sm text-slate-500">Hadir Hari Ini</div>
+        <div id="totalHadir" class="text-3xl font-bold text-green-600 mt-2">0</div>
+      </div>
+      <div class="card-smooth p-5">
+        <div class="text-sm text-slate-500">Izin / Sakit / Dinas</div>
+        <div id="totalLain" class="text-3xl font-bold text-amber-600 mt-2">0</div>
+      </div>
+    </div>
+
+    <!-- ===================================================== -->
+    <!-- FORM KEHADIRAN (FIX STATUS BUTTONS)                  -->
+    <!-- ===================================================== -->
+    <section id="page-kehadiran">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- LEFT CARD -->
+        <div class="card-smooth p-6">
+          <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran Guru</h2>
+          <p class="text-sm text-slate-500 mb-4">Pilih nama guru lalu isi status kehadiran.</p>
+
+          <div class="space-y-4">
+
+            <!-- NAMA GURU -->
+            <div>
+              <label class="block text-sm text-slate-700 mb-1">Nama Guru</label>
+              <select id="namaGuru" class="w-full border rounded p-2"></select>
+            </div>
+
+            <!-- STATUS SELECTION (BUTTONS) -->
+            <div>
+              <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
+
+              <div class="grid grid-cols-2 gap-3">
+
+                <button class="status-btn p-3 border rounded-lg bg-white text-center text-slate-700 font-medium"
+                  data-status="Hadir">✔ HADIR</button>
+
+                <button class="status-btn p-3 border rounded-lg bg-white text-center text-slate-700 font-medium"
+                  data-status="Izin">📝 IZIN</button>
+
+                <button class="status-btn p-3 border rounded-lg bg-white text-center text-slate-700 font-medium"
+                  data-status="Sakit">🤒 SAKIT</button>
+
+                <button class="status-btn p-3 border rounded-lg bg-white text-center text-slate-700 font-medium"
+                  data-status="Dinas Luar">🚗 DINAS LUAR</button>
+
+              </div>
+
+              <!-- Hidden fallback select for scripts -->
+              <select id="statusKehadiran" class="hidden">
+                <option value="">--</option>
+                <option value="Hadir">Hadir</option>
+                <option value="Izin">Izin</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Dinas Luar">Dinas Luar</option>
+              </select>
+
+            </div>
+
+            <!-- LOKASI -->
+            <div>
+              <label class="block text-sm text-slate-700 mb-1">Nama Tempat (opsional)</label>
+              <input id="placeName" class="w-full border rounded p-2" placeholder="Contoh: SDN Muhara" />
+
+              <div class="mt-2">
+                <label class="block text-sm text-slate-700 mb-1">Lokasi (otomatis)</label>
+                <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50 text-slate-600"
+                  placeholder="Menunggu lokasi..." />
+                <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
+
+                <button id="ambilLokasiBtn"
+                  class="mt-2 px-3 py-1 rounded bg-sky-600 text-white text-sm">
+                  Ambil Lokasi GPS
+                </button>
+              </div>
+            </div>
+
+            <!-- SUBMIT -->
+            <div class="flex gap-3 items-center">
+              <button id="kirimKehadiranBtn"
+                class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">
+                🚀 Kirim Kehadiran
+              </button>
+              <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
+            </div>
+
+          </div>
         </div>
+
+        <!-- RIGHT CARD (CHART + RECENT) -->
+        <div class="card-smooth p-6">
+          <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
+          <div class="mt-4">
+            <canvas id="chartDashboard" height="180"></canvas>
+          </div>
+
+          <div class="mt-6">
+            <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
+            <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
+              <p class="text-slate-400">Memuat data...</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+    <!-- ===================================================== -->
+    <!-- DATA GURU PAGE                                        -->
+    <!-- ===================================================== -->
+    <section id="page-guru" class="hidden mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
+        <div id="admin-controls-placeholder"></div>
       </div>
 
-      <nav class="mt-6 flex-1">
-        <ul class="space-y-1">
-          <li>
-            <button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">
-              📥 Isi Kehadiran
-            </button>
-          </li>
-          <li>
-            <button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">
-              📊 Dashboard
-            </button>
-          </li>
-          <li>
-            <button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">
-              👩‍🏫 Data Guru
-            </button>
-          </li>
-          <li>
-            <button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md hover:bg-white/10">
-              📅 Laporan Bulanan
-            </button>
-          </li>
-        </ul>
-      </nav>
+      <div class="bg-white rounded-xl shadow p-4 overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-rose-50 text-rose-700 font-semibold">
+            <tr>
+              <th class="border p-2 text-left">NIP</th>
+              <th class="border p-2 text-left">Nama Guru</th>
+              <th class="border p-2 text-left">Jabatan</th>
+              <th class="border p-2 text-left">Status</th>
+              <th class="border p-2 text-left">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="guruTableBody">
+            <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-      <div class="mt-auto text-sm text-red-100 px-3">Versi Online • 2025</div>
-    </aside>
+    <!-- ===================================================== -->
+    <!-- LAPORAN PAGE (pivot table head/body already in PART 2) -->
+    <!-- ===================================================== -->
+    <!-- (Part 2 included the input month + tombol + table placeholders)
+         This section ensures laporan-summary area exists (if not already) -->
+    <section id="laporan-extra" class="hidden">
+      <div id="laporan-summary" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
+    </section>
 
-    <!-- BOTTOM NAV (MOBILE) -->
-    <div class="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 bg-white/90 shadow-lg rounded-full px-3 py-1 z-40 flex gap-2">
-      <button data-page="kehadiran" class="px-3 py-2 rounded-full text-sm">📥</button>
-      <button data-page="dashboard" class="px-3 py-2 rounded-full text-sm">📊</button>
-      <button data-page="guru" class="px-3 py-2 rounded-full text-sm">👩‍🏫</button>
-      <button data-page="laporan" class="px-3 py-2 rounded-full text-sm">📅</button>
-    </div>
+    </div> <!-- .max-w-7xl -->
+  </main>
 
-    <!-- MAIN CONTENT -->
-    <div class="flex-1 min-w-0">
-
-      <!-- TOPBAR -->
-      <header class="flex items-center justify-between bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200 px-4 py-3">
-
-        <div class="flex items-center gap-4">
-          <button id="btn-toggle-sidebar" class="md:hidden p-2 rounded bg-white/60">☰</button>
-          <div>
-            <div class="text-sm text-slate-500" id="current-date-top"></div>
-            <div class="text-lg font-semibold">Dashboard Kehadiran</div>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-4">
-          <div id="clock-small" class="text-sm text-slate-600"></div>
-
-          <button id="btn-open-admin" class="text-sm px-3 py-1 rounded bg-rose-600 text-white">
-            Login Admin
-          </button>
-          <button id="btn-admin-logout" class="text-sm text-slate-600 underline hidden">
-            Logout
-          </button>
-        </div>
-
-      </header>
-
-      <main class="p-6">
-        <div class="max-w-7xl mx-auto">
-
-          <!-- DASHBOARD CARDS -->
-          <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
-            <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Total Guru</div>
-              <div id="totalGuru" class="text-3xl font-bold mt-2">0</div>
-            </div>
-            <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Hadir Hari Ini</div>
-              <div id="totalHadir" class="text-3xl font-bold text-green-600 mt-2">0</div>
-            </div>
-            <div class="card-smooth p-5">
-              <div class="text-sm text-slate-500">Izin / Sakit / Dinas</div>
-              <div id="totalLain" class="text-3xl font-bold text-amber-600 mt-2">0</div>
-            </div>
-          </div>
-
-          <!-- PAGE KEHADIRAN -->
-          <section id="page-kehadiran">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              <!-- FORM KEHADIRAN -->
-              <div class="card-smooth p-6">
-                <h2 class="text-xl font-semibold mb-2">📥 Isi Kehadiran</h2>
-                <p class="text-sm text-slate-500 mb-4">
-                  Pilih guru, ambil lokasi otomatis, lalu kirim kehadiran.
-                </p>
-
-                <div class="space-y-4">
-
-                  <div>
-                    <label class="block text-sm text-slate-700 mb-1">Nama Guru</label>
-                    <select id="namaGuru" class="w-full border rounded p-2"></select>
-                  </div>
-
-                  <!-- STATUS -->
-                  <div>
-                    <label class="block text-sm text-slate-700 mb-1">Status Kehadiran</label>
-                    <div class="grid grid-cols-2 gap-3">
-                      <button class="status-btn p-3 border rounded" data-status="Hadir">Hadir</button>
-                      <button class="status-btn p-3 border rounded" data-status="Izin">Izin</button>
-                      <button class="status-btn p-3 border rounded" data-status="Sakit">Sakit</button>
-                      <button class="status-btn p-3 border rounded" data-status="Dinas Luar">Dinas Luar</button>
-                    </div>
-                  </div>
-
-                  <!-- LOKASI -->
-                  <div>
-                    <label class="block text-sm text-slate-700 mb-1">Nama Tempat (otomatis)</label>
-                    <input id="placeName" class="w-full border rounded p-2" placeholder="Mengambil lokasi..." />
-
-                    <label class="block text-sm text-slate-700 mt-2 mb-1">Lokasi Koordinat</label>
-                    <input id="lokasi" readonly class="w-full border rounded p-2 bg-slate-50" placeholder="Menunggu..." />
-                    <div id="coords-small" class="text-xs text-slate-400 mt-1">Koordinat: —</div>
-
-                    <button id="ambilLokasiBtn" class="mt-3 bg-sky-600 text-white px-3 py-2 rounded">
-                      📍 Ambil Lokasi
-                    </button>
-                  </div>
-
-                  <!-- SUBMIT -->
-                  <div class="flex gap-3 items-center">
-                    <button id="kirimKehadiranBtn" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">
-                      🚀 Kirim Kehadiran
-                    </button>
-                    <div id="kehadiran-status" class="text-sm text-slate-500">—</div>
-                  </div>
-
-                </div>
-              </div>
-
-              <!-- GRAFIK -->
-              <div class="card-smooth p-6">
-                <h3 class="font-semibold">Grafik Kehadiran Hari Ini</h3>
-                <canvas id="chartDashboard" height="180" class="mt-4"></canvas>
-
-                <div class="mt-6">
-                  <h4 class="font-medium text-slate-700 mb-2">Aktivitas Terbaru</h4>
-                  <div id="recent-activity" class="space-y-1 text-slate-700 text-sm">
-                    <p class="text-slate-400">Menunggu data...</p>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </section>
-
-          <!-- PAGE GURU -->
-          <section id="page-guru" class="hidden">
-            <div class="flex items-center justify-between mb-4">
-              <h2 class="text-xl font-semibold">👩‍🏫 Daftar Guru</h2>
-              <div id="admin-controls-placeholder"></div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow p-4 overflow-auto">
-              <table class="min-w-full text-sm">
-                <thead class="bg-rose-50 text-rose-700 font-semibold">
-                  <tr>
-                    <th class="border p-2 text-left">NIP</th>
-                    <th class="border p-2 text-left">Nama Guru</th>
-                    <th class="border p-2 text-left">Jabatan</th>
-                    <th class="border p-2 text-left">Status</th>
-                    <th class="border p-2 text-left">Aksi</th>
-                  </tr>
-                </thead>
-
-                <tbody id="guruTableBody">
-                  <tr><td colspan="5" class="text-center p-6 text-slate-500">Memuat data...</td></tr>
-                </tbody>
-
-              </table>
-            </div>
-          </section>
-
-          <!-- PAGE LAPORAN -->
-          <section id="page-laporan" class="hidden">
-
-            <div class="flex flex-wrap gap-3 items-center mb-4">
-              <input type="month" id="bulan" class="border rounded p-2" />
-              <button id="tampilkanLaporanBtn" class="bg-sky-600 text-white px-4 py-2 rounded">
-                Tampilkan
-              </button>
-              <button id="exportLaporanBtn" class="bg-emerald-600 text-white px-4 py-2 rounded">
-                📥 Export Excel
-              </button>
-            </div>
-
-            <div class="bg-white rounded-xl shadow p-4 overflow-auto mb-4">
-              <table class="min-w-full text-sm">
-
-                <thead id="laporanPivotHead" class="bg-rose-50 text-rose-700 font-semibold"></thead>
-
-                <tbody id="laporanPivotBody">
-                  <tr>
-                    <td class="text-center p-6 text-slate-500">
-                      Pilih bulan terlebih dahulu.
-                    </td>
-                  </tr>
-                </tbody>
-
-              </table>
-            </div>
-
-            <div id="laporan-summary" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
-
-          </section>
-
-        </div>
-      </main>
-
-    </div>
-  </div>
-  <!-- TOAST CONTAINER -->
+  <!-- TOASTS -->
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
 
   <!-- ADMIN LOGIN MODAL -->
   <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
     <div class="bg-white rounded-xl shadow-lg p-6 w-96">
       <h3 class="text-lg font-semibold mb-2">Login Admin</h3>
-
-      <div class="space-y-3">
+      <div class="space-y-2">
         <input id="admin-email" class="border p-2 rounded w-full" placeholder="Email admin" type="email" />
         <input id="admin-password" class="border p-2 rounded w-full" placeholder="Password" type="password" />
-
-        <div id="admin-msg" class="text-sm text-red-600"></div>
-
-        <div class="flex justify-end gap-2 mt-2">
+        <div class="flex justify-end gap-2">
           <button id="admin-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
           <button id="admin-submit" class="px-3 py-1 rounded bg-rose-600 text-white">Login</button>
         </div>
+        <p id="admin-msg" class="text-sm text-red-600"></p>
       </div>
     </div>
   </div>
@@ -296,13 +211,11 @@
   <div id="guru-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
     <div class="bg-white rounded-xl shadow-lg p-6 w-96">
       <h3 id="guru-modal-title" class="text-lg font-semibold mb-2">Tambah Guru</h3>
-      
-      <div class="space-y-3">
+      <div class="space-y-2">
         <input id="guru-nip" class="border p-2 rounded w-full" placeholder="NIP (opsional)" />
         <input id="guru-nama-input" class="border p-2 rounded w-full" placeholder="Nama lengkap" />
         <input id="guru-jabatan-input" class="border p-2 rounded w-full" placeholder="Jabatan / Mapel" />
-
-        <div class="flex justify-end gap-2 mt-2">
+        <div class="flex justify-end gap-2">
           <button id="guru-cancel" class="px-3 py-1 rounded bg-slate-100">Batal</button>
           <button id="guru-save" class="px-3 py-1 rounded bg-rose-600 text-white">Simpan</button>
         </div>
@@ -311,13 +224,15 @@
   </div>
 
   <!-- FOOTER -->
-  <footer class="fixed md:static left-0 right-0 bottom-0 text-center text-slate-500 text-sm p-3 md:p-6">
-    WebsiteHadir SDN Muhara — © 2025
+  <footer class="fixed left-0 right-0 bottom-0 md:static md:mt-8 text-center text-slate-500 text-sm p-3 md:p-6">
+    SDN Muhara • WebsiteHadir • 2025
   </footer>
-<!-- PART D: Script UI utama -->
+
+</div> <!-- .min-h-screen -->
+<!-- PART 4: Script UI utama -->
 <script>
 (function(){
-  // --- helpers
+  // helpers
   const $ = s => document.querySelector(s);
   const $$ = s => Array.from(document.querySelectorAll(s));
 
@@ -336,7 +251,7 @@
     setTimeout(()=> { el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
   }
 
-  // pages
+  // page nav
   function showPage(name){
     ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
       const el = document.getElementById('page-'+p);
@@ -345,11 +260,15 @@
     });
     $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
   }
-  $$('[data-page]').forEach(btn=>btn.addEventListener('click', e => { e.preventDefault(); showPage(btn.dataset.page); }));
+  // attach nav handlers defensively
+  $$( '[data-page]' ).forEach(btn => {
+    try { btn.addEventListener('click', (e) => { e.preventDefault(); showPage(btn.dataset.page); }); }
+    catch(e){ /* ignore */ }
+  });
 
   // top date & clock
-  function setTopDate(){ const now = new Date(); $('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'}); }
-  function setClockSmall(){ $('#clock-small').textContent = new Date().toLocaleTimeString('id-ID'); }
+  function setTopDate(){ const now = new Date(); $('#current-date-top') && ($('#current-date-top').textContent = now.toLocaleDateString('id-ID',{weekday:'long', year:'numeric', month:'long', day:'numeric'})); }
+  function setClockSmall(){ $('#clock-small') && ($('#clock-small').textContent = new Date().toLocaleTimeString('id-ID')); }
   setTopDate(); setClockSmall(); setInterval(()=>{ setTopDate(); setClockSmall(); },1000);
 
   // mobile sidebar toggle
@@ -359,37 +278,42 @@
     aside.classList.toggle('hidden');
   });
 
-  // localStorage keys (UI-level)
+  // localStorage keys and helpers
   const LS_GURU = 'wh_guru_list_v1';
-  const LS_ATT = 'wh_att_list_v1';
+  function loadGuruList(){ try { return JSON.parse(localStorage.getItem(LS_GURU)||'[]'); } catch(e){ return []; } }
+  function saveGuruList(list){ try { localStorage.setItem(LS_GURU, JSON.stringify(list)); } catch(e){} }
 
-  // admin-local fallback marker (keeps legacy behaviour)
+  // admin fallback
   function isAdminLocal(){ return localStorage.getItem('wh_admin_logged') === '1'; }
   function setAdminLocal(v){ if (v) localStorage.setItem('wh_admin_logged','1'); else localStorage.removeItem('wh_admin_logged'); }
 
-  // inject admin controls (placeholder in page-guru)
+  // inject admin controls
   function injectAdminControls(){
-    const ph = $('#admin-controls-placeholder'); if (!ph) return;
+    const placeholder = $('#admin-controls-placeholder');
+    if (!placeholder) return;
     if ($('#admin-controls')) return;
-    const wrap = document.createElement('div'); wrap.id='admin-controls'; wrap.className='flex gap-2 items-center';
-    wrap.innerHTML = '<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button> <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>';
-    ph.appendChild(wrap);
-    $('#btn-add-guru-admin').addEventListener('click', ()=> {
+    const wrap = document.createElement('div');
+    wrap.id = 'admin-controls';
+    wrap.className = 'flex gap-2 items-center';
+    wrap.innerHTML = `
+      <button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>
+      <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>
+    `;
+    placeholder.appendChild(wrap);
+    // wire buttons
+    document.getElementById('btn-add-guru-admin').addEventListener('click', ()=> {
       $('#guru-modal-title').textContent='Tambah Guru';
       $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value='';
       $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden');
     });
-    $('#btn-sync-local').addEventListener('click', async ()=> {
+    document.getElementById('btn-sync-local').addEventListener('click', async ()=>{
       if (window.syncFromFirebase) { try { await window.syncFromFirebase(); toast('Sinkronisasi Firebase dipicu', 'ok'); } catch(e){ toast('Sinkron gagal: '+(e.message||e),'err'); } }
       else { toast('Fungsi sinkron tidak tersedia', 'err'); }
     });
   }
   function removeAdminControls(){ $('#admin-controls')?.remove(); }
 
-  // render functions
-  function loadGuruList(){ try { return JSON.parse(localStorage.getItem(LS_GURU)||'[]'); } catch(e){ return []; } }
-  function saveGuruList(list){ localStorage.setItem(LS_GURU, JSON.stringify(list)); }
-
+  // populate select
   function populateNamaSelect(listOverride){
     const sel = $('#namaGuru'); if (!sel) return;
     const list = Array.isArray(listOverride) ? listOverride : loadGuruList();
@@ -397,27 +321,33 @@
     list.forEach(g => {
       const opt = document.createElement('option');
       opt.value = `${g.id}||${g.nama||''}`;
-      opt.textContent = `${g.nama || ''}${g.jabatan ? ' — ' + g.jabatan : ''}`;
+      opt.textContent = (g.nama||'') + (g.jabatan ? ' — ' + g.jabatan : '');
       sel.appendChild(opt);
     });
   }
 
+  // render guru table
   function renderGuruTable(listOverride){
-    const tb = $('#guruTableBody');
-    if (!tb) return;
+    const tb = $('#guruTableBody'); if (!tb) return;
     const list = Array.isArray(listOverride) ? listOverride : loadGuruList();
-    if (!list.length){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect(list); $('#totalGuru') && ($('#totalGuru').textContent = '0'); return; }
+    if (!list || !list.length){ tb.innerHTML = '<tr><td colspan="5" class="text-center p-6 text-slate-500">Belum ada guru terdaftar.</td></tr>'; populateNamaSelect(list||[]); $('#totalGuru') && ($('#totalGuru').textContent='0'); return; }
     tb.innerHTML = '';
     list.forEach(g => {
-      const tr = document.createElement('tr'); tr.className='align-top';
-      const actions = isAdminLocal() ? `<button class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2" data-id="${g.id}">Edit</button>
-                                      <button class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm" data-id="${g.id}">Hapus</button>` : '<span class="text-sm text-slate-400">—</span>';
-      tr.innerHTML = `<td class="border p-2">${g.nip||''}</td><td class="border p-2">${escapeHtml(g.nama||'')}</td><td class="border p-2">${escapeHtml(g.jabatan||'')}</td><td class="border p-2">${escapeHtml(g.status||'Aktif')}</td><td class="border p-2">${actions}</td>`;
+      const tr = document.createElement('tr');
+      tr.className = 'align-top';
+      const actions = isAdminLocal() ? `<button data-id="${g.id}" class="btn-edit inline-block bg-yellow-400 px-2 py-1 rounded text-sm mr-2">Edit</button>
+                                      <button data-id="${g.id}" class="btn-del inline-block bg-rose-600 text-white px-2 py-1 rounded text-sm">Hapus</button>` : '<span class="text-sm text-slate-400">—</span>';
+      tr.innerHTML = `<td class="border p-2">${g.nip||''}</td>
+                      <td class="border p-2">${escapeHtml(g.nama||'')}</td>
+                      <td class="border p-2">${escapeHtml(g.jabatan||'')}</td>
+                      <td class="border p-2">${escapeHtml(g.status||'Aktif')}</td>
+                      <td class="border p-2">${actions}</td>`;
       tb.appendChild(tr);
     });
-    // attach handlers
-    $$('.btn-edit').forEach(b => b.onclick = (e)=> {
-      const id = e.currentTarget.dataset.id;
+
+    // wire edit/delete
+    $$('.btn-edit').forEach(b => b.onclick = (ev) => {
+      const id = ev.currentTarget.dataset.id;
       const g = loadGuruList().find(x=>x.id===id);
       if (!g) return toast('Data guru tidak ditemukan','err');
       $('#guru-modal-title').textContent='Edit Guru';
@@ -427,64 +357,56 @@
       $('#guru-save').dataset.editId = g.id;
       $('#guru-modal').classList.remove('hidden');
     });
-    $$('.btn-del').forEach(b => b.onclick = async (e)=> {
-      const id = e.currentTarget.dataset.id;
+
+    $$('.btn-del').forEach(b => b.onclick = async (ev) => {
+      const id = ev.currentTarget.dataset.id;
       if (!confirm('Hapus guru ini?')) return;
       try {
-        if (window.deleteGuruFirebase) {
-          await window.deleteGuruFirebase(id);
-          toast('Permintaan hapus dikirim ke server', 'ok');
-        } else {
-          const list = loadGuruList().filter(x=>x.id!==id);
-          saveGuruList(list); renderGuruTable(list); populateNamaSelect(list);
-          toast('Guru dihapus (lokal)', 'ok');
-        }
-      } catch(err){
-        console.error(err);
-        toast('Gagal hapus: '+(err && err.message?err.message:err), 'err');
-      }
+        if (window.deleteGuruFirebase) { await window.deleteGuruFirebase(id); toast('Permintaan hapus dikirim ke server', 'ok'); }
+        else { const list = loadGuruList().filter(x=>x.id!==id); saveGuruList(list); renderGuruTable(list); populateNamaSelect(list); toast('Guru dihapus (lokal)', 'ok'); }
+      } catch(err){ console.error(err); toast('Gagal hapus: '+(err && err.message ? err.message : err), 'err'); }
     });
+
     $('#totalGuru') && ($('#totalGuru').textContent = String(list.length));
   }
 
   function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&<>"'`]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;","`":"&#96;"}[c])); }
 
-  // admin modal open/close and auth wiring (UI only)
-  function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-email').focus(); $('#admin-msg').textContent=''; }
-  function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); $('#admin-email').value=''; $('#admin-password').value=''; $('#admin-msg').textContent=''; }
+  // admin modal handlers
+  function openAdminModal(){ $('#admin-modal').classList.remove('hidden'); $('#admin-email') && $('#admin-email').focus(); $('#admin-msg') && ($('#admin-msg').textContent=''); }
+  function closeAdminModal(){ $('#admin-modal').classList.add('hidden'); if($('#admin-email')) $('#admin-email').value=''; if($('#admin-password')) $('#admin-password').value=''; if($('#admin-msg')) $('#admin-msg').textContent=''; }
 
   document.addEventListener('click', async (e) => {
-    // open/close admin modal
+    // admin open/close
     if (e.target && e.target.id === 'btn-open-admin') openAdminModal();
     if (e.target && e.target.id === 'admin-cancel') closeAdminModal();
 
-    // admin login submit
+    // admin submit
     if (e.target && e.target.id === 'admin-submit') {
-      const email = ($('#admin-email').value||'').trim();
-      const pw = ($('#admin-password').value||'').trim();
+      const email = ($('#admin-email').value||'').trim(); const pw = ($('#admin-password').value||'').trim();
       if (!email || !pw) { $('#admin-msg').textContent = 'Email & password diperlukan.'; return; }
-      $('#admin-submit').disabled = true; $('#admin-msg').textContent = 'Menghubungkan...';
+      e.target.disabled = true; $('#admin-msg').textContent = 'Menghubungkan...';
       try {
         if (window.signInWithEmail) {
           const info = await window.signInWithEmail(email, pw);
-          // if signIn returns detail with admin claim, UI will be updated via auth-changed event (Part F)
-          setAdminLocal(true); // fallback marking
+          // auth-changed event will update UI; keep fallback marker
+          setAdminLocal(true);
           closeAdminModal();
           injectAdminControls();
           toast('Login admin berhasil', 'ok');
         } else {
-          // fallback local demo credential
+          // legacy demo fallback
           if (email==='admin' && pw==='admin123') { setAdminLocal(true); injectAdminControls(); closeAdminModal(); toast('Login demo admin', 'ok'); }
           else { $('#admin-msg').textContent = 'Auth tidak tersedia atau credential salah.'; }
         }
       } catch(err){
-        console.error('login err', err);
+        console.error('auth err', err);
         $('#admin-msg').textContent = 'Login gagal: ' + (err && err.message ? err.message : String(err));
-      } finally { $('#admin-submit').disabled = false; }
+      } finally { e.target.disabled = false; }
     }
 
-    // logout admin (UI)
-    if (e.target && e.target.id === 'btn-admin-logout'){
+    // admin logout
+    if (e.target && e.target.id === 'btn-admin-logout') {
       if (!confirm('Keluar sebagai admin?')) return;
       setAdminLocal(false);
       $('#admin-badge')?.classList?.add('hidden');
@@ -495,143 +417,90 @@
       toast('Logout lokal berhasil', 'ok');
     }
 
-    // open add guru modal (if any)
+    // add guru modal
     if (e.target && e.target.id === 'btn-add-guru-admin') {
       $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden');
     }
     if (e.target && e.target.id === 'guru-cancel') $('#guru-modal').classList.add('hidden');
 
-    // save guru (create/update)
+    // save guru
     if (e.target && e.target.id === 'guru-save') {
       const editId = e.target.dataset.editId || '';
-      const nip = ($('#guru-nip').value||'').trim();
-      const nama = ($('#guru-nama-input').value||'').trim();
-      const jab = ($('#guru-jabatan-input').value||'').trim();
+      const nip = ($('#guru-nip').value||'').trim(); const nama = ($('#guru-nama-input').value||'').trim(); const jab = ($('#guru-jabatan-input').value||'').trim();
       if (!nama) return toast('Masukkan nama guru','err');
       try {
         if (editId) {
           if (window.updateGuruFirebase) { await window.updateGuruFirebase(editId, { nip, nama, jabatan: jab }); toast('Perubahan dikirim ke server', 'ok'); }
-          else {
-            const list = loadGuruList().map(x=> x.id===editId ? Object.assign({}, x, { nip, nama, jabatan: jab }) : x );
-            saveGuruList(list); renderGuruTable(list); populateNamaSelect(list); toast('Perubahan disimpan (lokal)', 'ok');
-          }
+          else { const list = loadGuruList().map(x=> x.id===editId ? Object.assign({}, x, { nip, nama, jabatan: jab }) : x ); saveGuruList(list); renderGuruTable(list); populateNamaSelect(list); toast('Perubahan disimpan (lokal)', 'ok'); }
         } else {
           if (window.addGuruFirebase) { await window.addGuruFirebase({ nip, nama, jabatan: jab }); toast('Guru ditambahkan ke server', 'ok'); }
-          else {
-            const list = loadGuruList(); const id = 'g'+Date.now();
-            list.push({ id, nip, nama, jabatan: jab, status:'Aktif' }); saveGuruList(list); renderGuruTable(list); populateNamaSelect(list);
-            toast('Guru ditambahkan (lokal)', 'ok');
-          }
+          else { const list = loadGuruList(); const id = 'g'+Date.now(); list.push({ id, nip, nama, jabatan: jab, status:'Aktif' }); saveGuruList(list); renderGuruTable(list); populateNamaSelect(list); toast('Guru ditambahkan (lokal)', 'ok'); }
         }
       } catch(err){
         console.error('save guru err', err);
         toast('Gagal menyimpan: '+(err && err.message?err.message:err), 'err');
-      } finally {
-        $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId='';
-      }
+      } finally { $('#guru-modal').classList.add('hidden'); $('#guru-save').dataset.editId=''; }
     }
   });
 
-  // small UI initialization
+  // initial UI boot
   showPage('kehadiran');
+
   if (isAdminLocal()) { $('#admin-badge')?.classList?.remove('hidden'); $('#btn-admin-logout')?.classList?.remove('hidden'); $('#btn-open-admin')?.classList?.add('hidden'); injectAdminControls(); }
   else { $('#admin-badge')?.classList?.add('hidden'); }
 
-  // ensure quick local populate from cache
   const cached = loadGuruList();
   if (cached && cached.length) { renderGuruTable(cached); populateNamaSelect(cached); }
 
-  // ensure default elements exist
-  if (!document.getElementById('namaGuru')) {
-    const sel = document.createElement('select'); sel.id='namaGuru'; sel.className='hidden'; document.body.appendChild(sel);
-  }
-
-  // expose some helpers for debugging
+  // expose for debugging
   window.__WH_UI = { renderGuruTable, populateNamaSelect, loadGuruList, saveGuruList, toast };
 
 })();
 </script>
-<!-- PART E: Geolocation, Chart, Laporan Pivot, Export, Queue -->
+<!-- PART 5: Geolocation, Chart, Recent Activity, Pivot Laporan, Export, Queue -->
 <script>
 (function(){
-  const $ = s => document.querySelector(s);
-  const $$ = s => Array.from(document.querySelectorAll(s));
+  // ---- keys / helpers ----
   const LS_ATT = 'wh_att_list_v1';
   const LS_QUEUE = 'wh_queue_v1';
+  const LS_GURU = 'wh_guru_list_v1';
   const LS_GEOCACHE = 'wh_geo_cache_v1';
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
 
-  // --- small UI toast (reuse if available) ---
-  function toast(msg, type='info', timeout=3000){
+  function toast(msg, type='info', timeout=3200){
     const toasts = document.getElementById('toasts');
-    if (!toasts) return console.log(msg);
+    if (!toasts) return console.log('TOAST:', msg);
     const el = document.createElement('div');
-    el.className = 'px-4 py-2 rounded shadow text-sm';
-    if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800'); 
-    else if (type==='err') el.classList.add('bg-rose-100','text-rose-800'); 
+    el.className = 'px-4 py-2 rounded shadow flex items-center gap-3 text-sm';
+    el.style.minWidth='220px';
+    if (type==='ok') el.classList.add('bg-emerald-100','text-emerald-800');
+    else if (type==='err') el.classList.add('bg-rose-100','text-rose-800');
     else el.classList.add('bg-slate-100','text-slate-800');
-    el.textContent = msg; toasts.appendChild(el);
-    setTimeout(()=> { el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
+    el.textContent = msg;
+    toasts.appendChild(el);
+    setTimeout(()=>{ el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
   }
 
-  // --- local att helpers ---
   function loadAtt(){ try { return JSON.parse(localStorage.getItem(LS_ATT)||'[]'); } catch(e){ return []; } }
-  function saveAtt(list){ try { localStorage.setItem(LS_ATT, JSON.stringify(list)); } catch(e){} }
+  function saveAtt(arr){ try { localStorage.setItem(LS_ATT, JSON.stringify(arr)); } catch(e){} }
+  function loadGuru(){ try { return JSON.parse(localStorage.getItem(LS_GURU)||'[]'); } catch(e){ return []; } }
 
-  // --- Queue for offline ops ---
-  function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_QUEUE)||'[]'); } catch(e){ return []; } }
-  function writeQueue(q){ try { localStorage.setItem(LS_QUEUE, JSON.stringify(q)); } catch(e){} updatePendingBadge(); }
-  function enqueue(op){ const q = readQueue(); q.push(op); writeQueue(q); toast('Masuk antrian (offline)', 'info'); }
-  function clearQueue(){ try{ localStorage.removeItem(LS_QUEUE); }catch(e){} updatePendingBadge(); }
-  function updatePendingBadge(){ const q = readQueue(); const el = document.getElementById('pending-count'); if (!el) return; if (!q.length){ el.classList.add('hidden'); el.textContent=''; } else { el.classList.remove('hidden'); el.textContent = q.length + ' pending'; } }
-
-  // --- flush queue (attendance + guru ops) ---
-  let flushing = false;
-  async function flushQueue(){
-    if (flushing) return;
-    const q = readQueue();
-    if (!q.length) { updatePendingBadge(); return; }
-    if (!navigator.onLine) return;
-    if (!window.addAttendanceFirebase && !window.addGuruFirebase) return;
-    flushing = true;
-    for (let op of q){
-      try {
-        if (op.type === 'attendance' && window.addAttendanceFirebase) {
-          await window.addAttendanceFirebase(op.payload);
-        } else if (op.type === 'guru_add' && window.addGuruFirebase) {
-          await window.addGuruFirebase(op.payload);
-        } else if (op.type === 'guru_update' && window.updateGuruFirebase) {
-          await window.updateGuruFirebase(op.payload.id, op.payload.updates);
-        } else if (op.type === 'guru_delete' && window.deleteGuruFirebase) {
-          await window.deleteGuruFirebase(op.payload.id);
-        } else {
-          // skip if no handler
-        }
-      } catch(err){
-        console.warn('flush failed', err);
-        flushing = false;
-        return; // stop on first failure to avoid tight loop
-      }
-    }
-    clearQueue();
-    toast('Antrian tersinkronisasi', 'ok');
-    flushing = false;
-  }
-  window.addEventListener('online', flushQueue);
-  setInterval(()=>{ if (navigator.onLine) flushQueue(); updatePendingBadge(); }, 15000);
-
-  // --- reverse geocode (nominatim) with small cache ---
-  function geoCache(){ try { return JSON.parse(localStorage.getItem(LS_GEOCACHE)||'{}'); } catch(e){ return {}; } }
-  function saveGeoCache(c){ try { localStorage.setItem(LS_GEOCACHE, JSON.stringify(c)); } catch(e){} }
-  function coordsKey(lat,lon){ return `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`; }
+  // ---- GEO (Nominatim reverse geocode) ----
+  function readGeoCache(){ try { return JSON.parse(localStorage.getItem(LS_GEOCACHE)||'{}'); } catch(e){ return {}; } }
+  function writeGeoCache(o){ try { localStorage.setItem(LS_GEOCACHE, JSON.stringify(o)); } catch(e){} }
+  function coordKey(lat, lon){ return `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`; }
 
   async function reverseGeocode(lat, lon){
-    const cache = geoCache(); const k = coordsKey(lat,lon);
-    if (cache[k]) return cache[k];
+    const cache = readGeoCache(); const key = coordKey(lat,lon);
+    if (cache[key]) return cache[key];
     try {
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { headers:{ 'Accept':'application/json', 'User-Agent':'WebsiteHadir/1.0' }});
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+      const res = await fetch(url, { headers: { 'Accept':'application/json' }});
       if (!res.ok) throw new Error('HTTP '+res.status);
       const data = await res.json();
-      cache[k] = data; saveGeoCache(cache);
+      cache[key] = data;
+      writeGeoCache(cache);
       return data;
     } catch(err){
       console.warn('reverseGeocode error', err);
@@ -639,189 +508,219 @@
     }
   }
 
-  // --- capture location & populate fields ---
   async function captureLocationAndFill(){
     if (!navigator.geolocation) { toast('Geolocation tidak tersedia', 'err'); return null; }
-    const btn = document.getElementById('ambilLokasiBtn'); if (btn) { btn.disabled = true; btn.textContent = 'Mengambil...'; }
+    const btn = $('#ambilLokasiBtn'); const prev = btn?btn.textContent:'';
+    if (btn){ btn.disabled = true; btn.textContent = 'Mengambil...'; }
     try {
-      const pos = await new Promise((res, rej)=> navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:12000 }));
-      const { latitude, longitude } = pos.coords;
-      const coordLabel = `Lat ${latitude.toFixed(5)}, Lon ${longitude.toFixed(5)}`;
-      const placeInput = document.getElementById('placeName');
-      const lokasiInput = document.getElementById('lokasi');
-      if (lokasiInput) lokasiInput.value = coordLabel;
-      const coordsSmall = document.getElementById('coords-small');
-      if (coordsSmall) coordsSmall.textContent = `Koordinat: ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
-      const geo = await reverseGeocode(latitude, longitude);
-      if (geo && geo.display_name) {
-        if (placeInput && !placeInput.value) placeInput.value = geo.display_name;
-        toast('Nama tempat diambil otomatis', 'ok', 1600);
-      } else {
-        toast('Lokasi diambil — nama tempat tidak tersedia', 'info', 1400);
+      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:15000 }));
+      const lat = pos.coords.latitude, lon = pos.coords.longitude;
+      const coordLabel = `Lat ${lat.toFixed(5)}, Lon ${lon.toFixed(5)}`;
+      if ($('#lokasi')) $('#lokasi').value = coordLabel;
+      if ($('#coords-small')) $('#coords-small').textContent = `Koordinat: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+      const geo = await reverseGeocode(lat, lon);
+      if (geo && geo.display_name && $('#placeName') && !$('#placeName').value) {
+        $('#placeName').value = geo.display_name; toast('Nama tempat diisi otomatis', 'ok', 1400);
       }
-      return { latitude, longitude, coordLabel, display_name: (geo && geo.display_name) || '' };
+      return { lat, lon, coordLabel };
     } catch(err){
-      console.warn('geoloc err', err);
-      toast('Gagal ambil lokasi: '+(err.message||err), 'err', 2400);
+      toast('Gagal ambil lokasi: '+(err && err.message?err.message:err), 'err', 2400);
       return null;
-    } finally { if (btn) { btn.disabled=false; btn.textContent = '📍 Ambil Lokasi'; } }
-  }
-  $('#ambilLokasiBtn') && $('#ambilLokasiBtn').addEventListener('click', captureLocationAndFill);
-
-  // --- Chart (Chart.js) ---
-  let chart = null;
-  function renderChart(){
-    const ctx = document.getElementById('chartDashboard');
-    if (!ctx) return;
-    const today = new Date().toISOString().slice(0,10);
-    const rows = loadAtt().filter(r => (r.tanggal||'') === today);
-    const counts = { Hadir:0, Izin:0, Sakit:0, 'Dinas Luar':0 };
-    rows.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
-    const labels = Object.keys(counts);
-    const data = labels.map(k => counts[k]);
-    if (chart) chart.destroy();
-    chart = new Chart(ctx.getContext('2d'), {
-      type: 'bar',
-      data: { labels, datasets:[ { label:'Jumlah', data } ] },
-      options: { responsive:true, plugins:{ legend:{ display:false } } }
-    });
+    } finally { if (btn){ btn.disabled=false; btn.textContent = prev; } }
   }
 
-  // --- Recent activity UI ---
+  // wire lokasi button
+  document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'ambilLokasiBtn') captureLocationAndFill();
+  });
+
+  // ---- Chart.js safe renderer ----
+  let dashboardChart = null;
+  function renderAttendanceChart(){
+    try {
+      const canvas = document.getElementById('chartDashboard');
+      if (!canvas) return;
+      // destroy existing via Chart API if present
+      try {
+        if (Chart && typeof Chart.getChart === 'function') {
+          const existing = Chart.getChart(canvas) || Chart.getChart(canvas.id);
+          if (existing) { existing.destroy(); dashboardChart = null; }
+        }
+      } catch(e){ /* ignore */ }
+      if (dashboardChart && typeof dashboardChart.destroy === 'function') {
+        try { dashboardChart.destroy(); } catch(e){ console.warn('dashboardChart.destroy failed', e); }
+        dashboardChart = null;
+      }
+
+      const today = new Date().toISOString().slice(0,10);
+      const rows = loadAtt().filter(x => (x.tanggal||'').slice(0,10) === today);
+      const counts = { Hadir:0, Izin:0, Sakit:0, 'Dinas Luar':0 };
+      rows.forEach(r => { if (counts.hasOwnProperty(r.status)) counts[r.status]++; });
+
+      const labels = Object.keys(counts);
+      const data = labels.map(k=>counts[k]);
+
+      dashboardChart = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label:'Jumlah', data, backgroundColor: undefined }] },
+        options: { responsive:true, plugins:{ legend:{ display:false } } }
+      });
+    } catch(err){
+      console.error('renderAttendanceChart error', err);
+    }
+  }
+
+  // ---- Recent activity ----
   function refreshRecentActivity(){
     const container = document.getElementById('recent-activity');
     if (!container) return;
     const rows = loadAtt().slice().reverse().slice(0,12);
     container.innerHTML = '';
-    if (!rows.length) { container.innerHTML = '<div class="text-slate-400">Belum ada aktivitas.</div>'; return; }
+    if (!rows.length){ container.innerHTML = '<div class="text-slate-400">Belum ada aktivitas.</div>'; return; }
     rows.forEach(r => {
       const el = document.createElement('div');
       el.className = 'p-1 rounded border border-dashed border-slate-100 bg-white';
-      el.textContent = `${r.namaGuru} — ${r.status} (${r.jam||''})`;
+      el.textContent = `${r.namaGuru} — ${r.status} ${r.jam? '('+r.jam+')' : ''}`;
       container.appendChild(el);
     });
-    renderChart();
+    // update counters
+    const today = new Date().toISOString().slice(0,10);
+    const todays = loadAtt().filter(x=>x.tanggal===today);
+    if ($('#totalHadir')) $('#totalHadir').textContent = String(todays.filter(x=>x.status==='Hadir').length || 0);
+    if ($('#totalLain')) $('#totalLain').textContent = String(todays.filter(x=>['Izin','Sakit','Dinas Luar'].includes(x.status)).length || 0);
   }
 
-  // --- Send attendance (try firebase, else enqueue and localstore) ---
-  async function sendAttendance(payload){
-    // payload: { idGuru, namaGuru, status, placeName, lokasiLabel, jam, tanggal }
-    try {
-      if (window.addAttendanceFirebase) {
-        await window.addAttendanceFirebase(payload);
-        toast('Kehadiran tersimpan ke server', 'ok');
-      } else {
-        // push to queue
-        enqueue({ type:'attendance', payload, ts: Date.now() });
-        toast('Firebase tidak tersedia → tersimpan di antrian', 'info');
+  // ---- Queue (enqueue + flush) ----
+  function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_QUEUE)||'[]'); } catch(e){ return []; } }
+  function writeQueue(q){ try { localStorage.setItem(LS_QUEUE, JSON.stringify(q)); setPendingCount(q.length); } catch(e){} }
+  function enqueueOp(op){ const q = readQueue(); q.push(op); writeQueue(q); toast('Operasi disimpan antrian', 'info', 1600); }
+  function setPendingCount(n){ const el = document.getElementById('pending-count'); if (!el) return; if (!n) { el.classList.add('hidden'); el.textContent=''; } else { el.classList.remove('hidden'); el.textContent = n + ' pending'; } }
+
+  // robust flushQueue: skip guru ops if not admin, handle permission errors gracefully
+  let flushing = false;
+  async function flushQueue(){
+    if (flushing) return;
+    const q = readQueue();
+    if (!q.length) { setPendingCount(0); return; }
+    if (!navigator.onLine) return;
+    flushing = true;
+    // check admin
+    const currentUser = (window.__WH_FIREBASE && window.__WH_FIREBASE.currentUser) || null;
+    const isAdmin = currentUser ? !!currentUser.admin : (localStorage.getItem('wh_admin_logged')==='1');
+
+    for (let i=0;i<q.length;i++){
+      const op = q[0]; // always process head
+      try {
+        if (['guru_add','guru_update','guru_delete'].includes(op.type) && !isAdmin) {
+          // skip guru ops for non-admins; keep them in queue
+          console.warn('Skipping guru op (not admin):', op);
+          // move to next op (but stop to avoid busy loop)
+          break;
+        }
+        if (op.type === 'attendance') {
+          if (!window.addAttendanceFirebase) throw new Error('Firebase unavailable');
+          await window.addAttendanceFirebase(op.payload);
+        } else if (op.type === 'guru_add') {
+          if (!window.addGuruFirebase) throw new Error('Firebase unavailable');
+          await window.addGuruFirebase(op.payload);
+        } else if (op.type === 'guru_update') {
+          if (!window.updateGuruFirebase) throw new Error('Firebase unavailable');
+          await window.updateGuruFirebase(op.payload.id, op.payload.updates);
+        } else if (op.type === 'guru_delete') {
+          if (!window.deleteGuruFirebase) throw new Error('Firebase unavailable');
+          await window.deleteGuruFirebase(op.payload.id);
+        } else {
+          // unknown op -> drop
+        }
+        // remove head op on success
+        const cur = readQueue(); cur.shift(); writeQueue(cur);
+      } catch(err){
+        console.warn('flushQueue error on op', op, err);
+        const msg = (err && err.code) ? err.code : (err && err.message) ? err.message : String(err);
+        if (String(msg).toLowerCase().includes('permission')) {
+          toast('Sinkron gagal: permission denied — pastikan akun admin atau rules DB benar', 'err', 5000);
+          break;
+        }
+        // other errors: abort and try later
+        break;
       }
-      // optimistic local save
-      const arr = loadAtt(); arr.push(Object.assign({}, payload, { createdAt: Date.now() })); saveAtt(arr);
-      refreshRecentActivity();
-    } catch(err){
-      console.error('sendAttendance err', err);
-      enqueue({ type:'attendance', payload, ts: Date.now() });
-      const arr = loadAtt(); arr.push(Object.assign({}, payload, { createdAt: Date.now() })); saveAtt(arr);
-      refreshRecentActivity();
-      toast('Gagal kirim — disimpan lokal/antrian', 'err');
     }
+    flushing = false;
   }
 
-  // wire up button
-  document.getElementById('kirimKehadiranBtn') && document.getElementById('kirimKehadiranBtn').addEventListener('click', async ()=>{
-    const sel = document.getElementById('namaGuru');
-    if (!sel || !sel.value) return toast('Pilih guru terlebih dahulu','err');
-    // status from selected button or hidden select
-    const selectedBtn = document.querySelector('.status-btn.bg-rose-100');
-    const status = (selectedBtn && selectedBtn.dataset.status) || (document.getElementById('statusKehadiran') && document.getElementById('statusKehadiran').value) || '';
-    if (!status) return toast('Pilih status kehadiran','err');
-    const [id, nama] = sel.value.split('||');
-    const payload = {
-      idGuru: id,
-      namaGuru: nama || '',
-      status,
-      placeName: (document.getElementById('placeName') && document.getElementById('placeName').value) || '',
-      lokasiLabel: (document.getElementById('lokasi') && document.getElementById('lokasi').value) || '',
-      jam: new Date().toLocaleTimeString('id-ID'),
-      tanggal: new Date().toISOString().slice(0,10)
-    };
-    // UI feedback
-    const btn = document.getElementById('kirimKehadiranBtn'); const prev = btn.textContent; btn.disabled=true; btn.textContent='Mengirim...';
-    try { await sendAttendance(payload); } finally { btn.disabled=false; btn.textContent=prev; document.getElementById('kehadiran-status').textContent='Terkirim'; setTimeout(()=>document.getElementById('kehadiran-status').textContent='—',1200); }
-  });
+  // try flushing periodically when online
+  setInterval(()=>{ if (navigator.onLine) flushQueue(); setPendingCount(readQueue().length); }, 15000);
+  window.addEventListener('online', ()=>{ toast('Koneksi online — mencoba sinkron', 'info'); flushQueue(); });
+  window.addEventListener('offline', ()=>{ toast('Perangkat offline', 'err'); });
 
-  // --- Pivot report H/I/S/D (abbrev) ---
-  const STATUS_ABBR = { 'Hadir':'H', 'Izin':'I', 'Sakit':'S', 'Dinas Luar':'D' };
-  function statusToAbbr(s){ return STATUS_ABBR[s] || (s? s.charAt(0).toUpperCase(): ''); }
+  // ---- Laporan pivot / export ----
+  const STATUS_MAP = { 'Hadir':'H', 'Izin':'I', 'Sakit':'S', 'Dinas Luar':'D' };
+  function statusToAbbr(s){ return STATUS_MAP[s] || (s?String(s).charAt(0).toUpperCase():''); }
   function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
 
-  function getRowsForMonth(yyyymm){
-    if (!yyyymm) return [];
-    // prefer server-side helper if available
-    // but to keep offline-friendly, we read local cache
-    return loadAtt().filter(r => (r.tanggal||'').slice(0,7) === yyyymm);
-  }
+  function getRowsForMonth(yyyymm){ if (!yyyymm) return []; return loadAtt().filter(r => (r.tanggal||'').slice(0,7) === yyyymm); }
 
   function buildPivot(rows, year, month){
-    const gurus = JSON.parse(localStorage.getItem('wh_guru_list_v1')||'[]');
+    const gurus = loadGuru();
     const days = daysInMonth(year, month);
     const pivot = {};
-    // seed with gurus
-    gurus.forEach(g => { pivot[g.id] = { id:g.id, nama:g.nama, cells:{} }; for(let d=1; d<=days; d++) pivot[g.id].cells[String(d).padStart(2,'0')] = ''; });
-    // map rows
+    gurus.forEach(g => { pivot[g.id] = { id:g.id, nama:g.nama||'-', cells:{} }; for(let d=1; d<=days; d++) pivot[g.id].cells[String(d).padStart(2,'0')] = ''; });
     rows.forEach(r => {
       const day = (r.tanggal||'').slice(8,10);
-      const gid = r.idGuru || ('unk_'+(r.namaGuru||'').replace(/\s+/g,'_'));
-      if (!pivot[gid]) { pivot[gid] = { id:gid, nama: r.namaGuru || '—', cells:{} }; for(let d=1; d<=days; d++) pivot[gid].cells[String(d).padStart(2,'0')] = ''; }
+      const gid = r.idGuru || ('unknown_'+(r.namaGuru||'').replace(/\s+/g,'_'));
+      if (!pivot[gid]) { pivot[gid] = { id:gid, nama: r.namaGuru||'-', cells:{} }; for(let d=1; d<=days; d++) pivot[gid].cells[String(d).padStart(2,'0')] = ''; }
       const ab = statusToAbbr(r.status);
       const prev = pivot[gid].cells[day];
-      // prefer Hadir if any entry is Hadir
       if (!prev) pivot[gid].cells[day] = ab;
       else if (prev !== 'H' && ab === 'H') pivot[gid].cells[day] = 'H';
     });
     return Object.values(pivot).sort((a,b)=> (a.nama||'').localeCompare(b.nama||''));
   }
 
-  function renderPivotTable(yyyymm){
+  function renderPivotTableForMonth(yyyymm){
     const head = document.getElementById('laporanPivotHead');
     const body = document.getElementById('laporanPivotBody');
-    if (!yyyymm) { if (head) head.innerHTML=''; if (body) body.innerHTML='<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan terlebih dahulu.</td></tr>'; return; }
+    const summary = document.getElementById('laporan-summary');
+    if (!yyyymm){ if (head) head.innerHTML=''; if (body) body.innerHTML = '<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>'; if (summary) summary.textContent=''; return; }
     const [yStr,mStr] = yyyymm.split('-'); const y = Number(yStr), m = Number(mStr);
     const days = daysInMonth(y,m);
-    // head
     let th = '<tr><th class="p-2 border text-left">Nama Guru</th>';
     for (let d=1; d<=days; d++) th += `<th class="p-2 border text-center">${d}</th>`;
-    th += '</tr>';
-    head.innerHTML = th;
-    // body
+    th += '</tr>'; if (head) head.innerHTML = th;
     const rows = getRowsForMonth(yyyymm);
     const pivot = buildPivot(rows, y, m);
-    if (!pivot.length) { body.innerHTML = `<tr><td colspan="${days+1}" class="text-center p-6 text-slate-500">Tidak ada data untuk bulan ini.</td></tr>`; document.getElementById('laporan-summary').textContent='Tidak ada data.'; return; }
-    body.innerHTML = pivot.map(r=>{
-      let cells = `<td class="p-2 border">${escapeHtml(r.nama||'—')}</td>`;
+    if (!pivot.length){ if (body) body.innerHTML = `<tr><td colspan="${days+1}" class="text-center p-6 text-slate-500">Tidak ada data untuk bulan ini.</td></tr>`; if (summary) summary.textContent='Tidak ada data.'; return; }
+    if (body) body.innerHTML = pivot.map(r => {
+      let cells = `<td class="p-2 border">${escapeHtml(r.nama||'-')}</td>`;
       for (let d=1; d<=days; d++){
-        const k = String(d).padStart(2,'0'); const v = r.cells[k] || ''; let cls = 'text-center p-1';
+        const k = String(d).padStart(2,'0'); const v = r.cells[k] || '';
+        let cls = 'text-center p-1';
         if (v==='H') cls += ' text-green-700'; else if (v==='I') cls += ' text-amber-700'; else if (v==='S') cls += ' text-rose-600'; else if (v==='D') cls += ' text-sky-600';
         cells += `<td class="p-2 border ${cls}">${v || '-'}</td>`;
       }
       return `<tr>${cells}</tr>`;
     }).join('');
-    const total = rows.length; const hadir = rows.filter(r=>r.status==='Hadir').length;
-    document.getElementById('laporan-summary').innerHTML = `<strong>Total entri:</strong> ${total} &middot; <strong>Hadir:</strong> ${hadir}`;
+    if (summary) {
+      const totalEntries = rows.length;
+      const hadir = rows.filter(r=>r.status==='Hadir').length;
+      summary.innerHTML = `<strong>Total entri:</strong> ${totalEntries} &middot; <strong>Hadir:</strong> ${hadir} &middot; <strong>% Kehadiran:</strong> ${ (totalEntries?Math.round(hadir/totalEntries*100):0) }%`;
+    }
   }
 
-  document.getElementById('tampilkanLaporanBtn') && document.getElementById('tampilkanLaporanBtn').addEventListener('click', ()=>{
-    const val = document.getElementById('bulan').value; if (!val) return toast('Pilih bulan dulu','err');
-    renderPivotTable(val);
+  // tombol Tampilkan laporan
+  document.getElementById('tampilkanLaporanBtn')?.addEventListener('click', ()=> {
+    const val = document.getElementById('bulan')?.value;
+    if (!val) return toast('Pilih bulan terlebih dahulu','err');
+    renderPivotTableForMonth(val);
   });
 
-  // --- Export Excel & CSV for pivot ---
-  document.getElementById('exportLaporanBtn') && document.getElementById('exportLaporanBtn').addEventListener('click', ()=>{
-    const val = document.getElementById('bulan').value; if (!val) return toast('Pilih bulan dulu','err');
+  // export excel
+  document.getElementById('exportLaporanBtn')?.addEventListener('click', ()=> {
+    const val = document.getElementById('bulan')?.value;
+    if (!val) return toast('Pilih bulan terlebih dahulu','err');
     const [y,m] = val.split('-').map(Number); const days = daysInMonth(y,m);
     const rows = getRowsForMonth(val); const pivot = buildPivot(rows,y,m);
     if (!pivot.length) return toast('Tidak ada data untuk diexport','err');
-    // build array of arrays
     const header = ['Nama Guru']; for (let d=1; d<=days; d++) header.push(String(d));
     const aoa = [header];
     pivot.forEach(r => {
@@ -829,409 +728,28 @@
       for (let d=1; d<=days; d++) row.push(r.cells[String(d).padStart(2,'0')] || '');
       aoa.push(row);
     });
-    // XLSX export
-    const ws = XLSX.utils.aoa_to_sheet(aoa); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
-    const filename = `laporan-${val}.xlsx`;
-    XLSX.writeFile(wb, filename);
-    toast('Export Excel selesai', 'ok');
+    try {
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, `Laporan-${val}`);
+      XLSX.writeFile(wb, `laporan-pivot-${val}.xlsx`);
+      toast('Export Excel selesai', 'ok');
+    } catch(err){ console.error('export err', err); toast('Export gagal','err'); }
   });
 
-  // --- CSV export (flat per attendance) ---
-  function exportCSVForMonth(yyyymm){
-    const rows = getRowsForMonth(yyyymm);
-    if (!rows.length) return null;
-    const header = ['tanggal','namaGuru','jam','status','placeName','lokasiLabel'];
-    const lines = [header.join(',')];
-    rows.forEach(r => {
-      const vals = [r.tanggal, r.namaGuru, r.jam || '', r.status || '', (r.placeName||'').replace(/,/g,' '), (r.lokasiLabel||'').replace(/,/g,' ')];
-      lines.push(vals.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(','));
-    });
-    return lines.join('\n');
-  }
-  // optional CSV button (if you add one)
-  const exportCsvBtn = document.getElementById('exportCsvBtn');
-  if (exportCsvBtn) {
-    exportCsvBtn.addEventListener('click', ()=>{
-      const val = document.getElementById('bulan').value; if (!val) return toast('Pilih bulan dulu','err');
-      const csv = exportCSVForMonth(val);
-      if (!csv) return toast('Tidak ada data untuk CSV','err');
-      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = `laporan-${val}.csv`; a.click(); URL.revokeObjectURL(url);
-      toast('Export CSV selesai', 'ok');
-    });
-  }
-
-  // --- initialize visuals ---
-  function initial(){
-    refreshRecentActivity();
-    renderChart();
-    updatePendingBadge();
-    // try initial server sync if available
-    if (window.syncFromFirebase) {
-      window.syncFromFirebase().then(()=>{ toast('Sinkron awal selesai', 'ok'); refreshRecentActivity(); renderChart(); }).catch(e=>console.warn('initial sync failed', e));
-    }
-  }
-  initial();
+  // initial render
+  renderAttendanceChart();
+  refreshRecentActivity();
+  setTimeout(()=> { setPendingCount(readQueue().length); }, 300);
 
   // expose for debug
-  window.__WH_ATT = { loadAtt, saveAtt, enqueue, readQueue, flushQueue, renderChart, refreshRecentActivity };
+  window.__WH_REPORT = { renderAttendanceChart, refreshRecentActivity, captureLocationAndFill, renderPivotTableForMonth, enqueueOp, flushQueue };
 
 })();
 </script>
-<!-- PART E: Geolocation, Chart, Laporan Pivot, Export -->
+<!-- PART 6: Firebase wiring loader + runtime event wiring -->
 <script>
 (function(){
-  const $ = s => document.querySelector(s);
-  const $$ = s => Array.from(document.querySelectorAll(s));
-
-  // local keys (ke konsistenan dengan Part D)
-  const LS_GURU = 'wh_guru_list_v1';
-  const LS_ATT = 'wh_att_list_v1';
-  const LS_GEOCACHE = 'wh_geo_cache_v1';
-  const LS_QUEUE = 'wh_queue_v1';
-
-  // simple toast proxy (uses UI toast if exists)
-  function toast(msg, type='info', t=3000){
-    if (window.__WH_UI && window.__WH_UI.toast) return window.__WH_UI.toast(msg, type, t);
-    const el = document.createElement('div'); el.textContent = msg; console.log('TOAST:', msg);
-    setTimeout(()=>{}, t);
-  }
-
-  // --- Geolocation + reverse geocode using Nominatim (with simple cache) ---
-  function readGeoCache(){ try { return JSON.parse(localStorage.getItem(LS_GEOCACHE)||'{}'); } catch(e){ return {}; } }
-  function writeGeoCache(o){ try { localStorage.setItem(LS_GEOCACHE, JSON.stringify(o)); } catch(e){} }
-  function cacheKey(lat, lon){ return `${Number(lat).toFixed(4)},${Number(lon).toFixed(4)}`; }
-
-  async function reverseGeocode(lat, lon){
-    const key = cacheKey(lat, lon);
-    const cache = readGeoCache();
-    if (cache[key]) return cache[key];
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
-      const res = await fetch(url, { headers: { 'Accept':'application/json' } });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      cache[key] = data;
-      writeGeoCache(cache);
-      return data;
-    } catch(err){
-      console.warn('reverseGeocode err', err);
-      return null;
-    }
-  }
-
-  async function captureLocationAndFill(){
-    if (!navigator.geolocation) { toast('Geolocation tidak tersedia', 'err'); return null; }
-    const btn = $('#ambilLokasiBtn');
-    const old = btn ? btn.textContent : null;
-    if (btn) { btn.disabled = true; btn.textContent = 'Mengambil...'; }
-    try {
-      const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:12000 }));
-      const lat = pos.coords.latitude, lon = pos.coords.longitude;
-      const coordLabel = `Lat ${lat.toFixed(5)}, Lon ${lon.toFixed(5)}`;
-      if ($('#lokasi')) $('#lokasi').value = coordLabel;
-      if ($('#coords-small')) $('#coords-small').textContent = `Koordinat: ${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-      const info = await reverseGeocode(lat, lon);
-      if (info && info.display_name) {
-        if ($('#placeName') && !$('#placeName').value) $('#placeName').value = info.display_name;
-        toast('Nama tempat otomatis terisi', 'ok', 1600);
-      } else {
-        toast('Koordinat didapat — nama tempat tidak ditemukan', 'info', 1400);
-      }
-      return { lat, lon, coordLabel, placeName: info && info.display_name ? info.display_name : '' };
-    } catch(err){
-      toast('Gagal ambil lokasi: ' + (err && err.message ? err.message : err), 'err', 2600);
-      return null;
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = old; }
-    }
-  }
-
-  $('#ambilLokasiBtn')?.addEventListener('click', ()=> captureLocationAndFill());
-
-  // --- Attendance helpers: read/write local cache ---
-  function loadAtt(){ try { return JSON.parse(localStorage.getItem(LS_ATT)||'[]'); } catch(e){ return []; } }
-  function saveAtt(list){ try { localStorage.setItem(LS_ATT, JSON.stringify(list)); } catch(e){} }
-
-  // simple queue (for offline ops)
-  function readQueue(){ try { return JSON.parse(localStorage.getItem(LS_QUEUE)||'[]'); } catch(e){ return []; } }
-  function writeQueue(q){ try { localStorage.setItem(LS_QUEUE, JSON.stringify(q)); } catch(e){} }
-  function enqueue(op){ const q = readQueue(); q.push(op); writeQueue(q); toast('Disimpan ke antrian (offline)', 'info'); }
-
-  // --- Chart (Chart.js) ---
-  let attendanceChart = null;
-  function renderAttendanceChart(){
-    const ctx = document.getElementById('chartDashboard');
-    if (!ctx) return;
-    const today = new Date().toISOString().slice(0,10);
-    const rows = loadAtt().filter(r => (r.tanggal||'') === today);
-    const counts = { Hadir:0, Izin:0, Sakit:0, 'Dinas Luar':0 };
-    rows.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
-    const labels = Object.keys(counts);
-    const data = labels.map(l => counts[l]);
-    if (attendanceChart) attendanceChart.destroy();
-    attendanceChart = new Chart(ctx.getContext('2d'), {
-      type: 'bar',
-      data: { labels, datasets:[{ label:'Jumlah', data }] },
-      options: { responsive:true, plugins:{ legend:{ display:false } } }
-    });
-  }
-
-  // refresh recent activity UI
-  function refreshRecentActivity(){
-    const container = document.getElementById('recent-activity');
-    if (!container) return;
-    const rows = loadAtt().slice().reverse().slice(0,12);
-    container.innerHTML = '';
-    if (!rows.length) { container.innerHTML = '<div class="text-slate-400">Belum ada aktivitas.</div>'; return; }
-    rows.forEach(r => {
-      const el = document.createElement('div'); el.className = 'p-1 rounded border border-dashed border-slate-100 bg-white';
-      el.textContent = `${r.namaGuru} — ${r.status} (${r.jam||''})`;
-      container.appendChild(el);
-    });
-    renderAttendanceChart();
-  }
-
-  // Call refresh on startup and when attendances-updated event fires
-  refreshRecentActivity();
-  window.addEventListener('attendances-updated', ()=> { refreshRecentActivity(); });
-
-  // --- Submit Attendance (tries Firebase, else queue+local) ---
-  async function submitAttendance(payload){
-    // payload: { idGuru, namaGuru, status, placeName, lokasiLabel, jam, tanggal }
-    if (window.addAttendanceFirebase) {
-      try {
-        await window.addAttendanceFirebase(payload);
-        toast('Kehadiran terkirim ke server', 'ok', 1400);
-      } catch(err){
-        console.warn('addAttendanceFirebase failed', err);
-        enqueue({ type:'attendance', payload, ts: Date.now() });
-        toast('Gagal kirim — disimpan antrian', 'err', 2000);
-      }
-    } else {
-      enqueue({ type:'attendance', payload, ts: Date.now() });
-      toast('Server belum tersedia — disimpan lokal', 'info', 1600);
-    }
-    // optimistic local store
-    const arr = loadAtt(); arr.push(Object.assign({}, payload, { createdAt: Date.now() })); saveAtt(arr);
-    refreshRecentActivity();
-  }
-
-  // wire up button (if not already in Part D)
-  document.getElementById('kirimKehadiranBtn')?.addEventListener('click', async ()=>{
-    const sel = document.getElementById('namaGuru');
-    if (!sel) return toast('Nama guru tidak ditemukan','err');
-    const val = sel.value;
-    if (!val) return toast('Pilih guru terlebih dahulu','err');
-    const [id, nama] = val.split('||');
-    // status: try from status buttons or hidden select
-    const activeBtn = Array.from(document.querySelectorAll('.status-btn')).find(b => b.classList.contains('bg-rose-100'));
-    const status = (activeBtn && activeBtn.dataset.status) || (document.getElementById('statusKehadiran') ? document.getElementById('statusKehadiran').value : '') || '';
-    if (!status) return toast('Pilih status kehadiran','err');
-    const placeName = (document.getElementById('placeName')||{}).value || '';
-    const lokasiLabel = (document.getElementById('lokasi')||{}).value || '';
-    const jam = new Date().toLocaleTimeString('id-ID');
-    const tanggal = new Date().toISOString().slice(0,10);
-    const payload = { idGuru: id, namaGuru: nama, status, placeName, lokasiLabel, jam, tanggal };
-    // send
-    await submitAttendance(payload);
-    // UI feedback
-    const stat = document.getElementById('kehadiran-status'); if (stat) { stat.textContent = 'Terkirim'; setTimeout(()=>stat.textContent='—',1200); }
-    // clear selection
-    sel.value = '';
-    Array.from(document.querySelectorAll('.status-btn')).forEach(b=>b.classList.remove('bg-rose-100','ring-4'));
-  });
-
-  // --- Queue flush (attempt) ---
-  async function flushQueue(){
-    const q = readQueue();
-    if (!q.length) return;
-    if (!navigator.onLine) return;
-    if (!window.addAttendanceFirebase && !window.addGuruFirebase) return;
-    for (let i=0;i<q.length;i++){
-      const op = q[i];
-      try {
-        if (op.type === 'attendance') {
-          await window.addAttendanceFirebase(op.payload);
-        } else if (op.type === 'guru_add') {
-          await window.addGuruFirebase(op.payload);
-        } else if (op.type === 'guru_update') {
-          await window.updateGuruFirebase(op.payload.id, op.payload.updates);
-        } else if (op.type === 'guru_delete') {
-          await window.deleteGuruFirebase(op.payload.id);
-        }
-      } catch(err){
-        console.warn('flush op failed', err);
-        return; // stop and retry later
-      }
-    }
-    // if all succeed, clear queue
-    writeQueue([]);
-    try { localStorage.removeItem(LS_QUEUE); } catch(e){}
-    toast('Antrian ter-sinkronisasi', 'ok', 1600);
-    if (window.syncFromFirebase) try { await window.syncFromFirebase(); } catch(e){ console.warn('post-flush sync failed', e); }
-  }
-  window.addEventListener('online', () => { flushQueue(); });
-
-  // try periodic flush
-  setInterval(()=> { if (navigator.onLine) flushQueue(); }, 20000);
-
-  // --- REPORT / PIVOT (H/I/S/D) ---
-  const STATUS_ABBR = { 'Hadir':'H', 'Izin':'I', 'Sakit':'S', 'Dinas Luar':'D' };
-  function statusToAbbr(s){ return STATUS_ABBR[s] || (s ? String(s)[0].toUpperCase() : ''); }
-  function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
-
-  function getAttendanceRowsForMonth(yyyymm){
-    // try server first if available
-    if (window.getMonthlyReportFirebase) {
-      // note: async path handled by button click
-      return null;
-    }
-    const all = loadAtt();
-    return all.filter(r => (r.tanggal||'').slice(0,7) === yyyymm);
-  }
-
-  function buildPivot(rows, gurus, year, month){
-    const days = daysInMonth(year, month);
-    const pivot = {};
-    (gurus||[]).forEach(g => { pivot[g.id] = { id:g.id, nama:g.nama, cells:{} }; for(let d=1; d<=days; d++) pivot[g.id].cells[String(d).padStart(2,'0')] = ''; });
-    (rows||[]).forEach(r => {
-      const day = (r.tanggal||'').slice(8,10);
-      const gid = r.idGuru || ('unknown_' + (r.namaGuru||'').replace(/\s+/g,'_'));
-      if (!pivot[gid]) { pivot[gid] = { id: gid, nama: r.namaGuru || '—', cells:{} }; for(let d=1; d<=days; d++) pivot[gid].cells[String(d).padStart(2,'0')] = ''; }
-      const ab = statusToAbbr(r.status);
-      const prev = pivot[gid].cells[day];
-      if (!prev) pivot[gid].cells[day] = ab;
-      else if (prev !== 'H' && ab === 'H') pivot[gid].cells[day] = 'H';
-    });
-    return Object.values(pivot).sort((a,b)=> (a.nama||'').localeCompare(b.nama||''));
-  }
-
-  async function renderPivot(yyyymm){
-    const head = document.getElementById('laporanPivotHead');
-    const body = document.getElementById('laporanPivotBody');
-    const summary = document.getElementById('laporan-summary');
-    if (!yyyymm) { if (head) head.innerHTML=''; if (body) body.innerHTML = '<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan terlebih dahulu.</td></tr>'; if (summary) summary.textContent=''; return; }
-
-    const [yStr,mStr] = yyyymm.split('-'); const y = Number(yStr), m = Number(mStr);
-    const gurus = JSON.parse(localStorage.getItem(LS_GURU)||'[]');
-    let rows = getAttendanceRowsForMonth(yyyymm);
-
-    if (rows === null && window.getMonthlyReportFirebase) {
-      // async fetch from server
-      try {
-        rows = await window.getMonthlyReportFirebase(yyyymm);
-      } catch(err){
-        console.error('getMonthlyReportFirebase err', err);
-        toast('Gagal ambil laporan dari server', 'err');
-        rows = [];
-      }
-    }
-
-    const days = daysInMonth(y,m);
-    // build header
-    let th = '<tr><th class="p-2 border text-left">Nama Guru</th>';
-    for (let d=1; d<=days; d++) th += `<th class="p-2 border text-center">${d}</th>`;
-    th += '</tr>'; if (head) head.innerHTML = th;
-
-    const pivot = buildPivot(rows || [], gurus, y, m);
-    if (!pivot.length) {
-      if (body) body.innerHTML = `<tr><td colspan="${days+1}" class="text-center p-6 text-slate-500">Tidak ada data untuk bulan ini.</td></tr>`;
-      if (summary) summary.textContent = 'Tidak ada data.';
-      return;
-    }
-
-    if (body) body.innerHTML = pivot.map(r => {
-      let cells = `<td class="p-2 border">${escapeHtml(r.nama||'—')}</td>`;
-      for (let d=1; d<=days; d++){
-        const k = String(d).padStart(2,'0'); const v = r.cells[k] || ''; let cls = 'text-center p-1';
-        if (v==='H') cls += ' text-green-700'; else if (v==='I') cls += ' text-amber-700'; else if (v==='S') cls += ' text-rose-600'; else if (v==='D') cls += ' text-sky-600';
-        cells += `<td class="p-2 border ${cls}">${v || '-'}</td>`;
-      }
-      return `<tr>${cells}</tr>`;
-    }).join('');
-
-    const totalEntries = (rows||[]).length;
-    const hadirCount = (rows||[]).filter(r=>r.status==='Hadir').length;
-    if (summary) summary.innerHTML = `<strong>Total entri:</strong> ${totalEntries} &middot; <strong>Hadir:</strong> ${hadirCount} &middot; <strong>% Kehadiran:</strong> ${ (totalEntries?Math.round(hadirCount/totalEntries*100):0) }%`;
-  }
-
-  // show / button wiring
-  document.getElementById('tampilkanLaporanBtn')?.addEventListener('click', async ()=>{
-    const val = (document.getElementById('bulan')||{}).value;
-    if (!val) return toast('Pilih bulan terlebih dahulu','err');
-    await renderPivot(val);
-  });
-
-  // Export Excel (XLSX)
-  document.getElementById('exportLaporanBtn')?.addEventListener('click', async ()=>{
-    const val = (document.getElementById('bulan')||{}).value;
-    if (!val) return toast('Pilih bulan terlebih dahulu','err');
-    const [y,m] = val.split('-').map(Number);
-    const days = daysInMonth(y,m);
-    // get rows (server if available)
-    let rows = getAttendanceRowsForMonth(val);
-    if (rows === null && window.getMonthlyReportFirebase) {
-      try { rows = await window.getMonthlyReportFirebase(val); } catch(e){ rows = []; }
-    }
-    const gurus = JSON.parse(localStorage.getItem(LS_GURU)||'[]');
-    const pivot = buildPivot(rows || [], gurus, y, m);
-    if (!pivot.length) return toast('Tidak ada data untuk diexport','err');
-
-    const header = ['Nama Guru'];
-    for (let d=1; d<=days; d++) header.push(String(d));
-    const aoa = [header];
-    pivot.forEach(r => {
-      const row = [ r.nama || '' ];
-      for (let d=1; d<=days; d++) row.push(r.cells[String(d).padStart(2,'0')] || '');
-      aoa.push(row);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Laporan');
-    XLSX.writeFile(wb, `laporan-${val}.xlsx`);
-    toast('Export Excel selesai', 'ok', 1600);
-  });
-
-  // Export CSV quick (optional)
-  // If you want a CSV button, wire to this:
-  async function exportCsvForMonth(val){
-    if (!val) return toast('Pilih bulan','err');
-    const [y,m] = val.split('-').map(Number);
-    const days = daysInMonth(y,m);
-    let rows = getAttendanceRowsForMonth(val);
-    if (rows === null && window.getMonthlyReportFirebase) {
-      try { rows = await window.getMonthlyReportFirebase(val); } catch(e){ rows = []; }
-    }
-    const gurus = JSON.parse(localStorage.getItem(LS_GURU)||'[]');
-    const pivot = buildPivot(rows || [], gurus, y, m);
-    if (!pivot.length) return toast('Tidak ada data','err');
-
-    const lines = [];
-    const header = ['Nama Guru', ...Array.from({length:days}, (_,i)=>String(i+1))];
-    lines.push(header.join(','));
-    pivot.forEach(r => {
-      const row = [ `"${(r.nama||'').replace(/"/g,'""')}"` ];
-      for (let d=1; d<=days; d++) row.push(r.cells[String(d).padStart(2,'0')] || '');
-      lines.push(row.join(','));
-    });
-    const csv = lines.join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `laporan-${val}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    toast('Export CSV selesai', 'ok', 1400);
-  }
-
-  // expose some functions for debugging
-  window.__WH_REPORT = { renderPivot, exportCsvForMonth, captureLocationAndFill };
-
-})();
-</script>
-<!-- PART F: Firebase wiring + app.firebase.js loader + final checks -->
-<script>
-(function(){
-  // path ke app.firebase.js — pastikan file ini ada di folder yang sama dengan index.html
   const APP_FIREBASE_PATH = 'app.firebase.js';
 
   function loadScript(src, cb){
@@ -1243,143 +761,175 @@
     document.head.appendChild(s);
   }
 
-  function safeCall(fn){
-    try { return fn(); } catch(e){ console.warn('safeCall error', e); return null; }
-  }
-
-  // attempt to load app.firebase.js if not already loaded
-  if (!window.__WH_FIREBASE || typeof window.addGuruFirebase !== 'function') {
-    loadScript(APP_FIREBASE_PATH, (err) => {
-      if (err) {
-        console.error('app.firebase.js gagal dimuat:', err);
-        // still continue — UI will work in offline/local mode
-        document.dispatchEvent(new CustomEvent('app-firebase-load-failed', { detail: err.message }));
-        return;
-      }
-      console.log('app.firebase.js loaded');
-      afterFirebaseReady();
-    });
-  } else {
-    // already present
-    afterFirebaseReady();
-  }
-
   function afterFirebaseReady(){
-    // 1) Try initial sync to populate UI quickly
+    // initial sync if available
     if (window.syncFromFirebase) {
-      safeCall(() => {
-        window.syncFromFirebase().then(result => {
-          console.log('Initial syncFromFirebase OK', result);
-          // dispatch gurus/attendances updated events already inside app.firebase.js,
-          // but call UI refresh to be safe
-          document.dispatchEvent(new CustomEvent('app-initial-sync-done', { detail: result }));
-        }).catch(err => {
-          console.warn('Initial sync failed', err);
-        });
-      });
+      window.syncFromFirebase().then(res => {
+        console.log('Initial syncFromFirebase OK', res);
+      }).catch(err => console.warn('Initial sync failed', err));
     }
 
-    // 2) Wire auth-changed -> update UI (admin badge, controls)
+    // when gurus updated -> update UI caches
+    window.addEventListener('gurus-updated', (ev) => {
+      try {
+        const arr = ev.detail || [];
+        if (Array.isArray(arr)) {
+          localStorage.setItem('wh_guru_list_v1', JSON.stringify(arr));
+        }
+      } catch(e){}
+      // render (UI module listens too)
+    });
+
+    // when attendances updated -> update local cache and UI
+    window.addEventListener('attendances-updated', (ev) => {
+      try {
+        const arr = ev.detail || [];
+        if (Array.isArray(arr)) localStorage.setItem('wh_att_list_v1', JSON.stringify(arr));
+      } catch(e){}
+      // call report UI
+      try { window.__WH_REPORT && window.__WH_REPORT.renderAttendanceChart(); window.__WH_REPORT && window.__WH_REPORT.refreshRecentActivity(); } catch(e){}
+    });
+
+    // auth-changed -> reflect admin UI
     window.addEventListener('auth-changed', (ev) => {
       const user = ev.detail;
-      console.log('auth-changed event', user);
+      console.log('auth-changed', user);
       if (!user) {
         // signed out
-        document.querySelectorAll('#btn-open-admin').forEach(b => b.classList.remove('hidden'));
-        document.querySelectorAll('#btn-admin-logout').forEach(b => b.classList.add('hidden'));
-        // remove admin controls
+        document.getElementById('admin-badge')?.classList?.add('hidden');
+        document.getElementById('btn-admin-logout')?.classList?.add('hidden');
+        document.getElementById('btn-open-admin')?.classList?.remove('hidden');
+        localStorage.removeItem('wh_admin_logged');
         document.getElementById('admin-controls')?.remove();
-        localStorage.removeItem('wh_admin_logged'); // keep parity
         return;
       }
       // signed in
       if (user.admin) {
-        // show admin UI
-        document.querySelectorAll('#btn-open-admin').forEach(b => b.classList.add('hidden'));
-        document.querySelectorAll('#btn-admin-logout').forEach(b => b.classList.remove('hidden'));
-        // mark admin locally as fallback
         localStorage.setItem('wh_admin_logged','1');
-        // inject controls if not present
+        document.getElementById('admin-badge')?.classList?.remove('hidden');
+        document.getElementById('btn-admin-logout')?.classList?.remove('hidden');
+        document.getElementById('btn-open-admin')?.classList?.add('hidden');
+        // inject controls if missing
         if (!document.getElementById('admin-controls')) {
           const ph = document.getElementById('admin-controls-placeholder');
           if (ph) {
             const wrap = document.createElement('div');
             wrap.id = 'admin-controls';
             wrap.className = 'flex gap-2 items-center';
-            wrap.innerHTML = `<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>`;
+            wrap.innerHTML = `<button id="btn-add-guru-admin" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">Tambah Guru</button>
+                              <button id="btn-sync-local" class="bg-slate-100 px-3 py-1 rounded text-sm">Sinkron</button>`;
             ph.appendChild(wrap);
-            // wire add button
-            document.getElementById('btn-add-guru-admin').addEventListener('click', ()=> {
+            // wire add/sync (duplicate-safe)
+            document.getElementById('btn-add-guru-admin')?.addEventListener('click', ()=> {
               document.getElementById('guru-modal-title').textContent='Tambah Guru';
               document.getElementById('guru-nip').value=''; document.getElementById('guru-nama-input').value=''; document.getElementById('guru-jabatan-input').value='';
               document.getElementById('guru-save').dataset.editId=''; document.getElementById('guru-modal').classList.remove('hidden');
+            });
+            document.getElementById('btn-sync-local')?.addEventListener('click', async ()=> {
+              if (window.syncFromFirebase) { try { await window.syncFromFirebase(); alert('Sinkron selesai'); } catch(e){ alert('Sinkron gagal: '+(e.message||e)); } }
             });
           }
         }
       } else {
         // signed in but not admin
-        document.querySelectorAll('#btn-open-admin').forEach(b => b.classList.add('hidden'));
-        document.querySelectorAll('#btn-admin-logout').forEach(b => b.classList.remove('hidden'));
         localStorage.removeItem('wh_admin_logged');
+        document.getElementById('admin-badge')?.classList?.add('hidden');
       }
     });
 
-    // 3) When realtime events arrive from app.firebase.js, update UI data stores (localStorage) if needed
-    window.addEventListener('gurus-updated', (ev) => {
-      try {
-        if (Array.isArray(ev.detail)) {
-          localStorage.setItem('wh_guru_list_v1', JSON.stringify(ev.detail));
-        }
-      } catch(e){/*ignore*/ }
-      // let other parts handle rendering via their own listeners
-    });
-
-    window.addEventListener('attendances-updated', (ev) => {
-      try {
-        if (Array.isArray(ev.detail)) {
-          localStorage.setItem('wh_att_list_v1', JSON.stringify(ev.detail));
-        }
-      } catch(e){}
-      // UI parts listen to this event too (Part E)
-    });
-
-    // 4) Expose a small helper to validate Firebase connectivity
+    // helpful check in console
     window.__WH_FIREBASE_CHECK = async function(){
       try {
-        if (!window.__WH_FIREBASE || !window.__WH_FIREBASE.dbRef) return { ok:false, reason:'app.firebase.js not loaded' };
-        const dbURL = firebase.app().options && firebase.app().options.databaseURL;
-        // quick read attempt (once)
+        if (!window.__WH_FIREBASE) return { ok:false, reason:'no app.firebase.js' };
+        const dbURL = (firebase && firebase.app && firebase.app().options && firebase.app().options.databaseURL) || null;
         await firebase.database().ref('/.info/connected').once('value');
         return { ok:true, databaseURL: dbURL };
-      } catch(err){
-        return { ok:false, reason: err.message || String(err) };
-      }
+      } catch(err){ return { ok:false, reason: err.message || String(err) }; }
     };
+  } // afterFirebaseReady
 
-    // 5) Final UI hint: if app.firebase.js loaded but no data in /gurus, advise user
-    setTimeout(async ()=> {
-      const chk = await safeCall(() => window.__WH_FIREBASE_CHECK && window.__WH_FIREBASE_CHECK());
-      if (chk && !chk.ok) {
-        console.warn('Firebase connectivity check:', chk);
-        // do not forcibly show toast in case offline; just log
-      } else {
-        console.log('Firebase connectivity looks OK:', chk);
+  // Load app.firebase.js (if not already)
+  if (!window.__WH_FIREBASE || !window.addGuruFirebase) {
+    loadScript(APP_FIREBASE_PATH, (err) => {
+      if (err) {
+        console.error('app.firebase.js gagal dimuat:', err);
+        document.dispatchEvent(new CustomEvent('app-firebase-load-failed', { detail: err.message }));
+        return;
       }
-    }, 1200);
-  } // end afterFirebaseReady
-
-  // If app.firebase.js is already present synchronously, trigger wiring immediately
-  if (window.addGuruFirebase && (!window.__WH_FIREBASE || !window.__WH_FIREBASE.dbRef)) {
-    // small delay to allow app.firebase.js init
-    setTimeout(() => { if (typeof afterFirebaseReady === 'function') afterFirebaseReady(); }, 600);
+      console.log('app.firebase.js loaded');
+      try { afterFirebaseReady(); } catch(e){ console.warn(e); }
+    });
+  } else {
+    afterFirebaseReady();
   }
 
-  // final note for developer in console
-  console.log('PART F loaded — Firebase wiring pending (app.firebase.js).');
+})();
+</script>
+<!-- PART 7: Status-button FIX + closing tags -->
+<script>
+// =======================================================
+//  FIX STATUS BUTTON (ROBUST, ANTI ERROR, PASTI BISA DIKLIK)
+// =======================================================
+(function(){
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  // store selected status globally
+  window.__WH_selectedStatus = window.__WH_selectedStatus || "";
+
+  function setStatusValue(val){
+    window.__WH_selectedStatus = val || "";
+    const sel = document.getElementById("statusKehadiran");
+    if (sel) sel.value = val || "";
+  }
+  function clearStatusButtons(){
+    $$(".status-btn").forEach(btn=>{
+      btn.classList.remove("bg-rose-100","ring-4","ring-rose-300");
+    });
+  }
+  function activateButton(btn){
+    clearStatusButtons();
+    btn.classList.add("bg-rose-100","ring-4","ring-rose-300");
+  }
+  function handleStatusClick(btn){
+    const val = btn.dataset.status;
+    if (!val) return;
+    if (window.__WH_selectedStatus === val){
+      // toggle off
+      clearStatusButtons();
+      setStatusValue("");
+      return;
+    }
+    activateButton(btn);
+    setStatusValue(val);
+  }
+
+  // Delegation for ALL future buttons, guaranteed working
+  document.addEventListener("click", (e)=>{
+    const btn = e.target.closest && e.target.closest(".status-btn");
+    if (!btn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleStatusClick(btn);
+  });
+
+  // keyboard support
+  document.addEventListener("keydown", (e)=>{
+    const el = e.target;
+    if (!el || !el.classList) return;
+    if (!el.classList.contains("status-btn")) return;
+    if (e.key === " " || e.key === "Enter"){
+      e.preventDefault();
+      handleStatusClick(el);
+    }
+  });
+
+  // expose debug
+  window.__WH_getStatus = () => window.__WH_selectedStatus;
 
 })();
 </script>
 
-<!-- Close body / html (make sure to add these when you assemble parts) -->
+<!-- END OF ALL SCRIPTS -->
 </body>
 </html>
