@@ -1,13 +1,16 @@
-// =======================================================
-//  app.firebase.js — Full Online (Realtime + Auth + CRUD)
-// =======================================================
+/**
+ * app.firebase.js — FINAL 2025
+ * WebsiteHadirGuru • SDN Muhara
+ * Firebase V10 compat
+ */
 
-(function(){
+console.log("Loading app.firebase.js...");
 
-// ---------------------------------------------
-// Firebase Config (punya kamu)
-// ---------------------------------------------
-const firebaseConfig = {
+(function () {
+  // ======================================================
+  // 1) Firebase Config (gunakan milikmu)
+  // ======================================================
+  const firebaseConfig = {
     apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
     authDomain: "websitehadirsekolah.firebaseapp.com",
     databaseURL: "https://websitehadirsekolah-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -16,215 +19,157 @@ const firebaseConfig = {
     messagingSenderId: "811289978131",
     appId: "1:811289978131:web:ad0bd0b113dd1c733a26e6",
     measurementId: "G-PK0811G8VJ"
-};
+  };
 
-// init firebase
-try {
-    firebase.initializeApp(firebaseConfig);
-    console.log("%cFirebase initialized ✓", "color:green");
-} catch(e){
-    console.warn("Firebase init error:", e);
-}
+  // ======================================================
+  // 2) Init Firebase
+  // ======================================================
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const auth = firebase.auth();
 
-const db = firebase.database();
-const auth = firebase.auth();
+  window.__WH_FIREBASE = {
+    app: firebase,
+    auth,
+    db,
+    currentUser: null
+  };
 
-// local cache keys
-const LS_GURU = 'wh_guru_list_v1';
-const LS_ATT  = 'wh_att_list_v1';
+  console.log("Firebase initialized ✓");
 
-function now(){ return Date.now(); }
+  // small helper
+  function emit(name, detail) {
+    document.dispatchEvent(new CustomEvent(name, { detail }));
+  }
 
-// convert snapshot to array
-function snapToArray(snap){
-    const arr = [];
-    snap.forEach(ch => {
-        const v = ch.val();
-        v.id = ch.key;
-        arr.push(v);
-    });
-    return arr;
-}
+  // ======================================================
+  // 3) AUTH HANDLERS (email/password login admin)
+  // ======================================================
+  async function signInWithEmail(email, password) {
+    const cred = await auth.signInWithEmailAndPassword(email, password);
+    return cred.user;
+  }
 
-// =============================================
-//  REALTIME LISTENERS
-// =============================================
-let guruListener = null;
-let attListener  = null;
+  async function signOutFirebase() {
+    return auth.signOut();
+  }
 
-function startRealtime(){
+  window.signInWithEmail = signInWithEmail;
+  window.signOutFirebase = signOutFirebase;
 
-    if (!guruListener){
-        guruListener = db.ref('/gurus').on('value', snap => {
-            const arr = snapToArray(snap);
-            try { localStorage.setItem(LS_GURU, JSON.stringify(arr)); } catch(e){}
-            window.__latest_guru_list = arr;
-            window.dispatchEvent(new CustomEvent('gurus-updated',{ detail: arr }));
-            console.log("Realtime: gurus updated", arr.length);
-        }, err => console.error("Guru listener error:", err));
+  // listen to auth state changes
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      window.__WH_FIREBASE.currentUser = null;
+      emit("auth-changed", null);
+      return;
     }
 
-    if (!attListener){
-        attListener = db.ref('/attendances').on('value', snap => {
-            const arr = snapToArray(snap);
-            try { localStorage.setItem(LS_ATT, JSON.stringify(arr)); } catch(e){}
-            window.__latest_att_list = arr;
-            window.dispatchEvent(new CustomEvent('attendances-updated',{ detail: arr }));
-            console.log("Realtime: attendances updated", arr.length);
-        }, err => console.error("Attendance listener error:", err));
-    }
-}
+    // refresh token for custom claims
+    const token = await user.getIdTokenResult(true);
+    const isAdmin = token.claims.admin === true;
 
-startRealtime();
+    window.__WH_FIREBASE.currentUser = {
+      uid: user.uid,
+      email: user.email,
+      admin: isAdmin
+    };
 
-// =============================================
-//  SYNC MANUAL
-// =============================================
-async function syncFromFirebase(){
-    const [gSnap, aSnap] = await Promise.all([
-        db.ref('/gurus').once('value'),
-        db.ref('/attendances').once('value')
-    ]);
+    emit("auth-changed", window.__WH_FIREBASE.currentUser);
+  });
 
-    const gArr = snapToArray(gSnap);
-    const aArr = snapToArray(aSnap);
+  // ======================================================
+  // 4) GURU FUNCTIONS
+  // ======================================================
+  async function addGuruFirebase(data) {
+    const ref = db.ref("gurus").push();
+    const newData = {
+      id: ref.key,
+      nip: data.nip || "",
+      nama: data.nama || "",
+      jabatan: data.jabatan || "",
+      status: "Aktif"
+    };
+    await ref.set(newData);
+    return newData;
+  }
 
-    localStorage.setItem(LS_GURU, JSON.stringify(gArr));
-    localStorage.setItem(LS_ATT, JSON.stringify(aArr));
+  async function updateGuruFirebase(id, updates) {
+    if (!id) throw new Error("id guru kosong");
+    await db.ref("gurus/" + id).update(updates);
+    return true;
+  }
 
-    window.__latest_guru_list = gArr;
-    window.__latest_att_list  = aArr;
+  async function deleteGuruFirebase(id) {
+    if (!id) throw new Error("id guru kosong");
+    await db.ref("gurus/" + id).remove();
+    return true;
+  }
 
-    window.dispatchEvent(new CustomEvent('gurus-updated',{ detail: gArr }));
-    window.dispatchEvent(new CustomEvent('attendances-updated',{ detail: aArr }));
+  window.addGuruFirebase = addGuruFirebase;
+  window.updateGuruFirebase = updateGuruFirebase;
+  window.deleteGuruFirebase = deleteGuruFirebase;
+
+  // ======================================================
+  // 5) ATTENDANCE FUNCTIONS
+  // ======================================================
+  async function addAttendanceFirebase(data) {
+    const ref = db.ref("attendances").push();
+    const payload = {
+      id: ref.key,
+      idGuru: data.idGuru || "",
+      namaGuru: data.namaGuru || "",
+      status: data.status || "Hadir",
+      tanggal: data.tanggal || new Date().toISOString().slice(0, 10),
+      jam: data.jam || new Date().toLocaleTimeString("id-ID"),
+      lokasi: data.lokasi || "",
+      tempat: data.tempat || "",
+      lat: data.lat || "",
+      lon: data.lon || ""
+    };
+    await ref.set(payload);
+    return payload;
+  }
+
+  window.addAttendanceFirebase = addAttendanceFirebase;
+
+  // ======================================================
+  // 6) REALTIME LISTENERS (Guru + Attendance)
+  // ======================================================
+  db.ref("gurus").on("value", (snap) => {
+    const data = snap.val() || {};
+    const arr = Object.values(data);
+    emit("gurus-updated", arr);
+    console.log("Realtime: gurus updated", arr.length);
+  });
+
+  db.ref("attendances").on("value", (snap) => {
+    const data = snap.val() || {};
+    const arr = Object.values(data);
+    emit("attendances-updated", arr);
+    console.log("Realtime: attendances updated", arr.length);
+  });
+
+  // ======================================================
+  // 7) SYNC FROM SERVER (called on load)
+  // ======================================================
+  async function syncFromFirebase() {
+    const gSnap = await db.ref("gurus").once("value");
+    const aSnap = await db.ref("attendances").once("value");
+
+    const gArr = gSnap.val() ? Object.values(gSnap.val()) : [];
+    const aArr = aSnap.val() ? Object.values(aSnap.val()) : [];
+
+    localStorage.setItem("wh_guru_list_v1", JSON.stringify(gArr));
+    localStorage.setItem("wh_att_list_v1", JSON.stringify(aArr));
 
     return { gArr, aArr };
-}
+  }
 
-// =============================================
-//  CRUD GURU
-// =============================================
-async function addGuruFirebase(data){
-    if (!data.nama) throw new Error("Nama diperlukan!");
+  window.syncFromFirebase = syncFromFirebase;
 
-    const ref = db.ref('/gurus').push();
-    await ref.set({
-        nip: data.nip || "",
-        nama: data.nama,
-        jabatan: data.jabatan || "",
-        status: "Aktif",
-        createdAt: now()
-    });
-
-    return true;
-}
-
-async function updateGuruFirebase(id, data){
-    if (!id) throw new Error("ID diperlukan!");
-    await db.ref('/gurus/' + id).update(data);
-    return true;
-}
-
-async function deleteGuruFirebase(id){
-    if (!id) throw new Error("ID diperlukan!");
-    await db.ref('/gurus/' + id).remove();
-    return true;
-}
-
-// =============================================
-//  ADD ATTENDANCE
-// =============================================
-async function addAttendanceFirebase(p){
-    if (!p.tanggal || !p.namaGuru) throw new Error("Data tidak lengkap");
-
-    const ref = db.ref('/attendances').push();
-    await ref.set({
-        idGuru: p.idGuru,
-        namaGuru: p.namaGuru,
-        status: p.status,
-        tanggal: p.tanggal,
-        jam: p.jam,
-        lokasi: p.lokasi || "",
-        placeName: p.placeName || "",
-        createdAt: now(),
-        yearMonth: (p.tanggal || "").slice(0,7)
-    });
-
-    return true;
-}
-
-// =============================================
-//  LAPORAN BULANAN (FILTER)
-// =============================================
-async function getMonthlyReportFirebase(ym){
-    const snap = await db.ref('/attendances')
-        .orderByChild('yearMonth').equalTo(ym)
-        .once('value');
-
-    return snapToArray(snap);
-}
-
-// =============================================
-//  AUTH LISTENER + CUSTOM CLAIM ADMIN
-// =============================================
-auth.onAuthStateChanged(async user => {
-    if (!user){
-        window.__WH_FIREBASE = { currentUser:null };
-        window.dispatchEvent(new CustomEvent('auth-changed',{ detail:null }));
-        return;
-    }
-
-    try {
-        const token = await user.getIdTokenResult(true);
-        const isAdmin = !!token.claims.admin;
-
-        const info = {
-            uid: user.uid,
-            email: user.email,
-            admin: isAdmin
-        };
-
-        window.__WH_FIREBASE = { currentUser: info };
-        window.dispatchEvent(new CustomEvent('auth-changed',{ detail: info }));
-
-        console.log("Auth state:", info);
-
-    } catch(err){
-        console.error("auth token error:", err);
-    }
-});
-
-// =============================================
-//  LOGIN / LOGOUT
-// =============================================
-async function signInWithEmail(email, pw){
-    const cred = await auth.signInWithEmailAndPassword(email, pw);
-    const token = await cred.user.getIdTokenResult(true);
-
-    return {
-        uid: cred.user.uid,
-        email: cred.user.email,
-        admin: !!token.claims.admin
-    };
-}
-
-async function signOutFirebase(){
-    await auth.signOut();
-    return true;
-}
-
-// =============================================
-//  EXPORT to window (dipakai index.html)
-// =============================================
-window.addGuruFirebase         = addGuruFirebase;
-window.updateGuruFirebase      = updateGuruFirebase;
-window.deleteGuruFirebase      = deleteGuruFirebase;
-window.addAttendanceFirebase   = addAttendanceFirebase;
-window.getMonthlyReportFirebase= getMonthlyReportFirebase;
-window.syncFromFirebase        = syncFromFirebase;
-window.signInWithEmail         = signInWithEmail;
-window.signOutFirebase         = signOutFirebase;
-
-console.log("%capp.firebase.js fully loaded ✓", "color:green");
-
+  // ======================================================
+  // 8) READY
+  // ======================================================
+  console.log("app.firebase.js fully loaded ✓");
 })();
