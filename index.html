@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WebsiteHadir — SDN Muhara (Fixed)</title>
+  <title>WebsiteHadir — SDN Muhara (Full Fixed)</title>
 
   <!-- Tailwind CSS (CDN demo) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -33,8 +33,25 @@
 <body class="antialiased bg-slate-50 text-slate-800">
   <div class="min-h-screen flex">
 <!-- MAIN CONTENT BODY -->
-<main class="p-6">
+<main class="p-6 w-full">
   <div class="max-w-7xl mx-auto">
+
+    <!-- TOP BAR: date/clock + page nav + admin buttons -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex items-center gap-4">
+        <div id="current-date-top" class="text-sm text-slate-600"></div>
+        <div id="clock-small" class="text-sm text-slate-600"></div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button data-page="kehadiran" class="px-3 py-1 rounded text-sm">Kehadiran</button>
+        <button data-page="dashboard" class="px-3 py-1 rounded text-sm">Dashboard</button>
+        <button data-page="guru" class="px-3 py-1 rounded text-sm">Guru</button>
+        <button data-page="laporan" class="px-3 py-1 rounded text-sm">Laporan</button>
+        <button id="btn-open-admin" class="px-3 py-1 rounded bg-slate-100 text-sm">Admin</button>
+        <button id="btn-admin-logout" class="px-3 py-1 rounded bg-rose-100 text-sm hidden">Logout</button>
+        <div id="admin-badge" class="ml-2 px-2 py-1 rounded bg-emerald-600 text-white text-xs hidden">ADMIN</div>
+      </div>
+    </div>
 
     <!-- DASHBOARD CARDS -->
     <div id="page-dashboard" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 hidden">
@@ -53,7 +70,7 @@
     </div>
 
     <!-- ===================================================== -->
-    <!-- FORM KEHADIRAN (FIX STATUS BUTTONS)                  -->
+    <!-- FORM KEHADIRAN                                          -->
     <!-- ===================================================== -->
     <section id="page-kehadiran">
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -149,6 +166,7 @@
 
       </div>
     </section>
+
     <!-- ===================================================== -->
     <!-- DATA GURU PAGE                                        -->
     <!-- ===================================================== -->
@@ -177,19 +195,37 @@
     </section>
 
     <!-- ===================================================== -->
-    <!-- LAPORAN PAGE (pivot table head/body already in PART 2) -->
+    <!-- LAPORAN PAGE (full with expected IDs)                 -->
     <!-- ===================================================== -->
-    <!-- (Part 2 included the input month + tombol + table placeholders)
-         This section ensures laporan-summary area exists (if not already) -->
+    <section id="page-laporan" class="hidden mt-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">📋 Laporan Kehadiran</h2>
+        <div class="flex gap-2 items-center">
+          <input id="bulan" type="month" class="border p-2 rounded" />
+          <button id="tampilkanLaporanBtn" class="px-3 py-1 rounded bg-sky-600 text-white">Tampilkan</button>
+          <button id="exportLaporanBtn" class="px-3 py-1 rounded bg-emerald-600 text-white">Export Excel</button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow p-4 overflow-auto">
+        <table class="min-w-full text-sm">
+          <thead id="laporanPivotHead" class="bg-rose-50 text-rose-700 font-semibold"></thead>
+          <tbody id="laporanPivotBody"><tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr></tbody>
+        </table>
+      </div>
+      <div id="laporan-summary" class="mt-4 text-slate-700"></div>
+    </section>
+
+    <!-- backward compat -->
     <section id="laporan-extra" class="hidden">
-      <div id="laporan-summary" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
+      <div id="laporan-summary-legacy" class="bg-rose-50 rounded-xl p-4 text-slate-700"></div>
     </section>
 
     </div> <!-- .max-w-7xl -->
   </main>
 
   <!-- TOASTS -->
-  <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+  <div id="toasts" aria-live="polite" aria-atomic="true" class="fixed right-4 top-16 space-y-2"></div>
 
   <!-- ADMIN LOGIN MODAL -->
   <div id="admin-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40">
@@ -251,13 +287,14 @@
     setTimeout(()=> { el.style.transition='opacity .25s'; el.style.opacity='0'; setTimeout(()=>el.remove(),300); }, timeout);
   }
 
-  // page nav
+  // page nav — made robust & aligned with actual section IDs
   function showPage(name){
-    ['kehadiran','dashboard','guru','laporan'].forEach(p=>{
-      const el = document.getElementById('page-'+p);
-      if (!el) return;
-      if (p===name) el.classList.remove('hidden'); else el.classList.add('hidden');
-    });
+    const map = { kehadiran: 'page-kehadiran', dashboard: 'page-dashboard', guru: 'page-guru', laporan: 'page-laporan' };
+    Object.values(map).forEach(id => { const el = document.getElementById(id); if (!el) return; el.classList.add('hidden'); });
+    const targetId = map[name] || ('page-'+name);
+    const target = document.getElementById(targetId);
+    if (target) target.classList.remove('hidden');
+    // update active state for nav buttons (data-page)
     $$('[data-page]').forEach(b => { b.classList.toggle('font-semibold', b.dataset.page===name); });
   }
   // attach nav handlers defensively
@@ -417,7 +454,7 @@
       toast('Logout lokal berhasil', 'ok');
     }
 
-    // add guru modal
+    // add guru modal (duplicate-safe)
     if (e.target && e.target.id === 'btn-add-guru-admin') {
       $('#guru-modal-title').textContent='Tambah Guru'; $('#guru-nip').value=''; $('#guru-nama-input').value=''; $('#guru-jabatan-input').value=''; $('#guru-save').dataset.editId=''; $('#guru-modal').classList.remove('hidden');
     }
@@ -680,7 +717,7 @@
   function renderPivotTableForMonth(yyyymm){
     const head = document.getElementById('laporanPivotHead');
     const body = document.getElementById('laporanPivotBody');
-    const summary = document.getElementById('laporan-summary');
+    const summary = document.getElementById('laporan-summary') || document.getElementById('laporan-summary-legacy');
     if (!yyyymm){ if (head) head.innerHTML=''; if (body) body.innerHTML = '<tr><td colspan="32" class="text-center p-6 text-slate-500">Pilih bulan untuk menampilkan data.</td></tr>'; if (summary) summary.textContent=''; return; }
     const [yStr,mStr] = yyyymm.split('-'); const y = Number(yStr), m = Number(mStr);
     const days = daysInMonth(y,m);
@@ -865,7 +902,7 @@
 
 })();
 </script>
-<!-- PART 7: Status-button FIX + closing tags -->
+<!-- PART 7: Status-button FIX -->
 <script>
 // =======================================================
 //  FIX STATUS BUTTON (ROBUST, ANTI ERROR, PASTI BISA DIKLIK)
