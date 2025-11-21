@@ -1,5 +1,5 @@
 /**
- * app.firebase.fixed.js — Final (fixed)
+ * app.firebase.fixed.js — Final with Admin & Auth Check
  * WebsiteHadirGuru • SDN Muhara
  * Firebase V10 compat (compat SDK)
  */
@@ -78,6 +78,17 @@ console.log("Loading app.firebase.js (fixed)...");
     });
   }
 
+  // Utility: Cek apakah pengguna saat ini adalah Admin
+  function checkAdminAuth() {
+    const user = window.__WH_FIREBASE.currentUser;
+    if (!user || !user.admin) {
+      const error = new Error('Akses ditolak: Hanya Admin yang dapat melakukan operasi ini.');
+      error.code = 'permission-denied';
+      throw error;
+    }
+    return true;
+  }
+
   // ======================================================
   // 3) AUTH HANDLERS (email/password login admin)
   // ======================================================
@@ -103,8 +114,9 @@ console.log("Loading app.firebase.js (fixed)...");
     }
   }
 
-  window.signInWithEmail = signInWithEmail;
-  window.signOutFirebase = signOutFirebase;
+  // Alias yang digunakan di index.html untuk fitur Admin
+  window.signInAdmin = signInWithEmail;
+  window.signOutAdmin = signOutFirebase;
 
   // listen to auth state changes
   auth.onAuthStateChanged(async (user) => {
@@ -118,7 +130,9 @@ console.log("Loading app.firebase.js (fixed)...");
       // refresh token for custom claims — prefer force refresh only when needed
       let isAdmin = false;
       try {
-        const token = await user.getIdTokenResult(true);
+        // Mendapatkan token baru untuk memeriksa custom claims
+        const token = await user.getIdTokenResult(true); 
+        // Asumsi: Admin memiliki custom claim { admin: true }
         isAdmin = token && token.claims && token.claims.admin === true;
       } catch (e) {
         console.warn('getIdTokenResult failed', e);
@@ -137,9 +151,10 @@ console.log("Loading app.firebase.js (fixed)...");
   });
 
   // ======================================================
-  // 4) GURU FUNCTIONS
+  // 4) GURU FUNCTIONS (Admin-Only)
   // ======================================================
   async function addGuruFirebase(data) {
+    checkAdminAuth(); // <-- Admin Check
     try {
       const ref = db.ref("gurus").push();
       const newData = {
@@ -158,6 +173,7 @@ console.log("Loading app.firebase.js (fixed)...");
   }
 
   async function updateGuruFirebase(id, updates) {
+    checkAdminAuth(); // <-- Admin Check
     if (!id) throw Object.assign(new Error("id guru kosong"), { code: 'invalid-arg' });
     try {
       await db.ref("gurus/" + id).update(updates);
@@ -169,6 +185,7 @@ console.log("Loading app.firebase.js (fixed)...");
   }
 
   async function deleteGuruFirebase(id) {
+    checkAdminAuth(); // <-- Admin Check
     if (!id) throw Object.assign(new Error("id guru kosong"), { code: 'invalid-arg' });
     try {
       await db.ref("gurus/" + id).remove();
@@ -184,9 +201,10 @@ console.log("Loading app.firebase.js (fixed)...");
   window.deleteGuruFirebase = deleteGuruFirebase;
 
   // ======================================================
-  // 5) ATTENDANCE FUNCTIONS
+  // 5) ATTENDANCE FUNCTIONS (Open Access)
   // ======================================================
   async function addAttendanceFirebase(data) {
+    // Tidak perlu checkAdminAuth, karena ini adalah aksi pengisian kehadiran
     try {
       const ref = db.ref("attendances").push();
       const payload = {
@@ -249,6 +267,7 @@ console.log("Loading app.firebase.js (fixed)...");
       const gArr = normalizeSnapshotToArray(gSnap.val());
       const aArr = normalizeSnapshotToArray(aSnap.val());
 
+      // Simpan ke LocalStorage sebagai backup/cache
       localStorage.setItem("wh_guru_list_v1", JSON.stringify(gArr));
       localStorage.setItem("wh_att_list_v1", JSON.stringify(aArr));
 
@@ -264,6 +283,7 @@ console.log("Loading app.firebase.js (fixed)...");
   }
 
   window.syncFromFirebase = syncFromFirebase;
+  window.whUseFirebase = true; // Flag to indicate Firebase is active
 
   // ======================================================
   // 8) READY
