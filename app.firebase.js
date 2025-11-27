@@ -15,7 +15,7 @@ console.log("Loading app.firebase.js (fixed)...");
     authDomain: "websitehadirsekolah.firebaseapp.com",
     databaseURL: "https://websitehadirsekolah-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "websitehadirsekolah",
-    storageBucket: "websitehadirsekolah.appspot.app",
+    storageBucket: "websitehadirsekolah.firebasestorage.app",
     messagingSenderId: "811289978131",
     appId: "1:811289978131:web:ad0bd0b113dd1c733a26e6",
     measurementId: "G-PK0811G8VJ"
