@@ -15,7 +15,6 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        /* Z-index tinggi untuk modal dan toast */
         .z-60 { z-index: 60; }
         .z-70 { z-index: 70; }
         .z-80 { z-index: 80; }
@@ -63,6 +62,7 @@
 
         <main>
             
+            <!-- PAGE KEHADIRAN -->
             <section id="page-kehadiran" class="card-smooth p-4">
                 <h2 class="text-xl font-semibold mb-4 text-indigo-700">Input Kehadiran Guru Hari Ini</h2>
                 <div class="bg-indigo-50 p-4 rounded-lg mb-4">
@@ -102,11 +102,11 @@
                 </form>
             </section>
 
+            <!-- PAGE DASHBOARD -->
             <section id="page-dashboard" class="hidden mt-6 card-smooth p-4">
                 <h2 class="text-xl font-semibold mb-4">📊 Dashboard Kehadiran Hari Ini</h2>
                 
-                <div id="dashboard-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                </div>
+                <div id="dashboard-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
 
                 <h3 class="text-lg font-semibold mb-3">Daftar Kehadiran</h3>
                 <div class="overflow-auto">
@@ -126,6 +126,7 @@
                 </div>
             </section>
 
+            <!-- PAGE GURU -->
             <section id="page-guru" class="hidden mt-6 card-smooth p-4">
                 <h2 class="text-xl font-semibold mb-4">🧑‍🏫 Data Guru</h2>
                 <div id="guru-table-container" class="overflow-auto">
@@ -146,6 +147,7 @@
                 </div>
             </section>
 
+            <!-- PAGE LAPORAN -->
             <section id="page-laporan" class="hidden mt-6 card-smooth p-4">
               <h2 class="text-xl font-semibold mb-4">📜 Laporan Bulanan</h2>
               <div class="flex flex-wrap items-center gap-3 mb-4">
@@ -154,26 +156,28 @@
                 <label for="reportYear" class="text-sm font-medium">Tahun:</label>
                 <select id="reportYear" class="border rounded p-2 text-sm"></select>
                 <button id="generateReportBtn" class="px-3 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700">Tampilkan Laporan</button>
+                <button id="btnExportPdf" class="px-3 py-2 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">Cetak PDF</button>
+                <button id="btnExportExcel" class="px-3 py-2 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">Export Excel</button>
               </div>
               
-              <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              </div>
+              <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
 
-              <h3 class="text-lg font-semibold mb-3">Rekapitulasi Kehadiran</h3>
+              <h3 class="text-lg font-semibold mb-3">Rekapitulasi Kehadiran (Per Tanggal)</h3>
               <div class="overflow-auto">
-                <table class="min-w-full text-sm border border-gray-200" aria-label="Tabel Laporan Bulanan Guru">
+                <table class="min-w-full text-xs md:text-sm border border-gray-200" aria-label="Tabel Laporan Bulanan Guru">
                   <thead class="bg-indigo-50 text-indigo-700 font-semibold sticky top-0">
-                    <tr>
-                      <th class="p-2 text-left border">Nama Guru</th>
-                      <th class="p-2 text-center border">Hadir</th>
-                      <th class="p-2 text-center border">Izin</th>
-                      <th class="p-2 text-center border">Sakit</th>
-                      <th class="p-2 text-center border">Dinas Luar</th>
-                      <th class="p-2 text-center border">Total Absen</th>
+                    <tr id="report-header-row-1">
+                      <th class="p-2 text-left border" rowspan="2">Nama Guru</th>
+                      <th class="p-2 text-center border" colspan="31">Tanggal</th>
+                      <th class="p-2 text-center border" rowspan="2">Total H</th>
+                      <th class="p-2 text-center border" rowspan="2">Total A</th>
+                    </tr>
+                    <tr id="report-header-row-2">
+                      <!-- TH tanggal 1..31 diisi via JS -->
                     </tr>
                   </thead>
                   <tbody id="reportTableBody">
-                    <tr><td colspan="6" class="text-center p-6 text-slate-500">Silakan pilih bulan dan tahun, lalu klik Tampilkan Laporan.</td></tr>
+                    <tr><td colspan="34" class="text-center p-6 text-slate-500">Silakan pilih bulan dan tahun, lalu klik Tampilkan Laporan.</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -182,6 +186,7 @@
         </main>
     </div>
 
+    <!-- MODAL LOGIN -->
     <div id="login-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/40">
         <div class="bg-white rounded-xl shadow-lg p-6 w-96 max-w-sm">
             <h3 class="text-xl font-semibold mb-4 text-indigo-700">🔑 Login Admin</h3>
@@ -196,6 +201,7 @@
         </div>
     </div>
     
+    <!-- MODAL GURU -->
     <div id="guru-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/40">
         <div class="bg-white rounded-xl shadow-lg p-6 w-96 max-w-sm">
             <h3 class="text-xl font-semibold mb-4 text-indigo-700" id="guru-modal-title">Tambah Guru</h3>
@@ -221,11 +227,16 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDK v8 -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+    <!-- Library untuk PDF & Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- Script Firebase Anda -->
     <script src="app.firebase.js"></script>
 
     <script>
@@ -237,7 +248,7 @@
         let whAttList = [];
         let whIsAdmin = false;
 
-        // --- TOAST NOTIFICATIONS ---
+        // --- TOAST ---
         function toast(message, type = 'info', duration = 3000) {
             const container = $('#toast-container');
             const colorMap = {
@@ -281,14 +292,13 @@
             if (window.whUseFirebase && window.addAttendanceFirebase) {
                 return window.addAttendanceFirebase(data);
             }
-            // Local fallback
             const currentAtt = loadAtt();
             currentAtt.push(data);
             localStorage.setItem('wh_att_list_v1', JSON.stringify(currentAtt));
             return data;
         }
 
-        // --- NAVIGATION & UI STATE ---
+        // --- NAVIGATION ---
         function showPage(name) {
             const pages = {
                 'kehadiran': $('#page-kehadiran'),
@@ -303,35 +313,36 @@
                 }
             });
 
-            // Update Nav Item styles
             $$('.nav-item').forEach(btn => {
                 const isActive = btn.getAttribute('data-page') === name;
                 btn.classList.toggle('bg-indigo-600', isActive);
-                btn.classList.toggle('bg-white/10', isActive && btn.closest('aside')); // Sidebar active style
-                btn.classList.toggle('text-white', isActive && btn.closest('aside')); // Sidebar active style
-                btn.classList.toggle('text-indigo-700', isActive && btn.closest('header')); // Mobile active style
-                btn.classList.toggle('bg-indigo-100', isActive && btn.closest('header')); // Mobile active style
+                btn.classList.toggle('bg-white/10', isActive && btn.closest('aside'));
+                btn.classList.toggle('text-white', isActive && btn.closest('aside'));
+                btn.classList.toggle('text-indigo-700', isActive && btn.closest('header'));
+                btn.classList.toggle('bg-indigo-100', isActive && btn.closest('header'));
             });
             
-            // Re-render data when changing pages
             if (name === 'dashboard') renderDashboard();
             if (name === 'guru') renderGuruTable();
             if (name === 'laporan') generateReport();
         }
 
-        // Event listener untuk Navigasi
         $$('.nav-item').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 showPage(e.currentTarget.getAttribute('data-page'));
             });
         });
 
-        // --- Laporan Bulanan (versi total per status) ---
+        // --- LAPORAN BULANAN (MATRIX 1–31 + SUMMARY) ---
         const reportMonthSel = $('#reportMonth');
         const reportYearSel = $('#reportYear');
         const generateReportBtn = $('#generateReportBtn');
         const reportTableBody = $('#reportTableBody');
         const reportSummary = $('#report-summary');
+        const reportHeaderRow1 = document.getElementById('report-header-row-1');
+        const reportHeaderRow2 = document.getElementById('report-header-row-2');
+        const btnExportPdf = document.getElementById('btnExportPdf');
+        const btnExportExcel = document.getElementById('btnExportExcel');
 
         function populateReportSelectors(){
             const now = new Date();
@@ -357,68 +368,95 @@
             
             const allAtt = loadAtt(); 
             const gurus = loadGuruList();
-            
             const monthlyAtt = allAtt.filter(att => att.tanggal && att.tanggal.startsWith(prefixDate));
             
+            const daysInMonth = new Date(parseInt(selectedYear,10), parseInt(selectedMonth,10), 0).getDate();
+            const dayNumbers = Array.from({length: daysInMonth}, (_, i) => i + 1);
+
+            // Header tanggal
+            reportHeaderRow1.innerHTML = `
+                <th class="p-2 text-left border" rowspan="2">Nama Guru</th>
+                <th class="p-2 text-center border" colspan="${daysInMonth}">Tanggal</th>
+                <th class="p-2 text-center border" rowspan="2">Total H</th>
+                <th class="p-2 text-center border" rowspan="2">Total A</th>
+            `;
+            reportHeaderRow2.innerHTML = dayNumbers.map(d => `<th class="p-1 text-center border">${d}</th>`).join('');
+
+            // Data report per guru
             const reportData = {};
             gurus.forEach(g => {
+                const kodeMap = {};
+                dayNumbers.forEach(d => { kodeMap[d] = "-"; });
                 reportData[g.id] = { 
                     nama: g.nama,
-                    Hadir: 0, Izin: 0, Sakit: 0, 'Dinas Luar': 0, 
-                    TotalAbsen: 0
+                    map: kodeMap,
+                    totalH: 0,
+                    totalA: 0
                 };
             });
             
             monthlyAtt.forEach(att => {
-                const status = att.status;
                 const guruId = att.idGuru;
-                if (reportData[guruId]) {
-                    if (reportData[guruId][status] !== undefined) {
-                         reportData[guruId][status]++;
-                    }
-                    if (['Izin', 'Sakit', 'Dinas Luar'].includes(status)) {
-                        reportData[guruId].TotalAbsen++;
-                    }
-                }
+                if (!reportData[guruId]) return;
+                const day = parseInt(att.tanggal.split("-")[2], 10);
+                if (!day || !reportData[guruId].map[day]) return;
+
+                let code = "H";
+                if (att.status === "Izin") code = "I";
+                else if (att.status === "Sakit") code = "S";
+                else if (att.status === "Dinas Luar") code = "DL";
+
+                // Simpan status (pakai terakhir jika lebih dari satu input di hari yang sama)
+                reportData[guruId].map[day] = code;
+
+                if (code === "H") reportData[guruId].totalH++;
+                else if (code !== "-") reportData[guruId].totalA++;
             });
-            
+
             reportTableBody.innerHTML = '';
             const guruIds = Object.keys(reportData).sort((a,b) => reportData[a].nama.localeCompare(reportData[b].nama));
-            let totalHadirAll = 0, totalIzinAll = 0, totalSakitAll = 0, totalDinasAll = 0;
+
+            let totalHadirAll = 0, totalAbsenAll = 0;
 
             if (guruIds.length > 0) {
                 guruIds.forEach(id => {
                     const data = reportData[id];
-                    totalHadirAll += data.Hadir;
-                    totalIzinAll += data.Izin;
-                    totalSakitAll += data.Sakit;
-                    totalDinasAll += data['Dinas Luar'];
+                    totalHadirAll += data.totalH;
+                    totalAbsenAll += data.totalA;
+
+                    const tds = dayNumbers.map(d => {
+                        const v = data.map[d];
+                        let cls = "text-gray-700";
+                        if (v === "H") cls = "text-green-600 font-semibold";
+                        else if (v === "I") cls = "text-amber-600";
+                        else if (v === "S") cls = "text-rose-600";
+                        else if (v === "DL") cls = "text-sky-600";
+                        return `<td class="p-1 text-center border ${cls}">${v}</td>`;
+                    }).join("");
 
                     const tr = document.createElement('tr');
                     tr.className = 'hover:bg-slate-50';
                     tr.innerHTML = `
-                        <td class="p-2 border border-gray-200">${data.nama}</td>
-                        <td class="p-2 border border-gray-200 text-center font-bold text-green-600">${data.Hadir}</td>
-                        <td class="p-2 border border-gray-200 text-center text-amber-600">${data.Izin}</td>
-                        <td class="p-2 border border-gray-200 text-center text-rose-600">${data.Sakit}</td>
-                        <td class="p-2 border border-gray-200 text-center text-sky-600">${data['Dinas Luar']}</td>
-                        <td class="p-2 border border-gray-200 text-center font-bold text-lg">${data.TotalAbsen}</td>
+                        <td class="p-2 border border-gray-200 font-medium">${data.nama}</td>
+                        ${tds}
+                        <td class="p-2 border border-gray-200 text-center font-bold text-green-700">${data.totalH}</td>
+                        <td class="p-2 border border-gray-200 text-center font-bold text-amber-700">${data.totalA}</td>
                     `;
                     reportTableBody.appendChild(tr);
                 });
             } else {
-                 reportTableBody.innerHTML = '<tr><td colspan="6" class="text-center p-6 text-slate-500">Tidak ada data guru atau kehadiran yang cocok di bulan ini.</td></tr>';
+                 reportTableBody.innerHTML = '<tr><td colspan="34" class="text-center p-6 text-slate-500">Tidak ada data guru atau kehadiran di bulan ini.</td></tr>';
             }
             
             const selectedMonthName = reportMonthSel.options[reportMonthSel.selectedIndex].text;
             reportSummary.innerHTML = `
                 <div class="card-smooth p-5 bg-green-50">
-                    <div class="text-sm text-slate-500">Total Kehadiran (${selectedMonthName})</div>
+                    <div class="text-sm text-slate-500">Total Hadir (${selectedMonthName})</div>
                     <div class="text-3xl font-bold text-green-600 mt-2">${totalHadirAll}</div>
                 </div>
                 <div class="card-smooth p-5 bg-amber-50">
                     <div class="text-sm text-slate-500">Total Absen (Izin/Sakit/DL)</div>
-                    <div class="text-3xl font-bold text-amber-600 mt-2">${totalIzinAll + totalSakitAll + totalDinasAll}</div>
+                    <div class="text-3xl font-bold text-amber-600 mt-2">${totalAbsenAll}</div>
                 </div>
                 <div class="card-smooth p-5 bg-indigo-50">
                     <div class="text-sm text-slate-500">Total Guru Aktif</div>
@@ -430,9 +468,36 @@
         }
 
         generateReportBtn.addEventListener('click', generateReport);
+
+        // Export PDF
+        btnExportPdf.addEventListener('click', () => {
+            const element = document.querySelector('#page-laporan');
+            const monthText = reportMonthSel.options[reportMonthSel.selectedIndex].text;
+            const year = reportYearSel.value;
+            const opt = {
+                margin:       0.5,
+                filename:     `Laporan-Kehadiran-${monthText}-${year}.pdf`,
+                image:        { type: 'jpeg', quality: 0.95 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'cm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+        });
+
+        // Export Excel
+        btnExportExcel.addEventListener('click', () => {
+            const table = document.querySelector('#page-laporan table');
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.table_to_sheet(table);
+            XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+            const monthText = reportMonthSel.options[reportMonthSel.selectedIndex].text;
+            const year = reportYearSel.value;
+            XLSX.writeFile(wb, `Laporan-Kehadiran-${monthText}-${year}.xlsx`);
+        });
+
         populateReportSelectors();
 
-        // --- DASHBOARD LOGIC ---
+        // --- DASHBOARD ---
         function renderDashboard() {
             const today = new Date().toISOString().slice(0, 10);
             const todayAtt = loadAtt().filter(att => att.tanggal === today).reverse();
@@ -480,7 +545,7 @@
             }
         }
 
-        // --- GURU PAGE LOGIC ---
+        // --- GURU PAGE ---
         function renderGuruSelect() {
             const select = $('#guru-select');
             const gurus = loadGuruList().filter(g => g.status === 'Aktif').sort((a, b) => a.nama.localeCompare(b.nama));
@@ -518,7 +583,7 @@
             }
         }
         
-        // --- GURU MODAL LOGIC ---
+        // --- GURU MODAL ---
         const guruModal = $('#guru-modal');
         const guruForm = $('#guru-form');
         const guruIdInput = $('#guru-id');
@@ -592,7 +657,7 @@
         }
         window.deleteGuru = deleteGuru; 
 
-        // --- ATTENDANCE SUBMISSION (dengan cek 1x per hari) ---
+        // --- ATTENDANCE SUBMISSION (CEK 1X PER HARI) ---
         $('#attendance-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const selectedOption = $('#guru-select').options[$('#guru-select').selectedIndex];
@@ -608,7 +673,6 @@
             const now = new Date();
             const todayStr = now.toISOString().slice(0, 10);
 
-            // CEK: guru sudah absen hari ini?
             const alreadyToday = loadAtt().some(att => att.idGuru === idGuru && att.tanggal === todayStr);
             if (alreadyToday) {
                 toast('Anda sudah absen hari ini.', 'err');
@@ -636,7 +700,7 @@
             }
         });
 
-        // --- LOGIN ADMIN LOGIC ---
+        // --- LOGIN ADMIN ---
         const loginModal = $('#login-modal');
         const btnOpenLogin = $('#btn-open-login');
         const loginCancel = $('#login-cancel');
@@ -757,7 +821,7 @@
             }
         }
         
-        // --- INITIALIZATION ---
+        // --- INIT ---
         function initApp() {
             const today = new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             $('#current-date-display').textContent = `Tanggal: ${today}`;
