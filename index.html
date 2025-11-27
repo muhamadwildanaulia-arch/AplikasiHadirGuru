@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Hadir Guru</title>
+    <title>Website Hadir Guru – SDN Muhara</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .card-smooth {
@@ -26,7 +26,8 @@
     <div id="toast-container" class="fixed top-5 right-5 space-y-2 z-80"></div>
 
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-indigo-700 text-white p-4 hidden md:block">
-        <h1 class="text-2xl font-bold mb-6 border-b border-indigo-500 pb-2">Website Hadir</h1>
+        <h1 class="text-2xl font-bold mb-2">Website Hadir Guru</h1>
+        <p class="text-sm text-indigo-100 mb-6">SDN Muhara</p>
         <nav>
             <ul class="space-y-2">
                 <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">🏠 Input Kehadiran</button></li>
@@ -48,7 +49,10 @@
     <div class="md:ml-64 p-4">
 
         <header class="md:hidden bg-white card-smooth p-3 mb-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-indigo-700">W Hadir</h1>
+            <div>
+                <h1 class="text-lg font-bold text-indigo-700">Website Hadir Guru</h1>
+                <p class="text-xs text-gray-500">SDN Muhara</p>
+            </div>
             <nav class="flex space-x-2">
                 <button data-page="kehadiran" class="nav-item px-3 py-2 rounded-full text-sm bg-indigo-100 text-indigo-700 font-medium">🏠</button>
                 <button data-page="dashboard" class="nav-item px-3 py-2 rounded-full text-sm bg-gray-100 text-gray-700">📊</button>
@@ -102,7 +106,7 @@
                 <h2 class="text-xl font-semibold mb-4">📊 Dashboard Kehadiran Hari Ini</h2>
                 
                 <div id="dashboard-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    </div>
+                </div>
 
                 <h3 class="text-lg font-semibold mb-3">Daftar Kehadiran</h3>
                 <div class="overflow-auto">
@@ -153,7 +157,7 @@
               </div>
               
               <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                </div>
+              </div>
 
               <h3 class="text-lg font-semibold mb-3">Rekapitulasi Kehadiran</h3>
               <div class="overflow-auto">
@@ -216,6 +220,8 @@
             </form>
         </div>
     </div>
+
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -288,7 +294,7 @@
                 'kehadiran': $('#page-kehadiran'),
                 'dashboard': $('#page-dashboard'),
                 'guru': $('#page-guru'),
-                'laporan': $('#page-laporan') // Tambah Laporan
+                'laporan': $('#page-laporan')
             };
 
             Object.keys(pages).forEach(key => {
@@ -310,7 +316,7 @@
             // Re-render data when changing pages
             if (name === 'dashboard') renderDashboard();
             if (name === 'guru') renderGuruTable();
-            if (name === 'laporan') generateReport(); // Muat laporan saat halaman dibuka
+            if (name === 'laporan') generateReport();
         }
 
         // Event listener untuk Navigasi
@@ -320,15 +326,13 @@
             });
         });
 
-        // --- Laporan Bulanan Logic (BARU) ---
-
+        // --- Laporan Bulanan (versi total per status) ---
         const reportMonthSel = $('#reportMonth');
         const reportYearSel = $('#reportYear');
         const generateReportBtn = $('#generateReportBtn');
         const reportTableBody = $('#reportTableBody');
         const reportSummary = $('#report-summary');
 
-        // Helper: Populate Bulan dan Tahun
         function populateReportSelectors(){
             const now = new Date();
             const currentYear = now.getFullYear();
@@ -336,19 +340,16 @@
             
             reportMonthSel.innerHTML = months.map((m, i) => `<option value="${(i+1).toString().padStart(2,'0')}">${m}</option>`).join('');
             
-            // 5 tahun ke belakang dan 1 tahun ke depan
             const years = [];
             for (let y = currentYear - 5; y <= currentYear + 1; y++) {
                 years.push(y);
             }
             reportYearSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
             
-            // Set default ke bulan dan tahun ini
             reportMonthSel.value = (now.getMonth() + 1).toString().padStart(2,'0');
             reportYearSel.value = currentYear;
         }
         
-        // Helper: Generate Laporan
         function generateReport(){
             const selectedMonth = reportMonthSel.value;
             const selectedYear = reportYearSel.value;
@@ -357,16 +358,14 @@
             const allAtt = loadAtt(); 
             const gurus = loadGuruList();
             
-            // 1. Filter data untuk bulan/tahun terpilih
             const monthlyAtt = allAtt.filter(att => att.tanggal && att.tanggal.startsWith(prefixDate));
             
-            // 2. Agregasi data per Guru
             const reportData = {};
             gurus.forEach(g => {
                 reportData[g.id] = { 
                     nama: g.nama,
                     Hadir: 0, Izin: 0, Sakit: 0, 'Dinas Luar': 0, 
-                    TotalAbsen: 0 // Izin, Sakit, Dinas Luar
+                    TotalAbsen: 0
                 };
             });
             
@@ -383,7 +382,6 @@
                 }
             });
             
-            // 3. Render Tabel
             reportTableBody.innerHTML = '';
             const guruIds = Object.keys(reportData).sort((a,b) => reportData[a].nama.localeCompare(reportData[b].nama));
             let totalHadirAll = 0, totalIzinAll = 0, totalSakitAll = 0, totalDinasAll = 0;
@@ -412,7 +410,6 @@
                  reportTableBody.innerHTML = '<tr><td colspan="6" class="text-center p-6 text-slate-500">Tidak ada data guru atau kehadiran yang cocok di bulan ini.</td></tr>';
             }
             
-            // 4. Render Summary Cards
             const selectedMonthName = reportMonthSel.options[reportMonthSel.selectedIndex].text;
             reportSummary.innerHTML = `
                 <div class="card-smooth p-5 bg-green-50">
@@ -432,13 +429,10 @@
             toast(`Laporan Bulanan berhasil dimuat.`, 'info', 1500);
         }
 
-        // Event Listener Laporan
         generateReportBtn.addEventListener('click', generateReport);
-        // Panggil saat awal load
         populateReportSelectors();
 
-
-        // --- DASHBOARD LOGIC (Simplified) ---
+        // --- DASHBOARD LOGIC ---
         function renderDashboard() {
             const today = new Date().toISOString().slice(0, 10);
             const todayAtt = loadAtt().filter(att => att.tanggal === today).reverse();
@@ -448,17 +442,14 @@
             const todayAttIds = new Set();
 
             todayAtt.forEach(att => {
-                // Hanya hitungan status yang pertama kali diinput hari ini
                 if (!todayAttIds.has(att.idGuru)) {
                     summary[att.status] = (summary[att.status] || 0) + 1;
                     todayAttIds.add(att.idGuru);
                 }
             });
             
-            // Hitung Belum Hadir
             summary.BelumHadir = summary.Total - todayAttIds.size;
             
-            // Render Summary
             $('#dashboard-summary').innerHTML = `
                 <div class="card-smooth p-3 bg-green-50"><p class="text-xs text-slate-500">Hadir</p><p class="text-2xl font-bold text-green-600">${summary.Hadir}</p></div>
                 <div class="card-smooth p-3 bg-amber-50"><p class="text-xs text-slate-500">Izin/Sakit/DL</p><p class="text-2xl font-bold text-amber-600">${summary.Izin + summary.Sakit + summary['Dinas Luar']}</p></div>
@@ -466,7 +457,6 @@
                 <div class="card-smooth p-3 bg-indigo-50"><p class="text-xs text-slate-500">Total Guru</p><p class="text-2xl font-bold text-indigo-600">${summary.Total}</p></div>
             `;
 
-            // Render List
             const listBody = $('#attendance-list-body');
             listBody.innerHTML = todayAtt.map(att => `
                 <tr class="hover:bg-gray-50">
@@ -490,7 +480,7 @@
             }
         }
 
-        // --- GURU PAGE LOGIC (Simplified) ---
+        // --- GURU PAGE LOGIC ---
         function renderGuruSelect() {
             const select = $('#guru-select');
             const gurus = loadGuruList().filter(g => g.status === 'Aktif').sort((a, b) => a.nama.localeCompare(b.nama));
@@ -528,7 +518,7 @@
             }
         }
         
-        // --- GURU MODAL LOGIC (Simplified) ---
+        // --- GURU MODAL LOGIC ---
         const guruModal = $('#guru-modal');
         const guruForm = $('#guru-form');
         const guruIdInput = $('#guru-id');
@@ -600,9 +590,9 @@
                 toast(`Gagal menghapus: ${error.message}`, 'err');
              }
         }
-        window.deleteGuru = deleteGuru; // Expose to global scope for HTML onclick
+        window.deleteGuru = deleteGuru; 
 
-        // --- ATTENDANCE SUBMISSION ---
+        // --- ATTENDANCE SUBMISSION (dengan cek 1x per hari) ---
         $('#attendance-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const selectedOption = $('#guru-select').options[$('#guru-select').selectedIndex];
@@ -616,11 +606,20 @@
             }
 
             const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
+
+            // CEK: guru sudah absen hari ini?
+            const alreadyToday = loadAtt().some(att => att.idGuru === idGuru && att.tanggal === todayStr);
+            if (alreadyToday) {
+                toast('Anda sudah absen hari ini.', 'err');
+                return;
+            }
+
             const attendanceData = {
                 idGuru,
                 namaGuru,
                 status,
-                tanggal: now.toISOString().slice(0, 10),
+                tanggal: todayStr,
                 jam: now.toLocaleTimeString("id-ID"),
                 tempat: lokasiText,
                 lat: window.currentCoords ? window.currentCoords.lat : null,
@@ -631,13 +630,13 @@
                 await saveAtt(attendanceData);
                 toast(`Kehadiran ${status} untuk ${namaGuru} berhasil disimpan!`, 'ok');
                 $('#attendance-form').reset();
-                renderDashboard(); // Update dashboard setelah submit
+                renderDashboard();
             } catch (error) {
                 toast(`Gagal menyimpan kehadiran: ${error.message}`, 'err');
             }
         });
 
-        // --- LOGIN ADMIN LOGIC (BARU) ---
+        // --- LOGIN ADMIN LOGIC ---
         const loginModal = $('#login-modal');
         const btnOpenLogin = $('#btn-open-login');
         const loginCancel = $('#login-cancel');
@@ -649,11 +648,9 @@
         function updateAdminUI(isLoggedIn) {
             whIsAdmin = isLoggedIn;
             
-            // Ubah tombol Login menjadi Logout jika sudah login
             if (isLoggedIn) {
                 btnOpenLogin.textContent = '🔓 Logout Admin';
                 btnOpenLogin.onclick = handleLogout;
-                // Tampilkan tombol dan kolom admin
                 $('#admin-actions').classList.remove('hidden');
                 $('#btn-open-add-guru').classList.remove('hidden'); 
                 $('#btn-reset-sample').classList.remove('hidden');
@@ -661,13 +658,12 @@
             } else {
                 btnOpenLogin.textContent = '🔑 Login Admin';
                 btnOpenLogin.onclick = () => loginModal.classList.remove('hidden');
-                // Sembunyikan tombol dan kolom admin
                 $('#admin-actions').classList.add('hidden');
                 $('#btn-open-add-guru').classList.add('hidden'); 
                 $('#btn-reset-sample').classList.add('hidden');
                 $('#guru-action-header').classList.add('hidden');
             }
-            renderGuruTable(); // Re-render guru table to show/hide action column
+            renderGuruTable();
         }
 
         function handleLogout() {
@@ -687,14 +683,11 @@
                 return toast('Masukkan email dan password','err');
             }
             
-            // Panggil fungsi login Firebase
             if (window.whUseFirebase && window.signInAdmin) {
                 try {
                     await window.signInAdmin(email, password); 
-                    // onAuthStateChanged akan memanggil updateAdminUI
                     loginModal.classList.add('hidden');
                     toast('Login Berhasil! Mengambil status Admin...','ok');
-                    // Reset form
                     $('#login-email').value = '';
                     $('#login-password').value = '';
                     showPage('dashboard');
@@ -706,7 +699,6 @@
                     toast(msg,'err');
                 }
             } else {
-                // Fallback demo lokal (tidak disarankan)
                 if (email === 'admin@mail.com' && password === 'admin123') {
                     loginModal.classList.add('hidden');
                     toast('Login Berhasil (Demo Lokal)!','ok');
@@ -718,6 +710,27 @@
             }
         });
 
+        // --- REVERSE GEOCODING (NAMA TEMPAT) ---
+        async function reverseGeocode(lat, lon) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&addressdetails=1`;
+                const res = await fetch(url, {
+                    headers: { "Accept-Language": "id" }
+                });
+                const data = await res.json();
+                const addr = data.address || {};
+                const namaTempat = [
+                    addr.school || addr.university || addr.public_building || "",
+                    addr.village || addr.hamlet || addr.suburb || "",
+                    addr.city_district || addr.town || addr.city || addr.county || ""
+                ].filter(Boolean).join(", ");
+                return namaTempat || data.display_name || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+            } catch (e) {
+                console.error("Reverse geocode error:", e);
+                return `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+            }
+        }
+
         // --- LOCATION LOGIC ---
         function updateLocation(lat, lon, placeName) {
             window.currentCoords = { lat, lon };
@@ -727,9 +740,10 @@
         function getLocation() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
-                    (position) => {
+                    async (position) => {
                         const { latitude, longitude } = position.coords;
-                        updateLocation(latitude, longitude, `Lat: ${latitude.toFixed(4)}, Lon: ${longitude.toFixed(4)}`);
+                        const placeName = await reverseGeocode(latitude, longitude);
+                        updateLocation(latitude, longitude, placeName);
                     },
                     (error) => {
                         console.error('Geolocation Error:', error);
@@ -745,19 +759,17 @@
         
         // --- INITIALIZATION ---
         function initApp() {
-            // Set current date display
             const today = new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             $('#current-date-display').textContent = `Tanggal: ${today}`;
             
             getLocation();
             showPage('kehadiran');
             
-            // Listeners for data updates from Firebase
             document.addEventListener('gurus-updated', (e) => {
                 whGuruList = e.detail;
                 renderGuruSelect();
                 renderGuruTable();
-                generateReport(); // Update report data
+                generateReport();
                 renderDashboard();
                 toast(`Data Guru diperbarui (${whGuruList.length})`, 'info', 1000);
             });
@@ -765,33 +777,28 @@
             document.addEventListener('attendances-updated', (e) => {
                 whAttList = e.detail;
                 renderDashboard();
-                generateReport(); // Update report data
+                generateReport();
                 toast(`Data Kehadiran diperbarui (${whAttList.length})`, 'info', 1000);
             });
             
-            // Listener for Firebase Auth changes
             document.addEventListener('auth-changed', (e) => {
                  const user = e.detail;
                  const isAdmin = user && user.admin === true;
                  updateAdminUI(isAdmin);
             });
 
-
-            // Initial data sync (if using Firebase)
             if (window.whUseFirebase && window.syncFromFirebase) {
                  window.syncFromFirebase().catch(e => {
                      console.error("Initial sync failed", e);
                      toast("Gagal sinkronisasi data dari Firebase. Cek koneksi atau izin.", "err");
                  });
             } else {
-                 // Fallback: render UI dari LocalStorage
                  renderGuruSelect();
                  renderGuruTable();
                  renderDashboard();
                  generateReport();
             }
 
-            // Bind Reset Sample Button (Admin-Only)
             $('#btn-reset-sample').addEventListener('click', () => {
                  if (whIsAdmin && confirm('PERINGATAN: Aksi ini akan menghapus SEMUA data Guru dan Kehadiran di Firebase Realtime Database. Lanjutkan?')) {
                      if (window.__WH_FIREBASE && window.__WH_FIREBASE.db) {
