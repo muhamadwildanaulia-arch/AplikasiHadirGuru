@@ -40,12 +40,21 @@
         </nav>
         
         <div class="mt-8 pt-4 border-t border-indigo-500 px-1">
-            <button id="btn-open-login" class="w-full text-left px-3 py-2 rounded-md bg-red-700 text-white hover:bg-red-800 font-medium">🔑 Login Admin</button>
-            <div id="admin-actions" class="mt-4 space-y-2">
-                <button id="btn-open-add-guru" class="w-full text-left px-3 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 font-medium hidden">➕ Tambah Guru</button>
-                <button id="btn-reset-sample" class="w-full text-left px-3 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700 font-medium hidden">🔄 Reset Data</button>
+            <button id="btn-open-login" class="w-full text-left px-3 py-2 rounded-md bg-red-700 text-white hover:bg-red-800 font-medium">
+                🔑 Login Admin
+            </button>
+            <div id="admin-actions" class="mt-4 space-y-2 hidden">
+                <button id="btn-open-guru-admin" class="w-full text-left px-3 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-400 font-medium hidden">
+                    🧑‍🏫 Kelola Data Guru
+                </button>
+                <button id="btn-open-add-guru" class="w-full text-left px-3 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 font-medium hidden">
+                    ➕ Tambah Guru
+                </button>
+                <button id="btn-reset-sample" class="w-full text-left px-3 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700 font-medium hidden">
+                    🔄 Reset Data
+                </button>
             </div>
-        </div>
+    </div>
     </aside>
 
     <!-- WRAPPER KONTEN -->
@@ -610,17 +619,28 @@
         }
         
         // GURU MODAL
-        const guruModal = $('#guru-modal');
-        const guruForm = $('#guru-form');
-        const guruIdInput = $('#guru-id');
-        const guruNamaInput = $('#guru-nama');
-        const guruNipInput = $('#guru-nip');
-        const guruJabatanInput = $('#guru-jabatan');
-        const guruModalTitle = $('#guru-modal-title');
-        const btnOpenAddGuru = $('#btn-open-add-guru');
+       const guruModal = $('#guru-modal');
+       const guruForm = $('#guru-form');
+       const guruIdInput = $('#guru-id');
+       const guruNamaInput = $('#guru-nama');
+       const guruNipInput = $('#guru-nip');
+       const guruJabatanInput = $('#guru-jabatan');
+       const guruModalTitle = $('#guru-modal-title');
+       const btnOpenAddGuru = $('#btn-open-add-guru');
+       const btnOpenGuruAdmin = $('#btn-open-guru-admin');
 
-        btnOpenAddGuru.addEventListener('click', () => openGuruModal(''));
-        $('#guru-cancel').addEventListener('click', () => guruModal.classList.add('hidden'));
+       if (btnOpenAddGuru) {
+       btnOpenAddGuru.addEventListener('click', () => openGuruModal(''));
+       }
+
+       if (btnOpenGuruAdmin) {
+       btnOpenGuruAdmin.addEventListener('click', () => {
+           // Buka halaman Data Guru ketika admin klik menu ini
+           showPage('guru');
+       });
+      }
+
+      $('#guru-cancel').addEventListener('click', () => guruModal.classList.add('hidden'));
 
         function openGuruModal(id) {
             if (!whIsAdmin) { toast('Anda tidak memiliki izin Admin.', 'err'); return; }
@@ -843,15 +863,19 @@
             if (isLoggedIn) {
                 btnOpenLogin.textContent = '🔓 Logout Admin';
                 btnOpenLogin.onclick = handleLogout;
+                
                 $('#admin-actions').classList.remove('hidden');
+                $('#btn-open-guru-admin').classList.remove('hidden');
                 $('#btn-open-add-guru').classList.remove('hidden'); 
                 $('#btn-reset-sample').classList.remove('hidden');
                 $('#guru-action-header').classList.remove('hidden');
             } else {
                 btnOpenLogin.textContent = '🔑 Login Admin';
                 btnOpenLogin.onclick = () => loginModal.classList.remove('hidden');
+                
                 $('#admin-actions').classList.add('hidden');
                 $('#btn-open-add-guru').classList.add('hidden'); 
+                $('#btn-open-add-guru').classList.add('hidden');
                 $('#btn-reset-sample').classList.add('hidden');
                 $('#guru-action-header').classList.add('hidden');
             }
