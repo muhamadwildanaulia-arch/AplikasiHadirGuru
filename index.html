@@ -901,7 +901,11 @@
             
             if (window.whUseFirebase && window.signInAdmin) {
                 try {
-                    await window.signInAdmin(email, password); 
+                    await window.signInAdmin(email, password);
+
+                    // --- langsung aktifkan mode admin di UI ---
+                    updateAdminUI(true);
+                    
                     loginModal.classList.add('hidden');
                     toast('Login Berhasil! Mengambil status Admin...','ok');
                     $('#login-email').value = '';
