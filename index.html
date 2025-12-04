@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Hadir Guru – SDN Muhara</title>
+    <title>Sistem Kehadiran Guru – SDN Muhara</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .card-smooth {
@@ -19,6 +19,30 @@
         .z-60 { z-index: 60; }
         .z-70 { z-index: 70; }
         .z-80 { z-index: 80; }
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .photo-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-left: 5px;
+        }
+        .photo-yes { background-color: #10b981; }
+        .photo-no { background-color: #ef4444; }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -28,14 +52,17 @@
 
     <!-- SIDEBAR DESKTOP -->
     <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-indigo-700 text-white p-4 hidden md:block">
-        <h1 class="text-2xl font-bold mb-2">Website Hadir Guru</h1>
-        <p class="text-sm text-indigo-100 mb-6">SDN Muhara</p>
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold mb-2">Sistem Kehadiran</h1>
+            <p class="text-sm text-indigo-100">SDN Muhara</p>
+            <p class="text-xs text-indigo-200 mt-1">📱 Bisa dipakai di HP</p>
+        </div>
         <nav>
             <ul class="space-y-2">
-                <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">🏠 Input Kehadiran</button></li>
-                <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md text-white hover:bg-indigo-500">📊 Dashboard Hari Ini</button></li>
+                <li><button data-page="kehadiran" class="nav-item w-full text-left px-3 py-2 rounded-md bg-indigo-600 hover:bg-indigo-500 font-medium">🏠 Absen Hari Ini</button></li>
+                <li><button data-page="dashboard" class="nav-item w-full text-left px-3 py-2 rounded-md text-white hover:bg-indigo-500">📊 Dashboard</button></li>
                 <li><button data-page="guru" class="nav-item w-full text-left px-3 py-2 rounded-md text-white hover:bg-indigo-500">🧑‍🏫 Data Guru</button></li>
-                <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md text-white hover:bg-indigo-500">📜 Laporan Bulanan</button></li>
+                <li><button data-page="laporan" class="nav-item w-full text-left px-3 py-2 rounded-md text-white hover:bg-indigo-500">📜 Laporan</button></li>
             </ul>
         </nav>
         
@@ -44,17 +71,26 @@
                 🔑 Login Admin
             </button>
             <div id="admin-actions" class="mt-4 space-y-2 hidden">
-                <button id="btn-open-guru-admin" class="w-full text-left px-3 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-400 font-medium hidden">
+                <button id="btn-open-guru-admin" class="w-full text-left px-3 py-2 rounded-md bg-indigo-500 text-white hover:bg-indigo-400 font-medium">
                     🧑‍🏫 Kelola Data Guru
                 </button>
-                <button id="btn-open-add-guru" class="w-full text-left px-3 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 font-medium hidden">
+                <button id="btn-open-add-guru" class="w-full text-left px-3 py-2 rounded-md bg-green-600 text-white hover:bg-green-700 font-medium">
                     ➕ Tambah Guru
                 </button>
-                <button id="btn-reset-sample" class="w-full text-left px-3 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700 font-medium hidden">
+                <button id="btn-cleanup-base64" class="w-full text-left px-3 py-2 rounded-md bg-orange-600 text-white hover:bg-orange-700 font-medium hidden">
+                    🧹 Bersihkan Foto Lama
+                </button>
+                <button id="btn-reset-sample" class="w-full text-left px-3 py-2 rounded-md bg-amber-600 text-white hover:bg-amber-700 font-medium">
                     🔄 Reset Data
                 </button>
+                <div class="p-2 bg-indigo-900 rounded text-xs mt-2">
+                    <p class="font-semibold">ℹ️ Info Sistem:</p>
+                    <p>• Foto disimpan di database</p>
+                    <p>• Bisa dilihat semua device</p>
+                    <p id="storage-info">• Loading...</p>
+                </div>
             </div>
-    </div>
+        </div>
     </aside>
 
     <!-- WRAPPER KONTEN -->
@@ -63,7 +99,7 @@
         <!-- NAV MOBILE -->
         <header class="md:hidden bg-white card-smooth p-3 mb-4 flex justify-between items-center">
             <div>
-                <h1 class="text-lg font-bold text-indigo-700">Website Hadir Guru</h1>
+                <h1 class="text-lg font-bold text-indigo-700">Sistem Kehadiran</h1>
                 <p class="text-xs text-gray-500">SDN Muhara</p>
             </div>
             <nav class="flex space-x-2">
@@ -77,324 +113,1137 @@
         <main>
             <!-- PAGE KEHADIRAN -->
             <section id="page-kehadiran" class="card-smooth p-4">
-                <h2 class="text-xl font-semibold mb-4 text-indigo-700">Input Kehadiran Guru Hari Ini</h2>
+                <h2 class="text-xl font-semibold mb-4 text-indigo-700">Absen Hari Ini</h2>
+                
                 <div class="bg-indigo-50 p-4 rounded-lg mb-4">
                     <p class="text-sm font-medium text-indigo-700" id="current-date-display"></p>
-                    <p class="text-sm text-indigo-700" id="current-location-display">Lokasi: Mencari...</p>
+                    <p class="text-sm text-indigo-700" id="current-location-display">📍 Lokasi: Mencari...</p>
+                    <p class="text-xs text-indigo-600 mt-1">📸 Foto akan disimpan di database pusat</p>
                 </div>
 
                 <form id="attendance-form" class="space-y-4">
                     <div>
                         <label for="guru-select" class="block text-sm font-medium text-gray-700">Nama Guru:</label>
-                        <select id="guru-select" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white"></select>
+                        <select id="guru-select" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- Pilih Nama Anda --</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Pilih nama Anda dari daftar</p>
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700">Status Kehadiran:</label>
-                        <div class="mt-2 space-y-2">
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="status" value="Hadir" checked class="form-radio text-green-600 h-4 w-4">
-                                <span class="ml-2">Hadir (Masuk Kerja)</span>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status Kehadiran:</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="status" value="Hadir" checked class="form-radio text-green-600 h-5 w-5">
+                                <span class="ml-3">
+                                    <span class="block font-medium">Hadir</span>
+                                    <span class="block text-xs text-gray-500">Masuk kerja</span>
+                                </span>
                             </label>
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="status" value="Izin" class="form-radio text-amber-600 h-4 w-4">
-                                <span class="ml-2">Izin</span>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="status" value="Izin" class="form-radio text-amber-600 h-5 w-5">
+                                <span class="ml-3">
+                                    <span class="block font-medium">Izin</span>
+                                    <span class="block text-xs text-gray-500">Dengan alasan</span>
+                                </span>
                             </label>
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="status" value="Sakit" class="form-radio text-red-600 h-4 w-4">
-                                <span class="ml-2">Sakit</span>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="status" value="Sakit" class="form-radio text-red-600 h-5 w-5">
+                                <span class="ml-3">
+                                    <span class="block font-medium">Sakit</span>
+                                    <span class="block text-xs text-gray-500">Tidak masuk</span>
+                                </span>
                             </label>
-                            <label class="inline-flex items-center">
-                                <input type="radio" name="status" value="Dinas Luar" class="form-radio text-blue-600 h-4 w-4">
-                                <span class="ml-2">Dinas Luar</span>
+                            <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="status" value="Dinas Luar" class="form-radio text-blue-600 h-5 w-5">
+                                <span class="ml-3">
+                                    <span class="block font-medium">Dinas Luar</span>
+                                    <span class="block text-xs text-gray-500">Tugas luar</span>
+                                </span>
                             </label>
                         </div>
                     </div>
 
                     <!-- FOTO WAJIB -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Foto Kehadiran (wajib):</label>
-                        <input 
-                            id="attendance-photo" 
-                            type="file" 
-                            accept="image/*" 
-                            capture="environment"
-                            class="mt-1 block w-full text-sm text-gray-700"
-                            required
-                        />
-                        <p class="text-xs text-gray-500 mt-1">
-                            Ambil foto guru saat hadir. Ukuran akan dikompres otomatis.
+                    <div class="border-t pt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            📸 Foto Kehadiran (wajib)
+                            <span class="photo-indicator photo-no ml-2"></span>
+                        </label>
+                        
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-1">
+                                <input 
+                                    id="attendance-photo" 
+                                    type="file" 
+                                    accept="image/*" 
+                                    capture="user"
+                                    class="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                                    required
+                                />
+                            </div>
+                            <button type="button" id="btn-take-photo" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                                📷 Ambil Foto
+                            </button>
+                        </div>
+                        
+                        <p class="text-xs text-gray-500 mt-2">
+                            <span class="font-semibold text-green-600">✓ Foto disimpan di database pusat</span><br>
+                            <span class="text-amber-600">• Wajah harus jelas terlihat</span><br>
+                            <span class="text-blue-600">• Bisa dilihat admin & semua guru</span>
                         </p>
-                        <img id="photo-preview" class="mt-2 max-h-40 rounded-lg hidden" alt="Preview foto kehadiran" />
+                        
+                        <div class="mt-3">
+                            <img id="photo-preview" class="max-h-48 rounded-lg border hidden mx-auto" alt="Preview foto" />
+                            <div id="photo-info" class="text-xs text-center mt-2 hidden">
+                                <span id="photo-size" class="inline-block px-2 py-1 bg-gray-100 rounded"></span>
+                                <span id="photo-status" class="inline-block px-2 py-1 ml-2 rounded"></span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <button type="submit" id="submit-button" class="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 font-semibold transition duration-150">Kirim Kehadiran</button>
+                    <div class="pt-4 border-t">
+                        <button type="submit" id="submit-button" class="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 font-semibold transition duration-150 flex items-center justify-center text-lg shadow-md">
+                            <span id="submit-text">✅ KIRIM ABSEN</span>
+                        </button>
+                        <p class="text-xs text-center text-gray-500 mt-2">
+                            Pastikan internet stabil sebelum kirim
+                        </p>
+                    </div>
                 </form>
+                
+                <!-- INFO ABSEN HARI INI -->
+                <div id="today-attendance-info" class="mt-6 p-4 bg-gray-50 rounded-lg hidden">
+                    <h3 class="font-medium text-gray-700 mb-2">📋 Absen Anda Hari Ini:</h3>
+                    <div id="my-attendance-today"></div>
+                </div>
             </section>
 
             <!-- PAGE DASHBOARD -->
-            <section id="page-dashboard" class="hidden mt-6 card-smooth p-4">
-                <h2 class="text-xl font-semibold mb-4">📊 Dashboard Kehadiran Hari Ini</h2>
-                
-                <div id="dashboard-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+            <section id="page-dashboard" class="hidden mt-6">
+                <div class="card-smooth p-4 mb-4">
+                    <h2 class="text-xl font-semibold mb-4">📊 Dashboard Kehadiran</h2>
+                    <div id="dashboard-summary" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+                </div>
 
-                <h3 class="text-lg font-semibold mb-3">Daftar Kehadiran</h3>
-                <div class="overflow-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm" aria-label="Tabel Kehadiran Hari Ini">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama Guru</th>
-                                <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Jam</th>
-                                <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
-                                <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Foto</th>
-                            </tr>
-                        </thead>
-                        <tbody id="attendance-list-body" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="5" class="text-center p-4 text-gray-500">Memuat data kehadiran...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="card-smooth p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">Daftar Kehadiran Hari Ini</h3>
+                        <button onclick="renderDashboard()" class="px-3 py-1 text-sm bg-gray-100 rounded-lg hover:bg-gray-200">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Guru</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Jam</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Foto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="attendance-list-body" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="5" class="text-center p-6 text-gray-500">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 text-xs text-gray-500 flex justify-between">
+                        <div id="attendance-count">0 absen hari ini</div>
+                        <div id="photo-count">0 foto tersimpan</div>
+                    </div>
                 </div>
             </section>
 
             <!-- PAGE GURU -->
-            <section id="page-guru" class="hidden mt-6 card-smooth p-4">
-                <h2 class="text-xl font-semibold mb-4">🧑‍🏫 Data Guru</h2>
-                <div id="guru-table-container" class="overflow-auto">
-                    <table class="min-w-full divide-y divide-gray-200 text-sm" aria-label="Tabel Data Guru">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">NIP</th>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jabatan</th>
-                                <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th id="guru-action-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider hidden">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="guru-table-body" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="5" class="text-center p-4 text-gray-500">Memuat data guru...</td></tr>
-                        </tbody>
-                    </table>
+            <section id="page-guru" class="hidden mt-6">
+                <div class="card-smooth p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold">🧑‍🏫 Data Guru</h2>
+                        <button id="btn-add-guru-page" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium hidden">
+                            ➕ Tambah Guru
+                        </button>
+                    </div>
+                    
+                    <div id="guru-table-container" class="overflow-auto">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">NIP</th>
+                                    <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jabatan</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th id="guru-action-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guru-table-body" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="5" class="text-center p-6 text-gray-500">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 text-xs text-gray-500">
+                        Total: <span id="guru-count">0</span> guru aktif
+                    </div>
                 </div>
             </section>
 
             <!-- PAGE LAPORAN -->
-            <section id="page-laporan" class="hidden mt-6 card-smooth p-4">
-              <h2 class="text-xl font-semibold mb-4">📜 Laporan Bulanan</h2>
-              <div class="flex flex-wrap items-center gap-3 mb-4">
-                <label for="reportMonth" class="text-sm font-medium">Bulan:</label>
-                <select id="reportMonth" class="border rounded p-2 text-sm"></select>
-                <label for="reportYear" class="text-sm font-medium">Tahun:</label>
-                <select id="reportYear" class="border rounded p-2 text-sm"></select>
-                <button id="generateReportBtn" class="px-3 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700">Tampilkan Laporan</button>
-                <button id="btnExportPdf" class="px-3 py-2 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">Cetak PDF</button>
-                <button id="btnExportExcel" class="px-3 py-2 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">Export Excel</button>
-              </div>
-              
-              <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
+            <section id="page-laporan" class="hidden mt-6">
+                <div class="card-smooth p-4">
+                    <h2 class="text-xl font-semibold mb-4">📜 Laporan Bulanan</h2>
+                    
+                    <div class="flex flex-wrap items-center gap-3 mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center gap-2">
+                            <label for="reportMonth" class="text-sm font-medium">Bulan:</label>
+                            <select id="reportMonth" class="border rounded p-2 text-sm bg-white"></select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label for="reportYear" class="text-sm font-medium">Tahun:</label>
+                            <select id="reportYear" class="border rounded p-2 text-sm bg-white"></select>
+                        </div>
+                        <button id="generateReportBtn" class="px-4 py-2 rounded bg-sky-600 text-white text-sm hover:bg-sky-700 font-medium">
+                            🔍 Tampilkan
+                        </button>
+                        <div class="flex gap-2 ml-auto">
+                            <button id="btnExportPdf" class="px-3 py-2 rounded bg-rose-600 text-white text-sm hover:bg-rose-700">
+                                📄 PDF
+                            </button>
+                            <button id="btnExportExcel" class="px-3 py-2 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">
+                                📊 Excel
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="report-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"></div>
 
-              <h3 class="text-lg font-semibold mb-3">Rekapitulasi Kehadiran (Per Tanggal)</h3>
-              <div class="overflow-auto">
-                <table class="min-w-full text-xs md:text-sm border border-gray-200" aria-label="Tabel Laporan Bulanan Guru">
-                  <thead class="bg-indigo-50 text-indigo-700 font-semibold sticky top-0">
-                    <tr id="report-header-row-1">
-                      <th class="p-2 text-left border" rowspan="2">Nama Guru</th>
-                      <th class="p-2 text-center border" colspan="31">Tanggal</th>
-                      <th class="p-2 text-center border" rowspan="2">Total H</th>
-                      <th class="p-2 text-center border" rowspan="2">Total A</th>
-                    </tr>
-                    <tr id="report-header-row-2">
-                      <!-- TH tanggal 1..31 diisi via JS -->
-                    </tr>
-                  </thead>
-                  <tbody id="reportTableBody">
-                    <tr><td colspan="34" class="text-center p-6 text-slate-500">Silakan pilih bulan dan tahun, lalu klik Tampilkan Laporan.</td></tr>
-                  </tbody>
-                </table>
-              </div>
+                    <h3 class="text-lg font-semibold mb-3">Rekapitulasi Per Tanggal</h3>
+                    <div class="overflow-auto border rounded-lg">
+                        <table class="min-w-full text-xs md:text-sm">
+                            <thead class="bg-indigo-50 text-indigo-700 font-semibold sticky top-0">
+                                <tr id="report-header-row-1">
+                                    <th class="p-2 text-left border" rowspan="2">Nama Guru</th>
+                                    <th class="p-2 text-center border" colspan="31">Tanggal</th>
+                                    <th class="p-2 text-center border" rowspan="2">H</th>
+                                    <th class="p-2 text-center border" rowspan="2">A</th>
+                                </tr>
+                                <tr id="report-header-row-2"></tr>
+                            </thead>
+                            <tbody id="reportTableBody">
+                                <tr><td colspan="34" class="text-center p-8 text-gray-400">Pilih bulan dan tahun</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 text-xs text-gray-500">
+                        Keterangan: H = Hadir, I = Izin, S = Sakit, DL = Dinas Luar
+                    </div>
+                </div>
             </section>
 
         </main>
+        
+        <!-- FOOTER -->
+        <footer class="mt-8 text-center text-xs text-gray-500">
+            <p>Sistem Kehadiran Guru SDN Muhara &copy; 2024</p>
+            <p class="mt-1">📱 Compatible with mobile devices</p>
+        </footer>
     </div>
 
     <!-- MODAL LOGIN -->
-    <div id="login-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/40">
-        <div class="bg-white rounded-xl shadow-lg p-6 w-96 max-w-sm">
-            <h3 class="text-xl font-semibold mb-4 text-indigo-700">🔑 Login Admin</h3>
+    <div id="login-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-indigo-700">🔑 Login Admin</h3>
+                <button id="login-cancel" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
             <div class="space-y-4">
-                <input id="login-email" type="email" placeholder="Email Admin" class="w-full border rounded p-3 focus:ring-indigo-500 focus:border-indigo-500" />
-                <input id="login-password" type="password" placeholder="Password" class="w-full border rounded p-3 focus:ring-indigo-500 focus:border-indigo-500" />
-                <div class="flex justify-end gap-3 pt-2">
-                    <button id="login-cancel" type="button" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Batal</button>
-                    <button id="login-submit" type="button" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium">Login</button>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Admin</label>
+                    <input id="login-email" type="email" placeholder="admin@sekolah.sch.id" 
+                           class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input id="login-password" type="password" placeholder="••••••••" 
+                           class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button id="login-cancel-btn" type="button" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700">
+                        Batal
+                    </button>
+                    <button id="login-submit" type="button" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium">
+                        Login
+                    </button>
+                </div>
+                <div class="text-xs text-gray-500 pt-4 border-t">
+                    <p>Demo Login:</p>
+                    <p>Email: <span class="font-mono">admin@sdnmuhara.sch.id</span></p>
+                    <p>Password: <span class="font-mono">admin123</span></p>
                 </div>
             </div>
         </div>
     </div>
     
     <!-- MODAL GURU -->
-    <div id="guru-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/40">
-        <div class="bg-white rounded-xl shadow-lg p-6 w-96 max-w-sm">
-            <h3 class="text-xl font-semibold mb-4 text-indigo-700" id="guru-modal-title">Tambah Guru</h3>
+    <div id="guru-modal" class="fixed inset-0 z-60 hidden items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-indigo-700" id="guru-modal-title">Tambah Guru</h3>
+                <button id="guru-cancel" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
             <form id="guru-form" class="space-y-4">
                 <input type="hidden" id="guru-id" />
                 <div>
-                    <label for="guru-nip" class="block text-sm font-medium text-gray-700">NIP:</label>
-                    <input type="text" id="guru-nip" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                    <label for="guru-nip" class="block text-sm font-medium text-gray-700 mb-1">NIP (opsional)</label>
+                    <input type="text" id="guru-nip" placeholder="Nomor Induk Pegawai" 
+                           class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
                 </div>
                 <div>
-                    <label for="guru-nama" class="block text-sm font-medium text-gray-700">Nama Lengkap:</label>
-                    <input type="text" id="guru-nama" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                    <label for="guru-nama" class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
+                    <input type="text" id="guru-nama" placeholder="Nama lengkap guru" required
+                           class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
                 </div>
                 <div>
-                    <label for="guru-jabatan" class="block text-sm font-medium text-gray-700">Jabatan:</label>
-                    <input type="text" id="guru-jabatan" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+                    <label for="guru-jabatan" class="block text-sm font-medium text-gray-700 mb-1">Jabatan (opsional)</label>
+                    <input type="text" id="guru-jabatan" placeholder="Guru Kelas / Mata Pelajaran" 
+                           class="mt-1 block w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
                 </div>
-                <div class="flex justify-end gap-3 pt-2">
-                    <button type="button" id="guru-cancel" class="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700">Batal</button>
-                    <button type="submit" id="guru-submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium">Simpan</button>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" id="guru-cancel-btn" class="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700">
+                        Batal
+                    </button>
+                    <button type="submit" id="guru-submit" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 font-medium">
+                        Simpan
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Firebase SDK v8 -->
+    <!-- MODAL FOTO BESAR -->
+    <div id="photo-modal" class="fixed inset-0 z-70 hidden items-center justify-center bg-black/80 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div class="flex justify-between items-center p-4 border-b bg-gray-50">
+                <h3 class="text-lg font-semibold text-gray-800" id="photo-modal-title">Foto Kehadiran</h3>
+                <button onclick="closePhotoModal()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            <div class="p-4 overflow-auto">
+                <img id="modal-photo-img" class="max-w-full max-h-[70vh] rounded-lg mx-auto" alt="Foto kehadiran" />
+            </div>
+            <div class="p-4 border-t bg-gray-50 flex justify-between items-center">
+                <div id="photo-modal-info" class="text-sm text-gray-600"></div>
+                <button onclick="closePhotoModal()" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <!-- Tambahkan Storage SDK untuk upload foto -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
-
-    <!-- Library PDF & Excel -->
+    
+    <!-- Library Export -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Script Firebase milik Anda -->
+    <!-- Firebase Config -->
     <script src="app.firebase.js"></script>
 
     <script>
-        // Utility
+        // ========== GLOBAL VARIABLES ==========
         const $ = (selector) => document.querySelector(selector);
         const $$ = (selector) => document.querySelectorAll(selector);
 
         let whGuruList = [];
         let whAttList = [];
         let whIsAdmin = false;
+        let currentUserGuruId = null;
 
-        // TOAST
+        // ========== TOAST SYSTEM ==========
         function toast(message, type = 'info', duration = 3000) {
             const container = $('#toast-container');
-            const colorMap = {
+            const colors = {
                 'info': 'bg-blue-500',
-                'ok': 'bg-green-500',
-                'err': 'bg-red-500'
+                'success': 'bg-green-500',
+                'error': 'bg-red-500',
+                'warning': 'bg-amber-500'
             };
-            const bgColor = colorMap[type] || colorMap['info'];
+            
+            const toastEl = document.createElement('div');
+            toastEl.className = `${colors[type] || colors.info} text-white p-3 rounded-lg shadow-lg max-w-xs transform transition-all duration-300 translate-x-0 opacity-100`;
+            toastEl.innerHTML = `
+                <div class="flex items-start">
+                    <span class="mr-2">${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}</span>
+                    <span class="flex-1">${message}</span>
+                </div>
+            `;
 
-            const div = document.createElement('div');
-            div.className = `p-3 rounded-lg text-white ${bgColor} shadow-xl max-w-xs transition-all duration-300 ease-out transform translate-x-0 opacity-100 z-70`;
-            div.textContent = message;
-
-            container.appendChild(div);
+            container.appendChild(toastEl);
 
             setTimeout(() => {
-                div.classList.replace('opacity-100', 'opacity-0');
-                div.classList.replace('translate-x-0', 'translate-x-full');
-                div.addEventListener('transitionend', () => div.remove());
+                toastEl.classList.add('opacity-0', 'translate-x-full');
+                setTimeout(() => toastEl.remove(), 300);
             }, duration);
         }
 
-        // LOCAL DATA FALLBACK
+        // ========== DATA MANAGEMENT ==========
         function loadGuruList() {
             if (window.whUseFirebase) return whGuruList;
             try {
-                const data = localStorage.getItem('wh_guru_list_v1');
-                return data ? JSON.parse(data) : [];
+                return JSON.parse(localStorage.getItem('wh_guru_list_v1') || '[]');
             } catch { return []; }
         }
 
         function loadAtt() {
             if (window.whUseFirebase) return whAttList;
             try {
-                const data = localStorage.getItem('wh_att_list_v1');
-                return data ? JSON.parse(data) : [];
+                return JSON.parse(localStorage.getItem('wh_att_list_v1') || '[]');
             } catch { return []; }
         }
 
-        function saveAtt(data) {
-            if (window.whUseFirebase && window.addAttendanceFirebase) {
-                return window.addAttendanceFirebase(data);
-            }
-            const currentAtt = loadAtt();
-            currentAtt.push(data);
-            localStorage.setItem('wh_att_list_v1', JSON.stringify(currentAtt));
-            return data;
+        // ========== PHOTO HANDLING (BASE64) ==========
+        async function compressImageForBase64(file, maxWidth = 400, quality = 0.5) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // Resize untuk ukuran kecil
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Kompres agresif untuk ukuran kecil
+                        canvas.toBlob(
+                            (blob) => {
+                                if (!blob) reject(new Error("Gagal kompres gambar"));
+                                
+                                // Target maksimal 30KB
+                                if (blob.size > 30 * 1024) {
+                                    const newQuality = Math.max(0.2, quality * 0.6);
+                                    canvas.toBlob(
+                                        (smallerBlob) => resolve(smallerBlob || blob),
+                                        'image/jpeg',
+                                        newQuality
+                                    );
+                                } else {
+                                    resolve(blob);
+                                }
+                            },
+                            'image/jpeg',
+                            quality
+                        );
+                    };
+                    img.onerror = () => reject(new Error("Gagal memuat gambar"));
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => reject(new Error("Gagal membaca file"));
+                reader.readAsDataURL(file);
+            });
         }
 
-        // NAVIGASI
-        function showPage(name) {
-            const pages = {
-                'kehadiran': $('#page-kehadiran'),
-                'dashboard': $('#page-dashboard'),
-                'guru': $('#page-guru'),
-                'laporan': $('#page-laporan')
+        async function processPhotoForDatabase(file, guruId, tanggal) {
+            try {
+                // Validasi file
+                if (!file || !file.type.startsWith('image/')) {
+                    throw new Error('File harus berupa gambar');
+                }
+                
+                if (file.size > 5 * 1024 * 1024) {
+                    throw new Error('Ukuran file maksimal 5MB');
+                }
+
+                // Kompres gambar
+                const compressedBlob = await compressImageForBase64(file, 400, 0.4);
+                
+                // Konversi ke Base64
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const base64String = e.target.result;
+                        const base64Data = base64String.split(',')[1];
+                        
+                        // Potong maksimal 25KB untuk hemat database
+                        const truncatedBase64 = base64Data.substring(0, 25000);
+                        
+                        resolve({
+                            base64: truncatedBase64,
+                            fullBase64: base64String,
+                            size: compressedBlob.size,
+                            originalSize: file.size,
+                            compressed: true,
+                            timestamp: Date.now()
+                        });
+                    };
+                    reader.onerror = () => reject(new Error('Gagal konversi ke Base64'));
+                    reader.readAsDataURL(compressedBlob);
+                });
+                
+            } catch (error) {
+                throw new Error(`Gagal proses foto: ${error.message}`);
+            }
+        }
+
+        // ========== ATTENDANCE WITH BASE64 ==========
+        async function saveAttendanceWithBase64(attendanceData, file) {
+            if (!window.whUseFirebase || !firebase.database) {
+                throw new Error('Firebase tidak tersedia');
+            }
+
+            const db = firebase.database();
+            const today = attendanceData.tanggal;
+            const indexKey = `${attendanceData.idGuru}_${today}`;
+            const indexRef = db.ref('attendance_index').child(indexKey);
+
+            // Cek sudah absen hari ini
+            const snap = await indexRef.once('value');
+            if (snap.exists()) {
+                throw new Error('Anda sudah absen hari ini');
+            }
+
+            // Proses foto jika ada
+            if (file) {
+                try {
+                    const photoData = await processPhotoForDatabase(file, attendanceData.idGuru, today);
+                    
+                    // Simpan data foto
+                    attendanceData.photoBase64 = photoData.base64;
+                    attendanceData.photoSize = photoData.size;
+                    attendanceData.photoOriginalSize = photoData.originalSize;
+                    attendanceData.photoCompressed = photoData.compressed;
+                    attendanceData.hasPhoto = true;
+                    attendanceData.photoTimestamp = photoData.timestamp;
+                    
+                } catch (photoError) {
+                    console.warn('Foto gagal diproses:', photoError);
+                    attendanceData.photoError = photoError.message;
+                    // Lanjutkan tanpa foto
+                }
+            }
+
+            // Simpan ke database
+            const ref = db.ref('attendances').push();
+            const payload = {
+                ...attendanceData,
+                id: ref.key,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                deviceInfo: {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    isMobile: /Mobi|Android/i.test(navigator.userAgent)
+                },
+                syncVersion: '3.0-base64'
             };
 
-            Object.keys(pages).forEach(key => {
-                if (pages[key]) {
-                    pages[key].classList.toggle('hidden', key !== name);
-                }
-            });
-
-            $$('.nav-item').forEach(btn => {
-                const isActive = btn.getAttribute('data-page') === name;
-                btn.classList.toggle('bg-indigo-600', isActive);
-                btn.classList.toggle('bg-white/10', isActive && btn.closest('aside'));
-                btn.classList.toggle('text-white', isActive && btn.closest('aside'));
-                btn.classList.toggle('text-indigo-700', isActive && btn.closest('header'));
-                btn.classList.toggle('bg-indigo-100', isActive && btn.closest('header'));
-            });
+            await ref.set(payload);
+            await indexRef.set(true);
             
-            if (name === 'dashboard') renderDashboard();
-            if (name === 'guru') renderGuruTable();
-            if (name === 'laporan') generateReport();
+            return payload;
         }
 
-        $$('.nav-item').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                showPage(e.currentTarget.getAttribute('data-page'));
-            });
+        // ========== PHOTO PREVIEW HANDLING ==========
+        const photoInputEl = $('#attendance-photo');
+        const photoPreview = $('#photo-preview');
+        const photoInfo = $('#photo-info');
+        const photoSize = $('#photo-size');
+        const photoStatus = $('#photo-status');
+        const photoIndicator = $('.photo-indicator');
+
+        photoInputEl.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                resetPhotoPreview();
+                return;
+            }
+
+            // Validasi
+            if (!file.type.startsWith('image/')) {
+                toast('File harus berupa gambar (JPG/PNG)', 'error');
+                resetPhotoPreview();
+                return;
+            }
+
+            if (file.size > 5 * 1024 * 1024) {
+                toast('Ukuran file maksimal 5MB', 'error');
+                resetPhotoPreview();
+                return;
+            }
+
+            // Preview
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                photoPreview.src = ev.target.result;
+                photoPreview.classList.remove('hidden');
+                
+                // Update UI
+                const sizeMB = (file.size / 1024 / 1024).toFixed(2);
+                photoSize.textContent = `${sizeMB} MB`;
+                photoStatus.textContent = 'Akan dikompres';
+                photoStatus.className = 'inline-block px-2 py-1 ml-2 rounded bg-amber-100 text-amber-800';
+                photoInfo.classList.remove('hidden');
+                photoIndicator.classList.replace('photo-no', 'photo-yes');
+                
+                // Update tombol submit
+                updateSubmitButtonState();
+            };
+            reader.readAsDataURL(file);
         });
 
-        // LAPORAN BULANAN (MATRIX)
+        $('#btn-take-photo').addEventListener('click', () => {
+            photoInputEl.click();
+        });
+
+        function resetPhotoPreview() {
+            photoPreview.classList.add('hidden');
+            photoInfo.classList.add('hidden');
+            photoIndicator.classList.replace('photo-yes', 'photo-no');
+            updateSubmitButtonState();
+        }
+
+        function updateSubmitButtonState() {
+            const submitBtn = $('#submit-button');
+            const guruSelected = $('#guru-select').value;
+            const hasPhoto = photoInputEl.files.length > 0;
+            const isValid = guruSelected && hasPhoto;
+            
+            submitBtn.disabled = !isValid;
+            submitBtn.classList.toggle('opacity-50', !isValid);
+            submitBtn.classList.toggle('cursor-not-allowed', !isValid);
+        }
+
+        // ========== ATTENDANCE FORM SUBMISSION ==========
+        $('#attendance-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const selectedOption = $('#guru-select').options[$('#guru-select').selectedIndex];
+            const idGuru = selectedOption.value;
+            const namaGuru = selectedOption.getAttribute('data-nama');
+            const status = $('input[name="status"]:checked').value;
+            const lokasiText = $('#current-location-display').textContent.replace('📍 Lokasi: ', '');
+            const file = photoInputEl.files[0];
+            
+            if (!idGuru) {
+                toast('Pilih nama guru terlebih dahulu', 'error');
+                return;
+            }
+            
+            if (!file) {
+                toast('Foto kehadiran wajib diambil', 'error');
+                return;
+            }
+
+            // Simpan ID guru untuk cek absen hari ini
+            currentUserGuruId = idGuru;
+
+            const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
+
+            // Cek sudah absen (local check)
+            const alreadyToday = loadAtt().some(att => 
+                att.idGuru === idGuru && att.tanggal === todayStr
+            );
+            
+            if (alreadyToday) {
+                toast('Anda sudah absen hari ini', 'warning');
+                showMyAttendanceToday();
+                return;
+            }
+
+            const attendanceData = {
+                idGuru,
+                namaGuru,
+                status,
+                tanggal: todayStr,
+                jam: now.toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }),
+                tempat: lokasiText,
+                lat: window.currentCoords ? window.currentCoords.lat : null,
+                lon: window.currentCoords ? window.currentCoords.lon : null,
+            };
+
+            // Tampilkan loading
+            const submitBtn = $('#submit-button');
+            const originalText = $('#submit-text').textContent;
+            $('#submit-text').innerHTML = '<div class="loading-spinner"></div> Menyimpan...';
+            submitBtn.disabled = true;
+
+            try {
+                let result;
+                
+                if (window.whUseFirebase) {
+                    result = await saveAttendanceWithBase64(attendanceData, file);
+                } else {
+                    // Fallback untuk mode offline
+                    toast('Mode offline - simpan di localStorage', 'warning');
+                    attendanceData.timestamp = Date.now();
+                    const currentAtt = loadAtt();
+                    currentAtt.push(attendanceData);
+                    localStorage.setItem('wh_att_list_v1', JSON.stringify(currentAtt));
+                    result = attendanceData;
+                }
+                
+                toast(`✅ Absen ${status} berhasil disimpan!`, 'success');
+                
+                // Reset form tapi tetap tampilkan info
+                $('#attendance-form').reset();
+                resetPhotoPreview();
+                showMyAttendanceToday();
+                
+                // Refresh dashboard jika di halaman dashboard
+                if (!$('#page-dashboard').classList.contains('hidden')) {
+                    renderDashboard();
+                }
+                
+            } catch (error) {
+                console.error('Error save attendance:', error);
+                
+                if (error.message.includes('sudah absen')) {
+                    toast('❌ Anda sudah absen hari ini', 'error');
+                    showMyAttendanceToday();
+                } else if (error.message.includes('internet')) {
+                    toast('❌ Gagal menyimpan. Cek koneksi internet', 'error');
+                } else {
+                    toast(`❌ Gagal: ${error.message}`, 'error');
+                }
+            } finally {
+                $('#submit-text').textContent = originalText;
+                submitBtn.disabled = false;
+                updateSubmitButtonState();
+            }
+        });
+
+        // ========== SHOW MY ATTENDANCE TODAY ==========
+        function showMyAttendanceToday() {
+            if (!currentUserGuruId) return;
+            
+            const today = new Date().toISOString().slice(0, 10);
+            const myAttToday = loadAtt().find(att => 
+                att.idGuru === currentUserGuruId && att.tanggal === todayStr
+            );
+            
+            const container = $('#today-attendance-info');
+            const content = $('#my-attendance-today');
+            
+            if (myAttToday) {
+                container.classList.remove('hidden');
+                content.innerHTML = `
+                    <div class="flex items-center justify-between p-3 bg-white rounded border">
+                        <div>
+                            <div class="font-medium">${myAttToday.status}</div>
+                            <div class="text-sm text-gray-500">${myAttToday.jam} • ${myAttToday.tempat || 'Lokasi tidak diketahui'}</div>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs ${
+                            myAttToday.status === 'Hadir' ? 'bg-green-100 text-green-800' :
+                            myAttToday.status === 'Izin' ? 'bg-amber-100 text-amber-800' :
+                            myAttToday.status === 'Sakit' ? 'bg-red-100 text-red-800' :
+                            'bg-blue-100 text-blue-800'
+                        }">
+                            ${myAttToday.hasPhoto ? '📷 Dengan foto' : 'Tanpa foto'}
+                        </span>
+                    </div>
+                `;
+            } else {
+                container.classList.add('hidden');
+            }
+        }
+
+        // ========== DASHBOARD RENDERING ==========
+        function renderDashboard() {
+            const today = new Date().toISOString().slice(0, 10);
+            const todayAtt = loadAtt().filter(att => att.tanggal === today).reverse();
+            const guruList = loadGuruList();
+            
+            // Hitung summary
+            const summary = { 
+                Hadir: 0, 
+                Izin: 0, 
+                Sakit: 0, 
+                'Dinas Luar': 0, 
+                Total: guruList.length,
+                WithPhoto: 0
+            };
+            
+            const todayAttIds = new Set();
+            
+            todayAtt.forEach(att => {
+                if (!todayAttIds.has(att.idGuru)) {
+                    summary[att.status] = (summary[att.status] || 0) + 1;
+                    if (att.hasPhoto || att.photoBase64) summary.WithPhoto++;
+                    todayAttIds.add(att.idGuru);
+                }
+            });
+            
+            summary.BelumHadir = summary.Total - todayAttIds.size;
+            
+            // Update summary cards
+            $('#dashboard-summary').innerHTML = `
+                <div class="card-smooth p-4 bg-gradient-to-br from-green-50 to-green-100">
+                    <div class="text-sm text-green-700 mb-1">Hadir</div>
+                    <div class="text-3xl font-bold text-green-700">${summary.Hadir}</div>
+                    <div class="text-xs text-green-600 mt-1">${summary.WithPhoto} dengan foto</div>
+                </div>
+                <div class="card-smooth p-4 bg-gradient-to-br from-amber-50 to-amber-100">
+                    <div class="text-sm text-amber-700 mb-1">Tidak Hadir</div>
+                    <div class="text-3xl font-bold text-amber-700">${summary.Izin + summary.Sakit + summary['Dinas Luar']}</div>
+                    <div class="text-xs text-amber-600 mt-1">Izin/Sakit/DL</div>
+                </div>
+                <div class="card-smooth p-4 bg-gradient-to-br from-red-50 to-red-100">
+                    <div class="text-sm text-red-700 mb-1">Belum Hadir</div>
+                    <div class="text-3xl font-bold text-red-700">${summary.BelumHadir}</div>
+                    <div class="text-xs text-red-600 mt-1">Dari ${summary.Total} guru</div>
+                </div>
+                <div class="card-smooth p-4 bg-gradient-to-br from-indigo-50 to-indigo-100">
+                    <div class="text-sm text-indigo-700 mb-1">Total Guru</div>
+                    <div class="text-3xl font-bold text-indigo-700">${summary.Total}</div>
+                    <div class="text-xs text-indigo-600 mt-1">Aktif</div>
+                </div>
+            `;
+
+            // Render attendance list
+            const listBody = $('#attendance-list-body');
+            
+            if (todayAtt.length === 0) {
+                listBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center p-8">
+                            <div class="text-gray-400 mb-2">📭</div>
+                            <div class="text-gray-500">Belum ada absen hari ini</div>
+                        </td>
+                    </tr>
+                `;
+                $('#attendance-count').textContent = '0 absen';
+                $('#photo-count').textContent = '0 foto';
+                return;
+            }
+
+            listBody.innerHTML = todayAtt.map(att => {
+                // Handle foto dari Base64
+                let fotoUrl = null;
+                let hasPhoto = false;
+                
+                if (att.photoBase64) {
+                    fotoUrl = `data:image/jpeg;base64,${att.photoBase64}`;
+                    hasPhoto = true;
+                } else if (att.hasPhoto && att.fotoUrl) {
+                    fotoUrl = att.fotoUrl;
+                    hasPhoto = true;
+                }
+                
+                const fotoElement = hasPhoto ? `
+                    <button onclick="showPhotoModal('${fotoUrl}', '${att.namaGuru}', '${att.jam}', '${att.status}')" 
+                            class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm"
+                            title="Lihat Foto">
+                        📷 Lihat
+                    </button>
+                ` : '<span class="text-gray-400 text-sm">-</span>';
+                
+                return `
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3">
+                            <div class="font-medium">${att.namaGuru}</div>
+                            ${att.deviceInfo && att.deviceInfo.isMobile ? 
+                              '<span class="text-xs text-gray-500">📱 Mobile</span>' : ''}
+                        </td>
+                        <td class="px-4 py-3 text-center font-medium">${att.jam}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                att.status === 'Hadir' ? 'bg-green-100 text-green-800' :
+                                att.status === 'Izin' ? 'bg-amber-100 text-amber-800' :
+                                att.status === 'Sakit' ? 'bg-red-100 text-red-800' :
+                                'bg-blue-100 text-blue-800'
+                            }">
+                                ${att.status}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 max-w-xs">
+                            <div class="text-truncate" title="${att.tempat || 'Tidak diketahui'}">
+                                ${att.tempat || 'Tidak diketahui'}
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-center">${fotoElement}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Update counters
+            $('#attendance-count').textContent = `${todayAtt.length} absen hari ini`;
+            $('#photo-count').textContent = `${summary.WithPhoto} dengan foto`;
+        }
+
+        // ========== PHOTO MODAL ==========
+        function showPhotoModal(photoUrl, namaGuru, waktu = '', status = '') {
+            const modal = $('#photo-modal');
+            const img = $('#modal-photo-img');
+            const title = $('#photo-modal-title');
+            const info = $('#photo-modal-info');
+            
+            img.src = photoUrl;
+            title.textContent = `Foto: ${namaGuru}`;
+            info.textContent = `${status} • ${waktu}`;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closePhotoModal() {
+            $('#photo-modal').classList.add('hidden');
+        }
+
+        // ========== GURU MANAGEMENT ==========
+        function renderGuruSelect() {
+            const select = $('#guru-select');
+            const gurus = loadGuruList()
+                .filter(g => g.status !== 'Nonaktif')
+                .sort((a, b) => a.nama.localeCompare(b.nama));
+            
+            select.innerHTML = '<option value="">-- Pilih Nama Anda --</option>' + 
+                gurus.map(g => `
+                    <option value="${g.id}" data-nama="${g.nama}">
+                        ${g.nama}${g.jabatan ? ` (${g.jabatan})` : ''}
+                    </option>
+                `).join('');
+        }
+
+        function renderGuruTable() {
+            const body = $('#guru-table-body');
+            const gurus = loadGuruList().sort((a, b) => a.nama.localeCompare(b.nama));
+            
+            $('#guru-action-header').classList.toggle('hidden', !whIsAdmin);
+            $('#btn-add-guru-page').classList.toggle('hidden', !whIsAdmin);
+            
+            if (gurus.length === 0) {
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center p-8 text-gray-400">
+                            <div class="mb-2">👨‍🏫</div>
+                            Belum ada data guru
+                        </td>
+                    </tr>
+                `;
+                $('#guru-count').textContent = '0';
+                return;
+            }
+            
+            body.innerHTML = gurus.map(guru => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 font-medium">${guru.nama}</td>
+                    <td class="px-4 py-3">${guru.nip || '-'}</td>
+                    <td class="px-4 py-3">${guru.jabatan || '-'}</td>
+                    <td class="px-4 py-3 text-center">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                            guru.status === 'Aktif' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                        }">
+                            ${guru.status || 'Aktif'}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-center ${whIsAdmin ? '' : 'hidden'}">
+                        <button onclick="openGuruModal('${guru.id}')" 
+                                class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm mr-2">
+                            Edit
+                        </button>
+                        <button onclick="deleteGuru('${guru.id}', '${guru.nama}')" 
+                                class="px-3 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm">
+                            Hapus
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            $('#guru-count').textContent = gurus.length;
+        }
+
+        // ========== GURU MODAL FUNCTIONS ==========
+        function openGuruModal(id = '') {
+            if (!whIsAdmin) {
+                toast('Hanya admin yang bisa mengelola data guru', 'error');
+                return;
+            }
+            
+            const form = $('#guru-form');
+            form.reset();
+            
+            if (id) {
+                const guru = loadGuruList().find(g => g.id === id);
+                if (guru) {
+                    $('#guru-modal-title').textContent = 'Edit Guru';
+                    $('#guru-id').value = guru.id;
+                    $('#guru-nip').value = guru.nip || '';
+                    $('#guru-nama').value = guru.nama || '';
+                    $('#guru-jabatan').value = guru.jabatan || '';
+                }
+            } else {
+                $('#guru-modal-title').textContent = 'Tambah Guru';
+                $('#guru-id').value = '';
+            }
+            
+            $('#guru-modal').classList.remove('hidden');
+        }
+
+        async function saveGuru(e) {
+            e.preventDefault();
+            
+            const id = $('#guru-id').value;
+            const data = {
+                nip: $('#guru-nip').value.trim(),
+                nama: $('#guru-nama').value.trim(),
+                jabatan: $('#guru-jabatan').value.trim(),
+                status: 'Aktif',
+                updatedAt: Date.now()
+            };
+            
+            if (!data.nama) {
+                toast('Nama guru harus diisi', 'error');
+                return;
+            }
+            
+            try {
+                if (id && window.updateGuruFirebase) {
+                    await window.updateGuruFirebase(id, data);
+                    toast('Data guru berhasil diperbarui', 'success');
+                } else if (window.addGuruFirebase) {
+                    await window.addGuruFirebase(data);
+                    toast('Guru baru berhasil ditambahkan', 'success');
+                } else {
+                    // Fallback local
+                    const gurus = loadGuruList();
+                    if (id) {
+                        const index = gurus.findIndex(g => g.id === id);
+                        if (index !== -1) {
+                            gurus[index] = { ...gurus[index], ...data };
+                        }
+                    } else {
+                        gurus.push({ ...data, id: `local_${Date.now()}` });
+                    }
+                    localStorage.setItem('wh_guru_list_v1', JSON.stringify(gurus));
+                    toast('Data guru disimpan lokal', 'info');
+                }
+                
+                $('#guru-modal').classList.add('hidden');
+                renderGuruSelect();
+                renderGuruTable();
+                
+            } catch (error) {
+                toast(`Gagal menyimpan: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteGuru(id, nama) {
+            if (!whIsAdmin) {
+                toast('Hanya admin yang bisa menghapus guru', 'error');
+                return;
+            }
+            
+            if (!confirm(`Hapus guru "${nama}"?\n\nCatatan: Data kehadiran tetap tersimpan.`)) {
+                return;
+            }
+            
+            try {
+                if (window.deleteGuruFirebase) {
+                    await window.deleteGuruFirebase(id);
+                    toast('Guru berhasil dihapus', 'success');
+                } else {
+                    // Fallback local
+                    const gurus = loadGuruList().filter(g => g.id !== id);
+                    localStorage.setItem('wh_guru_list_v1', JSON.stringify(gurus));
+                    toast('Guru dihapus dari data lokal', 'info');
+                }
+                
+                renderGuruSelect();
+                renderGuruTable();
+                
+            } catch (error) {
+                toast(`Gagal menghapus: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== PAGE NAVIGATION ==========
+        function showPage(pageName) {
+            // Hide all pages
+            $$('section[id^="page-"]').forEach(page => {
+                page.classList.add('hidden');
+            });
+            
+            // Show selected page
+            $(`#page-${pageName}`).classList.remove('hidden');
+            
+            // Update active nav
+            $$('.nav-item').forEach(btn => {
+                const isActive = btn.getAttribute('data-page') === pageName;
+                const isSidebar = btn.closest('aside');
+                const isHeader = btn.closest('header');
+                
+                if (isSidebar) {
+                    btn.classList.toggle('bg-indigo-600', isActive);
+                    btn.classList.toggle('bg-white/10', isActive);
+                    btn.classList.toggle('text-white', true);
+                }
+                
+                if (isHeader) {
+                    btn.classList.toggle('bg-indigo-100', isActive);
+                    btn.classList.toggle('text-indigo-700', isActive);
+                    btn.classList.toggle('bg-gray-100', !isActive);
+                    btn.classList.toggle('text-gray-700', !isActive);
+                }
+            });
+            
+            // Execute page-specific functions
+            switch(pageName) {
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'guru':
+                    renderGuruTable();
+                    break;
+                case 'laporan':
+                    if (!reportMonthSel.value) populateReportSelectors();
+                    generateReport();
+                    break;
+            }
+        }
+
+        // ========== MONTHLY REPORT ==========
         const reportMonthSel = $('#reportMonth');
         const reportYearSel = $('#reportYear');
-        const generateReportBtn = $('#generateReportBtn');
-        const reportTableBody = $('#reportTableBody');
-        const reportSummary = $('#report-summary');
-        const reportHeaderRow1 = document.getElementById('report-header-row-1');
-        const reportHeaderRow2 = document.getElementById('report-header-row-2');
-        const btnExportPdf = document.getElementById('btnExportPdf');
-        const btnExportExcel = document.getElementById('btnExportExcel');
-
-        function populateReportSelectors(){
+        
+        function populateReportSelectors() {
             const now = new Date();
             const currentYear = now.getFullYear();
             const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
             
-            reportMonthSel.innerHTML = months.map((m, i) => `<option value="${(i+1).toString().padStart(2,'0')}">${m}</option>`).join('');
+            reportMonthSel.innerHTML = months.map((m, i) => 
+                `<option value="${(i+1).toString().padStart(2,'0')}">${m}</option>`
+            ).join('');
             
             const years = [];
-            for (let y = currentYear - 5; y <= currentYear + 1; y++) {
+            for (let y = currentYear - 2; y <= currentYear + 1; y++) {
                 years.push(y);
             }
-            reportYearSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            reportYearSel.innerHTML = years.map(y => 
+                `<option value="${y}">${y}</option>`
+            ).join('');
             
             reportMonthSel.value = (now.getMonth() + 1).toString().padStart(2,'0');
             reportYearSel.value = currentYear;
         }
         
-        function generateReport(){
+        function generateReport() {
             const selectedMonth = reportMonthSel.value;
             const selectedYear = reportYearSel.value;
             const prefixDate = `${selectedYear}-${selectedMonth}`;
@@ -403,19 +1252,22 @@
             const gurus = loadGuruList();
             const monthlyAtt = allAtt.filter(att => att.tanggal && att.tanggal.startsWith(prefixDate));
             
-            const daysInMonth = new Date(parseInt(selectedYear,10), parseInt(selectedMonth,10), 0).getDate();
+            const daysInMonth = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0).getDate();
             const dayNumbers = Array.from({length: daysInMonth}, (_, i) => i + 1);
 
-            // Header tanggal
-            reportHeaderRow1.innerHTML = `
+            // Update headers
+            $('#report-header-row-1').innerHTML = `
                 <th class="p-2 text-left border" rowspan="2">Nama Guru</th>
                 <th class="p-2 text-center border" colspan="${daysInMonth}">Tanggal</th>
-                <th class="p-2 text-center border" rowspan="2">Total H</th>
-                <th class="p-2 text-center border" rowspan="2">Total A</th>
+                <th class="p-2 text-center border" rowspan="2">H</th>
+                <th class="p-2 text-center border" rowspan="2">A</th>
             `;
-            reportHeaderRow2.innerHTML = dayNumbers.map(d => `<th class="p-1 text-center border">${d}</th>`).join('');
+            
+            $('#report-header-row-2').innerHTML = dayNumbers.map(d => 
+                `<th class="p-1 text-center border">${d}</th>`
+            ).join('');
 
-            // Data report per guru
+            // Prepare report data
             const reportData = {};
             gurus.forEach(g => {
                 const kodeMap = {};
@@ -428,11 +1280,13 @@
                 };
             });
             
+            // Fill attendance data
             monthlyAtt.forEach(att => {
                 const guruId = att.idGuru;
                 if (!reportData[guruId]) return;
+                
                 const day = parseInt(att.tanggal.split("-")[2], 10);
-                if (!day || !reportData[guruId].map[day]) return;
+                if (!day || day > daysInMonth) return;
 
                 let code = "H";
                 if (att.status === "Izin") code = "I";
@@ -445,18 +1299,29 @@
                 else if (code !== "-") reportData[guruId].totalA++;
             });
 
-            reportTableBody.innerHTML = '';
-            const guruIds = Object.keys(reportData).sort((a,b) => reportData[a].nama.localeCompare(reportData[b].nama));
+            // Render table
+            const reportTableBody = $('#reportTableBody');
+            const guruIds = Object.keys(reportData).sort((a,b) => 
+                reportData[a].nama.localeCompare(reportData[b].nama)
+            );
 
             let totalHadirAll = 0, totalAbsenAll = 0;
 
-            if (guruIds.length > 0) {
-                guruIds.forEach(id => {
+            if (guruIds.length === 0) {
+                reportTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="${34 + daysInMonth}" class="text-center p-8 text-gray-400">
+                            Tidak ada data untuk bulan ini
+                        </td>
+                    </tr>
+                `;
+            } else {
+                reportTableBody.innerHTML = guruIds.map(id => {
                     const data = reportData[id];
                     totalHadirAll += data.totalH;
                     totalAbsenAll += data.totalA;
 
-                    const tds = dayNumbers.map(d => {
+                    const dayCells = dayNumbers.map(d => {
                         const v = data.map[d];
                         let cls = "text-gray-700";
                         if (v === "H") cls = "text-green-600 font-semibold";
@@ -466,571 +1331,466 @@
                         return `<td class="p-1 text-center border ${cls}">${v}</td>`;
                     }).join("");
 
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-50';
-                    tr.innerHTML = `
-                        <td class="p-2 border border-gray-200 font-medium">${data.nama}</td>
-                        ${tds}
-                        <td class="p-2 border border-gray-200 text-center font-bold text-green-700">${data.totalH}</td>
-                        <td class="p-2 border border-gray-200 text-center font-bold text-amber-700">${data.totalA}</td>
+                    return `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-2 border font-medium">${data.nama}</td>
+                            ${dayCells}
+                            <td class="p-2 border text-center font-bold text-green-700">${data.totalH}</td>
+                            <td class="p-2 border text-center font-bold text-amber-700">${data.totalA}</td>
+                        </tr>
                     `;
-                    reportTableBody.appendChild(tr);
-                });
-            } else {
-                 reportTableBody.innerHTML = '<tr><td colspan="34" class="text-center p-6 text-slate-500">Tidak ada data guru atau kehadiran di bulan ini.</td></tr>';
+                }).join('');
             }
             
+            // Update summary
             const selectedMonthName = reportMonthSel.options[reportMonthSel.selectedIndex].text;
-            reportSummary.innerHTML = `
+            $('#report-summary').innerHTML = `
                 <div class="card-smooth p-5 bg-green-50">
-                    <div class="text-sm text-slate-500">Total Hadir (${selectedMonthName})</div>
+                    <div class="text-sm text-slate-500">Total Hadir</div>
                     <div class="text-3xl font-bold text-green-600 mt-2">${totalHadirAll}</div>
+                    <div class="text-xs text-slate-500 mt-1">${selectedMonthName} ${selectedYear}</div>
                 </div>
                 <div class="card-smooth p-5 bg-amber-50">
-                    <div class="text-sm text-slate-500">Total Absen (Izin/Sakit/DL)</div>
+                    <div class="text-sm text-slate-500">Total Tidak Hadir</div>
                     <div class="text-3xl font-bold text-amber-600 mt-2">${totalAbsenAll}</div>
+                    <div class="text-xs text-slate-500 mt-1">Izin/Sakit/DL</div>
                 </div>
                 <div class="card-smooth p-5 bg-indigo-50">
-                    <div class="text-sm text-slate-500">Total Guru Aktif</div>
-                    <div class="text-3xl font-bold text-indigo-600 mt-2">${gurus.length}</div>
+                    <div class="text-sm text-slate-500">Persentase Hadir</div>
+                    <div class="text-3xl font-bold text-indigo-600 mt-2">
+                        ${gurus.length > 0 ? Math.round((totalHadirAll / gurus.length) * 100) : 0}%
+                    </div>
+                    <div class="text-xs text-slate-500 mt-1">Dari ${gurus.length} guru</div>
                 </div>
             `;
             
-            toast(`Laporan Bulanan berhasil dimuat.`, 'info', 1500);
+            toast(`Laporan ${selectedMonthName} ${selectedYear} siap`, 'info', 2000);
         }
 
-        generateReportBtn.addEventListener('click', generateReport);
+        // ========== EXPORT FUNCTIONS ==========
+        $('#generateReportBtn').addEventListener('click', generateReport);
 
-        // Export PDF
-        btnExportPdf.addEventListener('click', () => {
-            const element = document.querySelector('#page-laporan');
+        $('#btnExportPdf').addEventListener('click', () => {
+            const element = $('#page-laporan');
             const monthText = reportMonthSel.options[reportMonthSel.selectedIndex].text;
             const year = reportYearSel.value;
+            
             const opt = {
                 margin:       0.5,
                 filename:     `Laporan-Kehadiran-${monthText}-${year}.pdf`,
-                image:        { type: 'jpeg', quality: 0.95 },
-                html2canvas:  { scale: 2 },
-                jsPDF:        { unit: 'cm', format: 'a4', orientation: 'landscape' }
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { 
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                },
+                jsPDF:        { 
+                    unit: 'mm', 
+                    format: 'a4', 
+                    orientation: 'landscape' 
+                }
             };
-            html2pdf().set(opt).from(element).save();
+            
+            toast('Membuat PDF...', 'info');
+            html2pdf().set(opt).from(element).save().then(() => {
+                toast('PDF berhasil diunduh', 'success');
+            });
         });
 
-        // Export Excel
-        btnExportExcel.addEventListener('click', () => {
-            const table = document.querySelector('#page-laporan table');
+        $('#btnExportExcel').addEventListener('click', () => {
+            const table = $('#page-laporan table');
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.table_to_sheet(table);
             XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+            
             const monthText = reportMonthSel.options[reportMonthSel.selectedIndex].text;
             const year = reportYearSel.value;
+            
+            toast('Membuat Excel...', 'info');
             XLSX.writeFile(wb, `Laporan-Kehadiran-${monthText}-${year}.xlsx`);
+            toast('Excel berhasil diunduh', 'success');
         });
 
-        populateReportSelectors();
-
-        // DASHBOARD
-        function renderDashboard() {
-            const today = new Date().toISOString().slice(0, 10);
-            const todayAtt = loadAtt().filter(att => att.tanggal === today).reverse();
-            const guruList = loadGuruList();
-            
-            const summary = { Hadir: 0, Izin: 0, Sakit: 0, 'Dinas Luar': 0, Total: guruList.length };
-            const todayAttIds = new Set();
-
-            todayAtt.forEach(att => {
-                if (!todayAttIds.has(att.idGuru)) {
-                    summary[att.status] = (summary[att.status] || 0) + 1;
-                    todayAttIds.add(att.idGuru);
-                }
-            });
-            
-            summary.BelumHadir = summary.Total - todayAttIds.size;
-            
-            $('#dashboard-summary').innerHTML = `
-                <div class="card-smooth p-3 bg-green-50"><p class="text-xs text-slate-500">Hadir</p><p class="text-2xl font-bold text-green-600">${summary.Hadir}</p></div>
-                <div class="card-smooth p-3 bg-amber-50"><p class="text-xs text-slate-500">Izin/Sakit/DL</p><p class="text-2xl font-bold text-amber-600">${summary.Izin + summary.Sakit + summary['Dinas Luar']}</p></div>
-                <div class="card-smooth p-3 bg-red-50"><p class="text-xs text-slate-500">Belum Hadir</p><p class="text-2xl font-bold text-red-600">${summary.BelumHadir}</p></div>
-                <div class="card-smooth p-3 bg-indigo-50"><p class="text-xs text-slate-500">Total Guru</p><p class="text-2xl font-bold text-indigo-600">${summary.Total}</p></div>
-            `;
-
-            const listBody = $('#attendance-list-body');
-            listBody.innerHTML = todayAtt.map(att => `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-3 py-2 whitespace-nowrap">${att.namaGuru}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center">${att.jam}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center">
-                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${att.status === 'Hadir' ? 'bg-green-100 text-green-800' : 
-                              att.status === 'Izin' ? 'bg-amber-100 text-amber-800' : 
-                              att.status === 'Sakit' ? 'bg-red-100 text-red-800' : 
-                              'bg-blue-100 text-blue-800'}">
-                            ${att.status}
-                        </span>
-                    </td>
-                    <td class="px-3 py-2 text-truncate max-w-xs" title="${att.tempat || 'N/A'}">${att.tempat || 'N/A'}</td>
-                    <td class="px-3 py-2 text-center">
-                        ${att.fotoUrl ? `<a href="${att.fotoUrl}" target="_blank" class="text-indigo-600 hover:underline" title="Lihat Foto">📷</a>` : '-'}
-                    </td>
-                </tr>
-            `).join('');
-
-            if (todayAtt.length === 0) {
-                 listBody.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Belum ada kehadiran hari ini.</td></tr>';
-            }
-        }
-
-        // GURU PAGE
-        function renderGuruSelect() {
-            const select = $('#guru-select');
-            const gurus = loadGuruList().filter(g => g.status === 'Aktif').sort((a, b) => a.nama.localeCompare(b.nama));
-            select.innerHTML = '<option value="">-- Pilih Guru --</option>' + gurus.map(g => 
-                `<option value="${g.id}" data-nama="${g.nama}">${g.nama} (${g.jabatan})</option>`
-            ).join('');
-        }
-
-        function renderGuruTable() {
-            const body = $('#guru-table-body');
-            const guruList = loadGuruList().sort((a, b) => a.nama.localeCompare(b.nama));
-            const isAdmin = whIsAdmin;
-
-            $('#guru-action-header').classList.toggle('hidden', !isAdmin);
-            
-            body.innerHTML = guruList.map(guru => `
-                <tr class="hover:bg-gray-50" data-id="${guru.id}">
-                    <td class="px-3 py-2 whitespace-nowrap font-medium text-gray-900">${guru.nama}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-gray-500">${guru.nip || '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-gray-500">${guru.jabatan || '-'}</td>
-                    <td class="px-3 py-2 whitespace-nowrap text-center">
-                         <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            ${guru.status}
-                        </span>
-                    </td>
-                    <td class="px-3 py-2 whitespace-nowrap text-right text-sm font-medium ${isAdmin ? '' : 'hidden'}">
-                        <button onclick="openGuruModal('${guru.id}')" class="text-indigo-600 hover:text-indigo-900 mr-2">Edit</button>
-                        <button onclick="deleteGuru('${guru.id}', '${guru.nama}')" class="text-red-600 hover:text-red-900">Hapus</button>
-                    </td>
-                </tr>
-            `).join('');
-
-            if (guruList.length === 0) {
-                 body.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-gray-500">Belum ada data guru.</td></tr>';
-            }
-        }
-        
-        // GURU MODAL
-       const guruModal = $('#guru-modal');
-       const guruForm = $('#guru-form');
-       const guruIdInput = $('#guru-id');
-       const guruNamaInput = $('#guru-nama');
-       const guruNipInput = $('#guru-nip');
-       const guruJabatanInput = $('#guru-jabatan');
-       const guruModalTitle = $('#guru-modal-title');
-       const btnOpenAddGuru = $('#btn-open-add-guru');
-       const btnOpenGuruAdmin = $('#btn-open-guru-admin');
-
-       if (btnOpenAddGuru) {
-       btnOpenAddGuru.addEventListener('click', () => openGuruModal(''));
-       }
-
-       if (btnOpenGuruAdmin) {
-       btnOpenGuruAdmin.addEventListener('click', () => {
-           // Buka halaman Data Guru ketika admin klik menu ini
-           showPage('guru');
-       });
-      }
-
-      $('#guru-cancel').addEventListener('click', () => guruModal.classList.add('hidden'));
-
-        function openGuruModal(id) {
-            if (!whIsAdmin) { toast('Anda tidak memiliki izin Admin.', 'err'); return; }
-            
-            guruForm.reset();
-            guruIdInput.value = '';
-            
-            if (id) {
-                const guru = loadGuruList().find(g => g.id === id);
-                if (guru) {
-                    guruModalTitle.textContent = 'Edit Guru';
-                    guruIdInput.value = guru.id;
-                    guruNamaInput.value = guru.nama;
-                    guruNipInput.value = guru.nip;
-                    guruJabatanInput.value = guru.jabatan;
-                }
-            } else {
-                guruModalTitle.textContent = 'Tambah Guru';
-            }
-            guruModal.classList.remove('hidden');
-        }
-
-        guruForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const id = guruIdInput.value;
-            const data = {
-                nama: guruNamaInput.value.trim(),
-                nip: guruNipInput.value.trim(),
-                jabatan: guruJabatanInput.value.trim()
-            };
-
-            try {
-                if (id && window.updateGuruFirebase) {
-                    await window.updateGuruFirebase(id, data);
-                    toast('Data guru berhasil diubah!', 'ok');
-                } else if (window.addGuruFirebase) {
-                    await window.addGuruFirebase(data);
-                    toast('Data guru berhasil ditambahkan!', 'ok');
-                } else {
-                    toast('Operasi tidak didukung.', 'err');
-                }
-            } catch (error) {
-                toast(`Gagal menyimpan: ${error.message}`, 'err');
-            }
-            guruModal.classList.add('hidden');
-        });
-
-        async function deleteGuru(id, nama) {
-             if (!whIsAdmin) { toast('Anda tidak memiliki izin Admin.', 'err'); return; }
-             if (!confirm(`Yakin ingin menghapus guru: ${nama}?`)) return;
-
-             try {
-                if (window.deleteGuruFirebase) {
-                    await window.deleteGuruFirebase(id);
-                    toast('Guru berhasil dihapus!', 'ok');
-                }
-             } catch (error) {
-                toast(`Gagal menghapus: ${error.message}`, 'err');
-             }
-        }
-        window.deleteGuru = deleteGuru; 
-
-        // ==== FOTO: KOMPRES + UPLOAD KE FIREBASE STORAGE ====
-
-        async function compressImage(file, maxWidth = 800, quality = 0.6) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                const reader = new FileReader();
-
-                reader.onload = (e) => {
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const scale = maxWidth / img.width;
-                        const width = img.width > maxWidth ? maxWidth : img.width;
-                        const height = img.width > maxWidth ? img.height * scale : img.height;
-
-                        canvas.width = width;
-                        canvas.height = height;
-
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        canvas.toBlob(
-                            (blob) => blob ? resolve(blob) : reject(new Error("Gagal kompres gambar")),
-                            "image/jpeg",
-                            quality
-                        );
-                    };
-                    img.onerror = reject;
-                    img.src = e.target.result;
-                };
-
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // preview foto
-        const photoInputEl = $('#attendance-photo');
-        const photoPreview = $('#photo-preview');
-        photoInputEl.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = ev => {
-                    photoPreview.src = ev.target.result;
-                    photoPreview.classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            } else {
-                photoPreview.src = "";
-                photoPreview.classList.add('hidden');
-            }
-        });
-
-        async function uploadAttendancePhotoToStorage(file, idGuru, tanggalISO) {
-            const compressedBlob = await compressImage(file, 800, 0.6);
-            const storageRef = firebase.storage().ref();
-            const safeDate = tanggalISO || new Date().toISOString().slice(0,10);
-            const fileName = `attendance_photos/${safeDate}/${idGuru}_${Date.now()}.jpg`;
-            const fileRef = storageRef.child(fileName);
-            await fileRef.put(compressedBlob);
-            const url = await fileRef.getDownloadURL();
-            return url;
-        }
-
-        async function saveAttendanceWithPhotoFirebase(attendanceData, file) {
-            const db = firebase.database();
-            const today = attendanceData.tanggal;
-            const indexKey = `${attendanceData.idGuru}_${today}`;
-            const indexRef = db.ref('attendance_index').child(indexKey);
-
-            // Cek sudah absen atau belum (server-side)
-            const snap = await indexRef.once('value');
-            if (snap.exists()) {
-                const err = new Error('Anda sudah absen hari ini.');
-                err.code = 'already-attended';
-                throw err;
-            }
-
-            const fotoUrl = await uploadAttendancePhotoToStorage(file, attendanceData.idGuru, today);
-            attendanceData.fotoUrl = fotoUrl;
-
-            const ref = db.ref('attendances').push();
-            const payload = { ...attendanceData, id: ref.key };
-            await ref.set(payload);
-            await indexRef.set(true);
-            return payload;
-        }
-
-        // ATTENDANCE SUBMISSION (FOTO WAJIB + ANTI GANDA)
-        $('#attendance-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const selectedOption = $('#guru-select').options[$('#guru-select').selectedIndex];
-            const idGuru = selectedOption.value;
-            const namaGuru = selectedOption.getAttribute('data-nama');
-            const status = $('input[name="status"]:checked').value;
-            const lokasiText = $('#current-location-display').textContent.replace('Lokasi: ', '');
-            const file = photoInputEl.files[0];
-            
-            if (!idGuru) {
-                return toast('Pilih nama guru terlebih dahulu', 'err');
-            }
-            if (!file) {
-                return toast('Foto kehadiran wajib diisi', 'err');
-            }
-
-            const now = new Date();
-            const todayStr = now.toISOString().slice(0, 10);
-
-            // Cek lokal dulu (cepat)
-            const alreadyToday = loadAtt().some(att => att.idGuru === idGuru && att.tanggal === todayStr);
-            if (alreadyToday) {
-                toast('Anda sudah absen hari ini.', 'err');
-                return;
-            }
-
-            const attendanceData = {
-                idGuru,
-                namaGuru,
-                status,
-                tanggal: todayStr,
-                jam: now.toLocaleTimeString("id-ID"),
-                tempat: lokasiText,
-                lat: window.currentCoords ? window.currentCoords.lat : null,
-                lon: window.currentCoords ? window.currentCoords.lon : null,
-            };
-
-            try {
-                if (window.whUseFirebase) {
-                    await saveAttendanceWithPhotoFirebase(attendanceData, file);
-                } else {
-                    await saveAtt(attendanceData); // mode offline tanpa simpan foto
-                }
-                toast(`Kehadiran ${status} untuk ${namaGuru} berhasil disimpan!`, 'ok');
-                $('#attendance-form').reset();
-                photoPreview.classList.add('hidden');
-                renderDashboard();
-            } catch (error) {
-                if (error.code === 'already-attended') {
-                    toast('Anda sudah absen hari ini.', 'err');
-                } else {
-                    toast(`Gagal menyimpan kehadiran: ${error.message}`, 'err');
-                }
-            }
-        });
-
-        // LOGIN ADMIN
-        const loginModal = $('#login-modal');
-        const btnOpenLogin = $('#btn-open-login');
-        const loginCancel = $('#login-cancel');
-        const loginSubmit = $('#login-submit');
-
-        btnOpenLogin.addEventListener('click', () => loginModal.classList.remove('hidden'));
-        loginCancel.addEventListener('click', () => loginModal.classList.add('hidden'));
-
+        // ========== ADMIN FUNCTIONS ==========
         function updateAdminUI(isLoggedIn) {
             whIsAdmin = isLoggedIn;
             
             if (isLoggedIn) {
-                btnOpenLogin.textContent = '🔓 Logout Admin';
-                btnOpenLogin.onclick = handleLogout;
+                $('#btn-open-login').textContent = '🔓 Logout Admin';
+                $('#btn-open-login').onclick = handleLogout;
                 
                 $('#admin-actions').classList.remove('hidden');
-                $('#btn-open-guru-admin').classList.remove('hidden');
-                $('#btn-open-add-guru').classList.remove('hidden'); 
-                $('#btn-reset-sample').classList.remove('hidden');
                 $('#guru-action-header').classList.remove('hidden');
+                $('#btn-add-guru-page').classList.remove('hidden');
+                $('#btn-cleanup-base64').classList.remove('hidden');
+                
+                // Update storage info
+                updateStorageInfo();
+                
             } else {
-                btnOpenLogin.textContent = '🔑 Login Admin';
-                btnOpenLogin.onclick = () => loginModal.classList.remove('hidden');
+                $('#btn-open-login').textContent = '🔑 Login Admin';
+                $('#btn-open-login').onclick = () => $('#login-modal').classList.remove('hidden');
                 
                 $('#admin-actions').classList.add('hidden');
-                $('#btn-open-add-guru').classList.add('hidden'); 
-                $('#btn-open-add-guru').classList.add('hidden');
-                $('#btn-reset-sample').classList.add('hidden');
                 $('#guru-action-header').classList.add('hidden');
+                $('#btn-add-guru-page').classList.add('hidden');
+                $('#btn-cleanup-base64').classList.add('hidden');
             }
+            
             renderGuruTable();
         }
 
-        function handleLogout() {
+        async function updateStorageInfo() {
+            if (!window.whUseFirebase || !whIsAdmin) return;
+            
+            try {
+                const db = firebase.database();
+                const [gurusSnap, attSnap] = await Promise.all([
+                    db.ref('gurus').once('value'),
+                    db.ref('attendances').once('value')
+                ]);
+                
+                const guruCount = gurusSnap.numChildren();
+                const attCount = attSnap.numChildren();
+                
+                // Hitung total size (estimasi)
+                let totalSize = 0;
+                attSnap.forEach(child => {
+                    const att = child.val();
+                    if (att.photoBase64) {
+                        totalSize += att.photoBase64.length * 0.75; // Base64 size estimate
+                    }
+                });
+                
+                const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2);
+                $('#storage-info').innerHTML = `
+                    • ${guruCount} guru<br>
+                    • ${attCount} absen<br>
+                    • ${totalSizeMB} MB foto
+                `;
+                
+            } catch (error) {
+                console.error('Gagal update storage info:', error);
+            }
+        }
+
+        async function handleLogout() {
             if (window.whUseFirebase && window.signOutAdmin) {
-                window.signOutAdmin();
+                await window.signOutAdmin();
             }
             updateAdminUI(false);
-            toast('Logout Berhasil', 'info');
+            toast('Logout berhasil', 'info');
             showPage('kehadiran');
         }
 
-        loginSubmit.addEventListener('click', async () => {
-            const email = $('#login-email').value.trim();
-            const password = $('#login-password').value.trim();
-
-            if (!email || !password) {
-                return toast('Masukkan email dan password','err');
+        // ========== CLEANUP BASE64 PHOTOS ==========
+        async function cleanupOldBase64Photos() {
+            if (!whIsAdmin) {
+                toast('Hanya admin yang bisa membersihkan foto', 'error');
+                return;
             }
             
-            if (window.whUseFirebase && window.signInAdmin) {
-                try {
-                    await window.signInAdmin(email, password);
-
-                    // --- langsung aktifkan mode admin di UI ---
-                    updateAdminUI(true);
-                    
-                    loginModal.classList.add('hidden');
-                    toast('Login Berhasil! Mengambil status Admin...','ok');
-                    $('#login-email').value = '';
-                    $('#login-password').value = '';
-                    showPage('dashboard');
-                } catch (error) {
-                    let msg = error.code === 'auth/user-not-found' ? 'Email tidak terdaftar.' : 
-                              error.code === 'auth/wrong-password' ? 'Password salah.' : 
-                              'Login Gagal. Cek kredensial Anda.';
-                    console.error('Login Gagal:', error);
-                    toast(msg,'err');
-                }
-            } else {
-                if (email === 'admin@mail.com' && password === 'admin123') {
-                    loginModal.classList.add('hidden');
-                    toast('Login Berhasil (Demo Lokal)!','ok');
-                    updateAdminUI(true);
-                    showPage('dashboard');
-                } else {
-                    toast('Login Gagal (Demo Lokal).','err');
-                }
+            if (!confirm('Bersihkan foto lama (Base64) dari database?\n\nFoto lebih dari 30 hari akan dihapus dari database untuk menghemat space.\nData kehadiran tetap ada.')) {
+                return;
             }
-        });
+            
+            try {
+                const db = firebase.database();
+                const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+                let cleanedCount = 0;
+                
+                const snapshot = await db.ref('attendances').once('value');
+                const updates = {};
+                
+                snapshot.forEach(child => {
+                    const att = child.val();
+                    const attTime = att.timestamp || 0;
+                    
+                    if (attTime < thirtyDaysAgo && att.photoBase64) {
+                        updates[`${child.key}/photoBase64`] = null;
+                        updates[`${child.key}/photoSize`] = null;
+                        updates[`${child.key}/photoCompressed`] = null;
+                        updates[`${child.key}/photoCleaned`] = true;
+                        updates[`${child.key}/photoCleanedAt`] = Date.now();
+                        cleanedCount++;
+                    }
+                });
+                
+                if (Object.keys(updates).length > 0) {
+                    await db.ref('attendances').update(updates);
+                    toast(`Berhasil membersihkan ${cleanedCount} foto lama`, 'success');
+                    updateStorageInfo();
+                } else {
+                    toast('Tidak ada foto yang perlu dibersihkan', 'info');
+                }
+                
+            } catch (error) {
+                toast(`Gagal membersihkan: ${error.message}`, 'error');
+            }
+        }
 
-        // REVERSE GEOCODING
+        // ========== LOCATION SERVICES ==========
         async function reverseGeocode(lat, lon) {
             try {
-                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=14&addressdetails=1`;
+                const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=16&addressdetails=1`;
                 const res = await fetch(url, {
-                    headers: { "Accept-Language": "id" }
+                    headers: { 
+                        "Accept-Language": "id",
+                        "User-Agent": "SDN-Muhara-Attendance-System"
+                    }
                 });
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
                 const data = await res.json();
                 const addr = data.address || {};
-                const namaTempat = [
-                    addr.school || addr.university || addr.public_building || "",
-                    addr.village || addr.hamlet || addr.suburb || "",
-                    addr.city_district || addr.town || addr.city || addr.county || ""
-                ].filter(Boolean).join(", ");
-                return namaTempat || data.display_name || `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
-            } catch (e) {
-                console.error("Reverse geocode error:", e);
-                return `Lat: ${lat.toFixed(4)}, Lon: ${lon.toFixed(4)}`;
+                
+                // Build location string
+                const parts = [
+                    addr.road,
+                    addr.village || addr.hamlet,
+                    addr.subdistrict,
+                    addr.city || addr.town,
+                    addr.state
+                ].filter(Boolean);
+                
+                return parts.length > 0 ? parts.join(', ') : data.display_name || 'Lokasi tidak diketahui';
+                
+            } catch (error) {
+                console.warn('Geocoding error:', error);
+                return `Koordinat: ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
             }
         }
 
         function updateLocation(lat, lon, placeName) {
             window.currentCoords = { lat, lon };
-            $('#current-location-display').textContent = `Lokasi: ${placeName || 'Koordinat Tersimpan'}`;
+            $('#current-location-display').textContent = `📍 Lokasi: ${placeName}`;
         }
-        
+
         function getLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    async (position) => {
-                        const { latitude, longitude } = position.coords;
+            if (!navigator.geolocation) {
+                $('#current-location-display').textContent = '📍 Lokasi: GPS tidak didukung';
+                return;
+            }
+            
+            $('#current-location-display').textContent = '📍 Lokasi: Mendeteksi...';
+            
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    const { latitude, longitude } = position.coords;
+                    
+                    try {
                         const placeName = await reverseGeocode(latitude, longitude);
                         updateLocation(latitude, longitude, placeName);
-                    },
-                    (error) => {
-                        console.error('Geolocation Error:', error);
-                        $('#current-location-display').textContent = 'Lokasi: Gagal mendapatkan lokasi (Izinkan akses).';
-                        toast('Gagal mendapatkan lokasi. Pastikan GPS aktif.', 'err');
-                    },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-                );
-            } else {
-                $('#current-location-display').textContent = 'Lokasi: Geolocation tidak didukung.';
-            }
+                    } catch (error) {
+                        updateLocation(latitude, longitude, `Koordinat: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+                    }
+                },
+                (error) => {
+                    console.warn('Geolocation error:', error);
+                    let message = 'Tidak dapat mengakses lokasi';
+                    
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            message = 'Izin lokasi ditolak';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            message = 'Informasi lokasi tidak tersedia';
+                            break;
+                        case error.TIMEOUT:
+                            message = 'Timeout mendapatkan lokasi';
+                            break;
+                    }
+                    
+                    $('#current-location-display').textContent = `📍 ${message}`;
+                    toast('Aktifkan GPS/lokasi untuk akurasi lebih baik', 'warning');
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
         }
-        
-        // INIT
+
+        // ========== INITIALIZATION ==========
         function initApp() {
-            const today = new Date().toLocaleDateString("id-ID", { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            $('#current-date-display').textContent = `Tanggal: ${today}`;
+            // Set current date
+            const today = new Date();
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            };
+            $('#current-date-display').textContent = `📅 ${today.toLocaleDateString('id-ID', options)}`;
             
+            // Get location
             getLocation();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Load initial data
+            renderGuruSelect();
+            renderDashboard();
+            populateReportSelectors();
+            
+            // Show default page
             showPage('kehadiran');
             
+            // Check for existing attendance today
+            showMyAttendanceToday();
+            
+            // Setup Firebase listeners if available
+            if (window.whUseFirebase) {
+                setupFirebaseListeners();
+            }
+            
+            toast('Sistem siap digunakan', 'info');
+        }
+
+        function setupEventListeners() {
+            // Navigation
+            $$('.nav-item').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    showPage(e.currentTarget.getAttribute('data-page'));
+                });
+            });
+            
+            // Guru select change
+            $('#guru-select').addEventListener('change', () => {
+                currentUserGuruId = $('#guru-select').value;
+                showMyAttendanceToday();
+                updateSubmitButtonState();
+            });
+            
+            // Status change
+            $$('input[name="status"]').forEach(radio => {
+                radio.addEventListener('change', updateSubmitButtonState);
+            });
+            
+            // Admin login
+            $('#login-submit').addEventListener('click', handleLogin);
+            $('#login-cancel').addEventListener('click', () => $('#login-modal').classList.add('hidden'));
+            $('#login-cancel-btn').addEventListener('click', () => $('#login-modal').classList.add('hidden'));
+            
+            // Guru modal
+            $('#guru-form').addEventListener('submit', saveGuru);
+            $('#guru-cancel').addEventListener('click', () => $('#guru-modal').classList.add('hidden'));
+            $('#guru-cancel-btn').addEventListener('click', () => $('#guru-modal').classList.add('hidden'));
+            $('#btn-open-add-guru').addEventListener('click', () => openGuruModal(''));
+            $('#btn-add-guru-page').addEventListener('click', () => openGuruModal(''));
+            
+            // Cleanup photos
+            $('#btn-cleanup-base64').addEventListener('click', cleanupOldBase64Photos);
+            
+            // Reset data
+            $('#btn-reset-sample').addEventListener('click', async () => {
+                if (!whIsAdmin || !confirm('RESET SEMUA DATA?\n\nIni akan menghapus semua data guru dan kehadiran dari Firebase.\nTindakan ini tidak dapat dibatalkan!')) {
+                    return;
+                }
+                
+                try {
+                    const db = firebase.database();
+                    await Promise.all([
+                        db.ref('gurus').remove(),
+                        db.ref('attendances').remove(),
+                        db.ref('attendance_index').remove()
+                    ]);
+                    
+                    toast('Semua data berhasil direset', 'success');
+                    
+                    // Refresh UI
+                    renderGuruSelect();
+                    renderDashboard();
+                    renderGuruTable();
+                    updateStorageInfo();
+                    
+                } catch (error) {
+                    toast(`Gagal reset: ${error.message}`, 'error');
+                }
+            });
+        }
+
+        function setupFirebaseListeners() {
+            // Listen for Firebase updates
             document.addEventListener('gurus-updated', (e) => {
                 whGuruList = e.detail;
                 renderGuruSelect();
                 renderGuruTable();
-                generateReport();
                 renderDashboard();
-                toast(`Data Guru diperbarui (${whGuruList.length})`, 'info', 1000);
+                generateReport();
             });
 
             document.addEventListener('attendances-updated', (e) => {
                 whAttList = e.detail;
                 renderDashboard();
                 generateReport();
-                toast(`Data Kehadiran diperbarui (${whAttList.length})`, 'info', 1000);
+                showMyAttendanceToday();
             });
             
             document.addEventListener('auth-changed', (e) => {
-                 const user = e.detail;
-                 const isAdmin = user && user.admin === true;
-                 updateAdminUI(isAdmin);
-            });
-
-            if (window.whUseFirebase && window.syncFromFirebase) {
-                 window.syncFromFirebase().catch(e => {
-                     console.error("Initial sync failed", e);
-                     toast("Gagal sinkronisasi data dari Firebase. Cek koneksi atau izin.", "err");
-                 });
-            } else {
-                 renderGuruSelect();
-                 renderGuruTable();
-                 renderDashboard();
-                 generateReport();
-            }
-
-            $('#btn-reset-sample').addEventListener('click', () => {
-                 if (whIsAdmin && confirm('PERINGATAN: Aksi ini akan menghapus SEMUA data Guru dan Kehadiran di Firebase Realtime Database. Lanjutkan?')) {
-                     if (window.__WH_FIREBASE && window.__WH_FIREBASE.db) {
-                         window.__WH_FIREBASE.db.ref('gurus').remove()
-                             .then(() => window.__WH_FIREBASE.db.ref('attendances').remove())
-                             .then(() => toast('Data Guru dan Kehadiran berhasil direset!', 'ok'))
-                             .catch(e => toast(`Gagal mereset: ${e.message}`, 'err'));
-                     }
-                 }
+                const user = e.detail;
+                const isAdmin = user && user.admin === true;
+                updateAdminUI(isAdmin);
             });
         }
 
+        async function handleLogin() {
+            const email = $('#login-email').value.trim();
+            const password = $('#login-password').value.trim();
+
+            if (!email || !password) {
+                toast('Email dan password harus diisi', 'error');
+                return;
+            }
+            
+            // Demo login (fallback)
+            if (!window.whUseFirebase || !window.signInAdmin) {
+                if (email === 'admin@sdnmuhara.sch.id' && password === 'admin123') {
+                    $('#login-modal').classList.add('hidden');
+                    updateAdminUI(true);
+                    toast('Login berhasil (demo mode)', 'success');
+                } else {
+                    toast('Login gagal. Coba: admin@sdnmuhara.sch.id / admin123', 'error');
+                }
+                return;
+            }
+            
+            // Firebase login
+            try {
+                await window.signInAdmin(email, password);
+                $('#login-modal').classList.add('hidden');
+                updateAdminUI(true);
+                toast('Login berhasil', 'success');
+                
+            } catch (error) {
+                console.error('Login error:', error);
+                let message = 'Login gagal';
+                
+                if (error.code === 'auth/user-not-found') {
+                    message = 'Email tidak terdaftar';
+                } else if (error.code === 'auth/wrong-password') {
+                    message = 'Password salah';
+                } else if (error.code === 'auth/too-many-requests') {
+                    message = 'Terlalu banyak percobaan. Coba lagi nanti';
+                }
+                
+                toast(message, 'error');
+            }
+        }
+
+        // ========== START APPLICATION ==========
         document.addEventListener('DOMContentLoaded', initApp);
+
+        // ========== GLOBAL FUNCTIONS ==========
+        window.openGuruModal = openGuruModal;
+        window.deleteGuru = deleteGuru;
+        window.showPhotoModal = showPhotoModal;
+        window.closePhotoModal = closePhotoModal;
+        window.renderDashboard = renderDashboard;
+
     </script>
 </body>
 </html>
