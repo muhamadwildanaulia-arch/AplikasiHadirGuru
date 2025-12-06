@@ -43,6 +43,26 @@
         }
         .photo-yes { background-color: #10b981; }
         .photo-no { background-color: #ef4444; }
+        .pin-input {
+            letter-spacing: 0.2em;
+            font-family: 'Courier New', monospace;
+        }
+        .pin-correct {
+            border-color: #10b981 !important;
+            background-color: #f0fdf4;
+        }
+        .pin-wrong {
+            border-color: #ef4444 !important;
+            background-color: #fef2f2;
+        }
+        @keyframes pinShake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+        .pin-shake {
+            animation: pinShake 0.5s ease-in-out;
+        }
         /* Mobile optimizations */
         @media (max-width: 640px) {
             .mobile-padding { padding: 1rem; }
@@ -91,8 +111,6 @@
                 </button>
                 <div class="p-2 bg-indigo-900 rounded text-xs mt-2">
                     <p class="font-semibold">ℹ️ Info Sistem:</p>
-                    <p>• Foto disimpan di database</p>
-                    <p>• Bisa dilihat semua device</p>
                     <p id="storage-info">• Loading...</p>
                 </div>
             </div>
@@ -134,6 +152,49 @@
                             <option value="">-- Pilih Nama Anda --</option>
                         </select>
                         <p class="text-xs text-gray-500 mt-1">Pilih nama Anda dari daftar</p>
+                    </div>
+
+                    <!-- PIN VERIFIKASI -->
+                    <div class="border-t pt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            🔐 Kode Verifikasi
+                            <button type="button" onclick="showPinHelp()" class="text-xs text-indigo-600 hover:text-indigo-800 ml-2">
+                                🆘 Bantuan
+                            </button>
+                        </label>
+                        
+                        <div class="relative">
+                            <input 
+                                type="password" 
+                                id="guru-pin" 
+                                maxlength="8"
+                                pattern="[0-9]*"
+                                inputmode="numeric"
+                                placeholder="Masukkan kode: 20203605"
+                                class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center text-lg tracking-wider pin-input"
+                                required
+                            />
+                            <button 
+                                type="button" 
+                                id="btn-show-pin" 
+                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                title="Tampilkan/Sembunyikan kode"
+                            >
+                                👁️
+                            </button>
+                        </div>
+                        
+                        <div class="mt-2 text-center">
+                            <p class="text-xs text-gray-500">
+                                Kode: <span id="hint-pin" class="font-mono text-amber-600">20203605</span>
+                                <button type="button" onclick="copyPinHint()" class="ml-2 text-indigo-600 hover:text-indigo-800 text-xs">
+                                    📋 Salin
+                                </button>
+                            </p>
+                            <p class="text-xs text-gray-400 mt-1">
+                                Kode sama untuk semua guru
+                            </p>
+                        </div>
                     </div>
 
                     <div>
@@ -282,11 +343,12 @@
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">NIP</th>
                                     <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Jabatan</th>
                                     <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase">Kode</th>
                                     <th id="guru-action-header" class="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase hidden">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody id="guru-table-body" class="bg-white divide-y divide-gray-200">
-                                <tr><td colspan="5" class="text-center p-6 text-gray-500">Memuat data...</td></tr>
+                                <tr><td colspan="6" class="text-center p-6 text-gray-500">Memuat data...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -449,6 +511,49 @@
         </div>
     </div>
 
+    <!-- MODAL BANTUAN PIN -->
+    <div id="pin-help-modal" class="fixed inset-0 z-80 hidden items-center justify-center bg-black/50 p-4">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-indigo-700">🆘 Bantuan Kode Verifikasi</h3>
+                <button onclick="closePinHelp()" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="bg-amber-50 p-4 rounded-lg">
+                    <p class="font-medium text-amber-800">Kode Verifikasi Saat Ini:</p>
+                    <p class="text-3xl font-bold text-center my-3 font-mono tracking-wider text-indigo-700">
+                        20203605
+                    </p>
+                    <button onclick="copyMasterPin()" class="w-full mt-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                        📋 Salin Kode
+                    </button>
+                </div>
+                
+                <div class="text-sm text-gray-600">
+                    <p class="font-medium mb-2">📝 Informasi:</p>
+                    <ul class="list-disc pl-5 space-y-1">
+                        <li>Kode ini sama untuk <strong>semua guru</strong></li>
+                        <li>Masukkan saat mengisi absen</li>
+                        <li>Pastikan koneksi internet stabil</li>
+                        <li>Foto wajah harus jelas terlihat</li>
+                    </ul>
+                </div>
+                
+                <div class="text-xs text-gray-500 border-t pt-4">
+                    <p>Ada masalah? Hubungi admin:</p>
+                    <p class="font-medium">📞 0812-3456-7890</p>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end">
+                <button onclick="closePinHelp()" class="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -498,6 +603,66 @@
             }, duration);
         }
 
+        // ========== PIN FUNCTIONS ==========
+        function validateGuruPin(guruId, pinInput) {
+            const MASTER_PIN = '20203605';
+            const cleanPin = pinInput.replace(/\s/g, '');
+            
+            if (cleanPin === MASTER_PIN) {
+                return true;
+            }
+            
+            return false;
+        }
+
+        function setupPinVisibilityToggle() {
+            const pinInput = $('#guru-pin');
+            const showBtn = $('#btn-show-pin');
+            
+            showBtn.addEventListener('click', () => {
+                if (pinInput.type === 'password') {
+                    pinInput.type = 'text';
+                    showBtn.textContent = '🙈';
+                    showBtn.title = 'Sembunyikan kode';
+                } else {
+                    pinInput.type = 'password';
+                    showBtn.textContent = '👁️';
+                    showBtn.title = 'Tampilkan kode';
+                }
+            });
+        }
+
+        function copyPinHint() {
+            const pinHint = '20203605';
+            navigator.clipboard.writeText(pinHint).then(() => {
+                toast('Kode disalin ke clipboard!', 'success');
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                const tempInput = document.createElement('input');
+                tempInput.value = pinHint;
+                document.body.appendChild(tempInput);
+                tempInput.select();
+                document.execCommand('copy');
+                document.body.removeChild(tempInput);
+                toast('Kode disalin!', 'success');
+            });
+        }
+
+        function showPinHelp() {
+            $('#pin-help-modal').classList.remove('hidden');
+        }
+
+        function closePinHelp() {
+            $('#pin-help-modal').classList.add('hidden');
+        }
+
+        function copyMasterPin() {
+            const masterPin = '20203605';
+            navigator.clipboard.writeText(masterPin).then(() => {
+                toast('Kode berhasil disalin!', 'success');
+            });
+        }
+
         // ========== DATA MANAGEMENT ==========
         function loadGuruList() {
             if (window.whUseFirebase) return whGuruList;
@@ -513,7 +678,7 @@
             } catch { return []; }
         }
 
-        // ========== PHOTO HANDLING (BASE64) ==========
+        // ========== PHOTO HANDLING ==========
         async function compressImageForBase64(file, maxWidth = 400, quality = 0.5) {
             return new Promise((resolve, reject) => {
                 const img = new Image();
@@ -525,7 +690,6 @@
                         let width = img.width;
                         let height = img.height;
                         
-                        // Resize untuk ukuran kecil
                         if (width > maxWidth) {
                             height = (height * maxWidth) / width;
                             width = maxWidth;
@@ -537,12 +701,10 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Kompres agresif untuk ukuran kecil
                         canvas.toBlob(
                             (blob) => {
                                 if (!blob) reject(new Error("Gagal kompres gambar"));
                                 
-                                // Target maksimal 30KB
                                 if (blob.size > 30 * 1024) {
                                     const newQuality = Math.max(0.2, quality * 0.6);
                                     canvas.toBlob(
@@ -568,7 +730,6 @@
 
         async function processPhotoForDatabase(file, guruId, tanggal) {
             try {
-                // Validasi file
                 if (!file || !file.type.startsWith('image/')) {
                     throw new Error('File harus berupa gambar');
                 }
@@ -577,17 +738,13 @@
                     throw new Error('Ukuran file maksimal 5MB');
                 }
 
-                // Kompres gambar
                 const compressedBlob = await compressImageForBase64(file, 400, 0.4);
                 
-                // Konversi ke Base64
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = (e) => {
                         const base64String = e.target.result;
                         const base64Data = base64String.split(',')[1];
-                        
-                        // Potong maksimal 25KB untuk hemat database
                         const truncatedBase64 = base64Data.substring(0, 25000);
                         
                         resolve({
@@ -608,49 +765,6 @@
             }
         }
 
-        // ========== ATTENDANCE WITH BASE64 ==========
-        async function saveAttendanceWithBase64(attendanceData, file) {
-            if (!window.whUseFirebase || !firebase.database) {
-                throw new Error('Firebase tidak tersedia');
-            }
-
-            const today = attendanceData.tanggal;
-            const indexKey = `${attendanceData.idGuru}_${today}`;
-            
-            // Proses foto jika ada
-            if (file) {
-                try {
-                    const photoData = await processPhotoForDatabase(file, attendanceData.idGuru, today);
-                    
-                    // Simpan data foto
-                    attendanceData.photoBase64 = photoData.base64;
-                    attendanceData.photoSize = photoData.size;
-                    attendanceData.photoOriginalSize = photoData.originalSize;
-                    attendanceData.photoCompressed = photoData.compressed;
-                    attendanceData.hasPhoto = true;
-                    attendanceData.photoTimestamp = photoData.timestamp;
-                    
-                } catch (photoError) {
-                    console.warn('Foto gagal diproses:', photoError);
-                    attendanceData.photoError = photoError.message;
-                    // Lanjutkan tanpa foto
-                }
-            }
-
-            // Simpan ke database menggunakan fungsi dari app.firebase.js
-            if (window.addAttendanceFirebase) {
-                try {
-                    const result = await window.addAttendanceFirebase(attendanceData);
-                    return result;
-                } catch (error) {
-                    console.error('Error from addAttendanceFirebase:', error);
-                    throw error;
-                }
-            } else {
-                throw new Error('Fungsi addAttendanceFirebase tidak tersedia');
-            }
-        }
-
         // ========== PHOTO PREVIEW HANDLING ==========
         const photoInputEl = $('#attendance-photo');
         const photoPreview = $('#photo-preview');
@@ -666,7 +780,6 @@
                 return;
             }
 
-            // Validasi
             if (!file.type.startsWith('image/')) {
                 toast('File harus berupa gambar (JPG/PNG)', 'error');
                 resetPhotoPreview();
@@ -679,13 +792,11 @@
                 return;
             }
 
-            // Preview
             const reader = new FileReader();
             reader.onload = (ev) => {
                 photoPreview.src = ev.target.result;
                 photoPreview.classList.remove('hidden');
                 
-                // Update UI
                 const sizeMB = (file.size / 1024 / 1024).toFixed(2);
                 photoSize.textContent = `${sizeMB} MB`;
                 photoStatus.textContent = 'Akan dikompres';
@@ -693,7 +804,6 @@
                 photoInfo.classList.remove('hidden');
                 photoIndicator.classList.replace('photo-no', 'photo-yes');
                 
-                // Update tombol submit
                 updateSubmitButtonState();
             };
             reader.readAsDataURL(file);
@@ -714,7 +824,8 @@
             const submitBtn = $('#submit-button');
             const guruSelected = $('#guru-select').value;
             const hasPhoto = photoInputEl.files.length > 0;
-            const isValid = guruSelected && hasPhoto;
+            const hasPin = $('#guru-pin').value.trim().length >= 8;
+            const isValid = guruSelected && hasPhoto && hasPin;
             
             submitBtn.disabled = !isValid;
             submitBtn.classList.toggle('opacity-50', !isValid);
@@ -729,11 +840,27 @@
             const idGuru = selectedOption.value;
             const namaGuru = selectedOption.getAttribute('data-nama');
             const status = $('input[name="status"]:checked').value;
+            const pinInput = $('#guru-pin').value.trim();
             const lokasiText = $('#current-location-display').textContent.replace('📍 Lokasi: ', '');
             const file = photoInputEl.files[0];
             
+            // Validasi
             if (!idGuru) {
                 toast('Pilih nama guru terlebih dahulu', 'error');
+                return;
+            }
+            
+            if (!pinInput) {
+                toast('Masukkan kode verifikasi', 'error');
+                $('#guru-pin').focus();
+                return;
+            }
+            
+            // Validasi PIN
+            if (!validateGuruPin(idGuru, pinInput)) {
+                toast('Kode verifikasi salah. Masukkan: 20203605', 'error');
+                $('#guru-pin').focus();
+                $('#guru-pin').select();
                 return;
             }
             
@@ -741,14 +868,13 @@
                 toast('Foto kehadiran wajib diambil', 'error');
                 return;
             }
-
-            // Simpan ID guru untuk cek absen hari ini
+            
             currentUserGuruId = idGuru;
-
+            
             const now = new Date();
             const todayStr = now.toISOString().slice(0, 10);
-
-            // Cek sudah absen (local check)
+            
+            // Cek sudah absen
             const alreadyToday = loadAtt().some(att => 
                 att.idGuru === idGuru && att.tanggal === todayStr
             );
@@ -758,7 +884,7 @@
                 showMyAttendanceToday();
                 return;
             }
-
+            
             const attendanceData = {
                 idGuru,
                 namaGuru,
@@ -768,19 +894,20 @@
                 tempat: lokasiText,
                 lat: window.currentCoords ? window.currentCoords.lat : null,
                 lon: window.currentCoords ? window.currentCoords.lon : null,
+                verifiedByPin: true
             };
-
-            // Tampilkan loading
+            
+            // Loading state
             const submitBtn = $('#submit-button');
             const originalText = $('#submit-text').textContent;
-            $('#submit-text').innerHTML = '<div class="loading-spinner"></div> Menyimpan...';
+            $('#submit-text').innerHTML = '<div class="loading-spinner"></div> Verifikasi & Menyimpan...';
             submitBtn.disabled = true;
-
+            
             try {
                 let result;
                 
                 if (window.whUseFirebase && window.addAttendanceFirebase) {
-                    // Proses foto terlebih dahulu
+                    // Proses foto
                     if (file) {
                         try {
                             const photoData = await processPhotoForDatabase(file, idGuru, todayStr);
@@ -789,15 +916,13 @@
                             attendanceData.hasPhoto = true;
                         } catch (photoError) {
                             console.warn('Foto gagal diproses:', photoError);
-                            // Lanjutkan tanpa foto
                         }
                     }
                     
-                    // Panggil fungsi dari app.firebase.js
                     result = await window.addAttendanceFirebase(attendanceData);
                     
                 } else {
-                    // Fallback untuk mode offline
+                    // Fallback offline
                     toast('Mode offline - simpan di localStorage', 'warning');
                     attendanceData.timestamp = Date.now();
                     const currentAtt = loadAtt();
@@ -806,14 +931,15 @@
                     result = attendanceData;
                 }
                 
-                toast(`✅ Absen ${status} berhasil disimpan!`, 'success');
+                toast(`✅ Absen ${status} berhasil! Kode verifikasi valid.`, 'success');
                 
-                // Reset form tapi tetap tampilkan info
+                // Reset form
                 $('#attendance-form').reset();
                 resetPhotoPreview();
+                $('#guru-pin').value = '';
                 showMyAttendanceToday();
                 
-                // Refresh dashboard jika di halaman dashboard
+                // Refresh dashboard
                 if (!$('#page-dashboard').classList.contains('hidden')) {
                     renderDashboard();
                 }
@@ -954,7 +1080,6 @@
             }
 
             listBody.innerHTML = todayAtt.map(att => {
-                // Handle foto dari Base64
                 let fotoUrl = null;
                 let hasPhoto = false;
                 
@@ -1050,7 +1175,7 @@
             if (gurus.length === 0) {
                 body.innerHTML = `
                     <tr>
-                        <td colspan="5" class="text-center p-8 text-gray-400">
+                        <td colspan="6" class="text-center p-8 text-gray-400">
                             <div class="mb-2">👨‍🏫</div>
                             Belum ada data guru
                         </td>
@@ -1073,6 +1198,9 @@
                             ${guru.status || 'Aktif'}
                         </span>
                     </td>
+                    <td class="px-4 py-3 text-center font-mono text-sm">
+                        <span class="bg-gray-100 px-2 py-1 rounded">20203605</span>
+                    </td>
                     <td class="px-4 py-3 text-center ${whIsAdmin ? '' : 'hidden'}">
                         <button onclick="openGuruModal('${guru.id}')" 
                                 class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 text-sm mr-2">
@@ -1089,7 +1217,6 @@
             $('#guru-count').textContent = gurus.length;
         }
 
-        // ========== GURU MODAL FUNCTIONS ==========
         function openGuruModal(id = '') {
             if (!whIsAdmin) {
                 toast('Hanya admin yang bisa mengelola data guru', 'error');
@@ -1141,7 +1268,6 @@
                     await window.addGuruFirebase(data);
                     toast('Guru baru berhasil ditambahkan', 'success');
                 } else {
-                    // Fallback local
                     const gurus = loadGuruList();
                     if (id) {
                         const index = gurus.findIndex(g => g.id === id);
@@ -1179,7 +1305,6 @@
                     await window.deleteGuruFirebase(id);
                     toast('Guru berhasil dihapus', 'success');
                 } else {
-                    // Fallback local
                     const gurus = loadGuruList().filter(g => g.id !== id);
                     localStorage.setItem('wh_guru_list_v1', JSON.stringify(gurus));
                     toast('Guru dihapus dari data lokal', 'info');
@@ -1195,15 +1320,12 @@
 
         // ========== PAGE NAVIGATION ==========
         function showPage(pageName) {
-            // Hide all pages
             $$('section[id^="page-"]').forEach(page => {
                 page.classList.add('hidden');
             });
             
-            // Show selected page
             $(`#page-${pageName}`).classList.remove('hidden');
             
-            // Update active nav
             $$('.nav-item').forEach(btn => {
                 const isActive = btn.getAttribute('data-page') === pageName;
                 const isSidebar = btn.closest('aside');
@@ -1223,7 +1345,6 @@
                 }
             });
             
-            // Execute page-specific functions
             switch(pageName) {
                 case 'dashboard':
                     renderDashboard();
@@ -1232,7 +1353,7 @@
                     renderGuruTable();
                     break;
                 case 'laporan':
-                    if (!reportMonthSel.value) populateReportSelectors();
+                    if (!$('#reportMonth').value) populateReportSelectors();
                     generateReport();
                     break;
             }
@@ -1444,7 +1565,6 @@
                 $('#btn-add-guru-page').classList.remove('hidden');
                 $('#btn-cleanup-base64').classList.remove('hidden');
                 
-                // Update storage info
                 updateStorageInfo();
                 
             } else {
@@ -1473,12 +1593,11 @@
                 const guruCount = gurusSnap.numChildren();
                 const attCount = attSnap.numChildren();
                 
-                // Hitung total size (estimasi)
                 let totalSize = 0;
                 attSnap.forEach(child => {
                     const att = child.val();
                     if (att.photoBase64) {
-                        totalSize += att.photoBase64.length * 0.75; // Base64 size estimate
+                        totalSize += att.photoBase64.length * 0.75;
                     }
                 });
                 
@@ -1503,7 +1622,6 @@
             showPage('kehadiran');
         }
 
-        // ========== CLEANUP BASE64 PHOTOS ==========
         async function cleanupOldBase64Photos() {
             if (!whIsAdmin) {
                 toast('Hanya admin yang bisa membersihkan foto', 'error');
@@ -1515,33 +1633,37 @@
             }
             
             try {
-                const db = firebase.database();
                 const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
                 let cleanedCount = 0;
                 
-                const snapshot = await db.ref('attendances').once('value');
-                const updates = {};
-                
-                snapshot.forEach(child => {
-                    const att = child.val();
-                    const attTime = att.timestamp || 0;
+                if (window.whUseFirebase) {
+                    const db = firebase.database();
+                    const snapshot = await db.ref('attendances').once('value');
+                    const updates = {};
                     
-                    if (attTime < thirtyDaysAgo && att.photoBase64) {
-                        updates[`${child.key}/photoBase64`] = null;
-                        updates[`${child.key}/photoSize`] = null;
-                        updates[`${child.key}/photoCompressed`] = null;
-                        updates[`${child.key}/photoCleaned`] = true;
-                        updates[`${child.key}/photoCleanedAt`] = Date.now();
-                        cleanedCount++;
+                    snapshot.forEach(child => {
+                        const att = child.val();
+                        const attTime = att.timestamp || 0;
+                        
+                        if (attTime < thirtyDaysAgo && att.photoBase64) {
+                            updates[`${child.key}/photoBase64`] = null;
+                            updates[`${child.key}/photoSize`] = null;
+                            updates[`${child.key}/photoCompressed`] = null;
+                            updates[`${child.key}/photoCleaned`] = true;
+                            updates[`${child.key}/photoCleanedAt`] = Date.now();
+                            cleanedCount++;
+                        }
+                    });
+                    
+                    if (Object.keys(updates).length > 0) {
+                        await db.ref('attendances').update(updates);
+                        toast(`Berhasil membersihkan ${cleanedCount} foto lama`, 'success');
+                        updateStorageInfo();
+                    } else {
+                        toast('Tidak ada foto yang perlu dibersihkan', 'info');
                     }
-                });
-                
-                if (Object.keys(updates).length > 0) {
-                    await db.ref('attendances').update(updates);
-                    toast(`Berhasil membersihkan ${cleanedCount} foto lama`, 'success');
-                    updateStorageInfo();
                 } else {
-                    toast('Tidak ada foto yang perlu dibersihkan', 'info');
+                    toast('Fitur hanya tersedia dengan Firebase', 'warning');
                 }
                 
             } catch (error) {
@@ -1565,7 +1687,6 @@
                 const data = await res.json();
                 const addr = data.address || {};
                 
-                // Build location string
                 const parts = [
                     addr.road,
                     addr.village || addr.hamlet,
@@ -1651,9 +1772,32 @@
             // Setup event listeners
             setupEventListeners();
             
+            // Setup PIN functionality
+            setupPinVisibilityToggle();
+            
+            // Set placeholder untuk PIN
+            $('#guru-pin').placeholder = 'Kode: 20203605';
+            
             // Load initial data
-            renderGuruSelect();
-            renderDashboard();
+            if (window.whUseFirebase && window.syncFromFirebase) {
+                window.syncFromFirebase().then(() => {
+                    console.log('Initial sync completed');
+                    renderGuruSelect();
+                    renderDashboard();
+                }).catch(err => {
+                    console.error('Sync failed:', err);
+                    whGuruList = loadGuruList();
+                    whAttList = loadAtt();
+                    renderGuruSelect();
+                    renderDashboard();
+                });
+            } else {
+                whGuruList = loadGuruList();
+                whAttList = loadAtt();
+                renderGuruSelect();
+                renderDashboard();
+            }
+            
             populateReportSelectors();
             
             // Show default page
@@ -1661,11 +1805,6 @@
             
             // Check for existing attendance today
             showMyAttendanceToday();
-            
-            // Setup Firebase listeners if available
-            if (window.whUseFirebase) {
-                setupFirebaseListeners();
-            }
             
             toast('Sistem siap digunakan', 'info');
         }
@@ -1688,6 +1827,20 @@
             // Status change
             $$('input[name="status"]').forEach(radio => {
                 radio.addEventListener('change', updateSubmitButtonState);
+            });
+            
+            // PIN input
+            $('#guru-pin').addEventListener('input', () => {
+                updateSubmitButtonState();
+                
+                const pin = $('#guru-pin').value;
+                if (pin.length === 8) {
+                    $('#guru-pin').classList.remove('border-red-300');
+                    $('#guru-pin').classList.add('border-green-300');
+                } else {
+                    $('#guru-pin').classList.remove('border-green-300');
+                    $('#guru-pin').classList.add('border-red-300');
+                }
             });
             
             // Admin login
@@ -1721,7 +1874,6 @@
                     
                     toast('Semua data berhasil direset', 'success');
                     
-                    // Refresh UI
                     renderGuruSelect();
                     renderDashboard();
                     renderGuruTable();
@@ -1734,25 +1886,26 @@
         }
 
         function setupFirebaseListeners() {
-            // Listen for Firebase updates
-            document.addEventListener('gurus-updated', (e) => {
-                whGuruList = e.detail;
+            if (!window.whUseFirebase) return;
+            
+            window.addEventListener('gurus-updated', (e) => {
+                whGuruList = e.detail || [];
                 renderGuruSelect();
                 renderGuruTable();
                 renderDashboard();
                 generateReport();
             });
 
-            document.addEventListener('attendances-updated', (e) => {
-                whAttList = e.detail;
+            window.addEventListener('attendances-updated', (e) => {
+                whAttList = e.detail || [];
                 renderDashboard();
                 generateReport();
                 showMyAttendanceToday();
             });
             
-            document.addEventListener('auth-changed', (e) => {
+            window.addEventListener('auth-changed', (e) => {
                 const user = e.detail;
-                const isAdmin = user && user.admin === true;
+                const isAdmin = user && (user.admin === true || user.email === 'admin@sdnmuhara.sch.id');
                 updateAdminUI(isAdmin);
             });
         }
@@ -1766,29 +1919,31 @@
                 return;
             }
             
-            // Demo login (fallback)
-            if (!window.whUseFirebase || !window.signInAdmin) {
-                if (email === 'admin@sdnmuhara.sch.id' && password === 'admin123') {
-                    $('#login-modal').classList.add('hidden');
-                    updateAdminUI(true);
-                    toast('Login berhasil (demo mode)', 'success');
-                } else {
-                    toast('Login gagal. Coba: admin@sdnmuhara.sch.id / admin123', 'error');
-                }
-                return;
-            }
-            
-            // Firebase login
+            // Tampilkan loading
+            const loginBtn = $('#login-submit');
+            const originalText = loginBtn.textContent;
+            loginBtn.textContent = 'Loading...';
+            loginBtn.disabled = true;
+
             try {
-                await window.signInAdmin(email, password);
-                $('#login-modal').classList.add('hidden');
-                updateAdminUI(true);
-                toast('Login berhasil', 'success');
+                if (window.signInAdmin) {
+                    await window.signInAdmin(email, password);
+                    $('#login-modal').classList.add('hidden');
+                    toast('Login berhasil', 'success');
+                } else {
+                    if (email === 'admin@sdnmuhara.sch.id' && password === 'admin123') {
+                        $('#login-modal').classList.add('hidden');
+                        updateAdminUI(true);
+                        toast('Login berhasil (demo mode)', 'success');
+                    } else {
+                        toast('Login gagal. Coba: admin@sdnmuhara.sch.id / admin123', 'error');
+                    }
+                }
                 
             } catch (error) {
                 console.error('Login error:', error);
-                let message = 'Login gagal';
                 
+                let message = 'Login gagal';
                 if (error.code === 'auth/user-not-found') {
                     message = 'Email tidak terdaftar';
                 } else if (error.code === 'auth/wrong-password') {
@@ -1798,6 +1953,15 @@
                 }
                 
                 toast(message, 'error');
+                
+                if (window.whUseFirebase && email === 'admin@sdnmuhara.sch.id' && password === 'admin123') {
+                    toast('Menggunakan mode demo', 'warning');
+                    $('#login-modal').classList.add('hidden');
+                    updateAdminUI(true);
+                }
+            } finally {
+                loginBtn.textContent = originalText;
+                loginBtn.disabled = false;
             }
         }
 
@@ -1810,6 +1974,10 @@
         window.showPhotoModal = showPhotoModal;
         window.closePhotoModal = closePhotoModal;
         window.renderDashboard = renderDashboard;
+        window.showPinHelp = showPinHelp;
+        window.closePinHelp = closePinHelp;
+        window.copyMasterPin = copyMasterPin;
+        window.copyPinHint = copyPinHint;
 
     </script>
 </body>
