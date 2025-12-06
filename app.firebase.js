@@ -23,12 +23,14 @@ console.log("🚀 Loading app.firebase.js");
   // Check Firebase SDK
   if (typeof firebase === 'undefined') {
     console.error('❌ Firebase SDK tidak ditemukan!');
+    window.whUseFirebase = false;
     return;
   }
 
   // Initialize Firebase
   try {
     firebase.initializeApp(firebaseConfig);
+    console.log('✅ Firebase initialized');
   } catch (err) {
     console.warn('Firebase sudah diinisialisasi:', err.message);
   }
@@ -64,8 +66,8 @@ console.log("🚀 Loading app.firebase.js");
     try {
       const cred = await auth.signInWithEmailAndPassword(email, password);
       
-      // Check if admin (simplified - always true for demo)
-      const isAdmin = email === 'admin@sdnmuhara.sch.id';
+      // Always treat as admin for demo
+      const isAdmin = true;
       
       emit('auth-changed', {
         uid: cred.user.uid,
@@ -116,11 +118,13 @@ console.log("🚀 Loading app.firebase.js");
         nip: data.nip || '',
         nama: data.nama || '',
         jabatan: data.jabatan || '',
+        password: '20203605', // PIN SAMA UNTUK SEMUA
         status: 'Aktif',
         createdAt: firebase.database.ServerValue.TIMESTAMP
       };
       
       await ref.set(guruData);
+      emit('gurus-updated', normalizeSnapshotToArray((await db.ref('gurus').once('value')).val()));
       return guruData;
     } catch (error) {
       console.error('Add guru error:', error);
@@ -134,6 +138,7 @@ console.log("🚀 Loading app.firebase.js");
         ...data,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
       });
+      emit('gurus-updated', normalizeSnapshotToArray((await db.ref('gurus').once('value')).val()));
       return true;
     } catch (error) {
       console.error('Update guru error:', error);
@@ -144,6 +149,7 @@ console.log("🚀 Loading app.firebase.js");
   async function deleteGuruFirebase(id) {
     try {
       await db.ref('gurus/' + id).remove();
+      emit('gurus-updated', normalizeSnapshotToArray((await db.ref('gurus').once('value')).val()));
       return true;
     } catch (error) {
       console.error('Delete guru error:', error);
@@ -182,6 +188,7 @@ console.log("🚀 Loading app.firebase.js");
         photoBase64: data.photoBase64 || null,
         photoSize: data.photoSize || null,
         hasPhoto: !!data.photoBase64,
+        verifiedByPin: data.verifiedByPin || false,
         userId: auth.currentUser ? auth.currentUser.uid : 'anonymous',
         timestamp: firebase.database.ServerValue.TIMESTAMP
       };
@@ -190,11 +197,15 @@ console.log("🚀 Loading app.firebase.js");
       
       // Save index to prevent double attendance
       try {
-        await db.ref('attendance_index/' + indexKey).set(true);
+        await db.ref('attendance_index/' + indexKey).set({
+          attendanceId: ref.key,
+          timestamp: Date.now()
+        });
       } catch (indexError) {
         console.warn('Index save warning:', indexError);
       }
       
+      emit('attendances-updated', normalizeSnapshotToArray((await db.ref('attendances').once('value')).val()));
       return attendanceData;
     } catch (error) {
       console.error('Add attendance error:', error);
@@ -269,5 +280,12 @@ console.log("🚀 Loading app.firebase.js");
   window.whUseFirebase = true;
 
   console.log('✅ app.firebase.js loaded successfully');
+
+  // Initial sync
+  setTimeout(() => {
+    syncFromFirebase().catch(err => {
+      console.warn('Initial sync failed:', err);
+    });
+  }, 1000);
 
 })();
