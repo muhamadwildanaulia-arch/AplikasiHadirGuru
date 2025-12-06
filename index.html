@@ -614,17 +614,9 @@
                 throw new Error('Firebase tidak tersedia');
             }
 
-            const db = firebase.database();
             const today = attendanceData.tanggal;
             const indexKey = `${attendanceData.idGuru}_${today}`;
-            const indexRef = db.ref('attendance_index').child(indexKey);
-
-            // Cek sudah absen hari ini
-            const snap = await indexRef.once('value');
-            if (snap.exists()) {
-                throw new Error('Anda sudah absen hari ini');
-            }
-
+            
             // Proses foto jika ada
             if (file) {
                 try {
@@ -645,31 +637,18 @@
                 }
             }
 
-            // Simpan ke database
-            const ref = db.ref('attendances').push();
-            const payload = {
-                ...attendanceData,
-                id: ref.key,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                deviceInfo: {
-                    userAgent: navigator.userAgent,
-                    platform: navigator.platform,
-                    isMobile: /Mobi|Android/i.test(navigator.userAgent)
-                },
-                syncVersion: '3.0-base64'
-            };
-
-            await ref.set(payload);
-            
-            // Simpan index untuk cegah double absen
-            try {
-                await indexRef.set(true);
-            } catch (indexError) {
-                console.warn('Gagal simpan index (mungkin permission denied):', indexError);
-                // Lanjutkan saja, absen tetap tersimpan
+            // Simpan ke database menggunakan fungsi dari app.firebase.js
+            if (window.addAttendanceFirebase) {
+                try {
+                    const result = await window.addAttendanceFirebase(attendanceData);
+                    return result;
+                } catch (error) {
+                    console.error('Error from addAttendanceFirebase:', error);
+                    throw error;
+                }
+            } else {
+                throw new Error('Fungsi addAttendanceFirebase tidak tersedia');
             }
-            
-            return payload;
         }
 
         // ========== PHOTO PREVIEW HANDLING ==========
@@ -767,7 +746,7 @@
             currentUserGuruId = idGuru;
 
             const now = new Date();
-            const todayStr = now.toISOString().slice(0, 10); // <-- DIKOREKSI: todayStr dideklarasikan di sini!
+            const todayStr = now.toISOString().slice(0, 10);
 
             // Cek sudah absen (local check)
             const alreadyToday = loadAtt().some(att => 
@@ -800,8 +779,23 @@
             try {
                 let result;
                 
-                if (window.whUseFirebase) {
-                    result = await saveAttendanceWithBase64(attendanceData, file);
+                if (window.whUseFirebase && window.addAttendanceFirebase) {
+                    // Proses foto terlebih dahulu
+                    if (file) {
+                        try {
+                            const photoData = await processPhotoForDatabase(file, idGuru, todayStr);
+                            attendanceData.photoBase64 = photoData.base64;
+                            attendanceData.photoSize = photoData.size;
+                            attendanceData.hasPhoto = true;
+                        } catch (photoError) {
+                            console.warn('Foto gagal diproses:', photoError);
+                            // Lanjutkan tanpa foto
+                        }
+                    }
+                    
+                    // Panggil fungsi dari app.firebase.js
+                    result = await window.addAttendanceFirebase(attendanceData);
+                    
                 } else {
                     // Fallback untuk mode offline
                     toast('Mode offline - simpan di localStorage', 'warning');
@@ -827,11 +821,13 @@
             } catch (error) {
                 console.error('Error save attendance:', error);
                 
-                if (error.message.includes('sudah absen')) {
+                if (error.message.includes('sudah absen') || error.code === 'already-attended') {
                     toast('❌ Anda sudah absen hari ini', 'error');
                     showMyAttendanceToday();
-                } else if (error.message.includes('internet')) {
+                } else if (error.message.includes('internet') || error.message.includes('koneksi')) {
                     toast('❌ Gagal menyimpan. Cek koneksi internet', 'error');
+                } else if (error.message.includes('permission') || error.code === 'permission-denied') {
+                    toast('❌ Akses ditolak. Hubungi admin', 'error');
                 } else {
                     toast(`❌ Gagal: ${error.message}`, 'error');
                 }
@@ -846,7 +842,7 @@
         function showMyAttendanceToday() {
             if (!currentUserGuruId) return;
             
-            const today = new Date().toISOString().slice(0, 10); // <-- DIKOREKSI: 'today' bukan 'todayStr'
+            const today = new Date().toISOString().slice(0, 10);
             const myAttToday = loadAtt().find(att => 
                 att.idGuru === currentUserGuruId && att.tanggal === today
             );
@@ -1751,7 +1747,7 @@
                 whAttList = e.detail;
                 renderDashboard();
                 generateReport();
-                showMyAttendanceToday(); // <-- DIKOREKSI: Dipanggil setelah data update
+                showMyAttendanceToday();
             });
             
             document.addEventListener('auth-changed', (e) => {
