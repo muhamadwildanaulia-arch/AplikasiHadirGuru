@@ -1,14 +1,14 @@
 /**
- * app.firebase.fixed.js — Final with Admin & Auth Check
+ * app.firebase.fixed.js — FINAL VERSION
  * WebsiteHadirGuru • SDN Muhara
- * Firebase V10 compat (compat SDK)
+ * Firebase V8 SDK
  */
 
-console.log("Loading app.firebase.js (fixed)...");
+console.log("Loading app.firebase.js (final version)...");
 
 (function () {
   // ======================================================
-  // 1) Firebase Config (gunakan milikmu)
+  // 1) FIREBASE CONFIG
   // ======================================================
   const firebaseConfig = {
     apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
@@ -21,24 +21,24 @@ console.log("Loading app.firebase.js (fixed)...");
     measurementId: "G-PK0811G8VJ"
   };
 
-  // defensive: ensure firebase lib hadir
+  // Check Firebase SDK
   if (typeof firebase === 'undefined' || !firebase.database) {
-    console.error('Firebase SDK tidak ditemukan. Pastikan <script src="https://www.gstatic.com/firebasejs/..."> sudah dimuat di index.html');
+    console.error('Firebase SDK tidak ditemukan.');
     return;
   }
 
   // ======================================================
-  // 2) Init Firebase
+  // 2) INIT FIREBASE
   // ======================================================
   try {
     firebase.initializeApp(firebaseConfig);
   } catch (err) {
-    // jika sudah di-init sebelumnya di halaman lain, ignore
-    console.warn('firebase.initializeApp warning:', err && err.message ? err.message : err);
+    console.warn('Firebase init warning:', err.message || err);
   }
+  
   const db = firebase.database();
   const auth = firebase.auth();
-
+  
   window.__WH_FIREBASE = {
     app: firebase,
     auth,
@@ -48,40 +48,47 @@ console.log("Loading app.firebase.js (fixed)...");
 
   console.log("Firebase initialized ✓");
 
-  // small helper: emit to both window & document for compatibility
+  // ======================================================
+  // 3) UTILITY FUNCTIONS
+  // ======================================================
   function emit(name, detail) {
     try {
-      // older code attached listeners to window; some to document — kirim ke keduanya
       const ev = new CustomEvent(name, { detail });
-      try { window.dispatchEvent(ev); } catch(e) { /* ignore */ }
-      try { document.dispatchEvent(ev); } catch(e) { /* ignore */ }
+      window.dispatchEvent(ev);
+      document.dispatchEvent(ev);
     } catch (e) {
       console.error('emit error', e);
     }
   }
 
-  // utility: normalisasi snapshot value -> array of items with id
   function normalizeSnapshotToArray(snapVal) {
     if (!snapVal) return [];
     if (Array.isArray(snapVal)) {
-      // ensure each item has id if available
-      return snapVal.map((v, i) => (v && v.id) ? v : Object.assign({}, v || {}, { id: (v && v.id) ? v.id : String(i) }));
+      return snapVal.map((v, i) => ({ ...v, id: v.id || String(i) }));
     }
-    // object map: include key as id if missing
-    return Object.entries(snapVal).map(([k, v]) => {
-      if (!v) return { id: k };
-      if (typeof v === 'object') {
-        return Object.assign({}, v, { id: (v.id || k) });
-      }
-      // scalar value (unexpected) -> wrap
-      return { id: k, value: v };
-    });
+    return Object.entries(snapVal).map(([k, v]) => ({ ...v, id: v.id || k }));
   }
 
-  // Utility: Cek apakah pengguna saat ini adalah Admin
-  function checkAdminAuth() {
+  // PERBAIKAN: Async check admin
+  async function checkAdminAuth() {
     const user = window.__WH_FIREBASE.currentUser;
-    if (!user || !user.admin) {
+    if (!user) {
+      // Coba refresh auth state
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const refreshedUser = window.__WH_FIREBASE.currentUser;
+      if (!refreshedUser) {
+        const error = new Error('Anda belum login. Silakan login sebagai admin.');
+        error.code = 'auth/not-logged-in';
+        throw error;
+      }
+      if (!refreshedUser.admin) {
+        const error = new Error('Akses ditolak: Hanya Admin yang dapat melakukan operasi ini.');
+        error.code = 'permission-denied';
+        throw error;
+      }
+      return true;
+    }
+    if (!user.admin) {
       const error = new Error('Akses ditolak: Hanya Admin yang dapat melakukan operasi ini.');
       error.code = 'permission-denied';
       throw error;
@@ -90,35 +97,55 @@ console.log("Loading app.firebase.js (fixed)...");
   }
 
   // ======================================================
-  // 3) AUTH HANDLERS (email/password login admin)
+  // 4) AUTH HANDLERS
   // ======================================================
   async function signInWithEmail(email, password) {
-    if (!email || !password) throw Object.assign(new Error('email & password diperlukan'), { code: 'auth/invalid-args' });
+    if (!email || !password) {
+      throw Object.assign(new Error('Email & password diperlukan'), { code: 'auth/invalid-args' });
+    }
+    
     try {
       const cred = await auth.signInWithEmailAndPassword(email, password);
-      // return user object for UI fallback; `auth.onAuthStateChanged` akan emit event
-      return cred.user;
+      
+      // Get fresh token with claims
+      let isAdmin = false;
+      try {
+        const token = await cred.user.getIdTokenResult(true);
+        isAdmin = token && token.claims && token.claims.admin === true;
+      } catch (tokenError) {
+        console.warn('Token check failed:', tokenError);
+        // Fallback: if email is admin@sdnmuhara.sch.id
+        isAdmin = email === 'admin@sdnmuhara.sch.id';
+      }
+
+      window.__WH_FIREBASE.currentUser = {
+        uid: cred.user.uid,
+        email: cred.user.email,
+        admin: isAdmin
+      };
+
+      emit("auth-changed", window.__WH_FIREBASE.currentUser);
+      return window.__WH_FIREBASE.currentUser;
+      
     } catch (err) {
-      // forward firebase error (has .code & .message)
-      console.error('signIn error', err);
+      console.error('Sign in error:', err);
       throw err;
     }
   }
 
   async function signOutFirebase() {
     try {
-      return await auth.signOut();
+      await auth.signOut();
+      window.__WH_FIREBASE.currentUser = null;
+      emit("auth-changed", null);
+      return true;
     } catch (err) {
-      console.error('signOut error', err);
+      console.error('Sign out error:', err);
       throw err;
     }
   }
 
-  // Alias yang digunakan di index.html untuk fitur Admin
-  window.signInAdmin = signInWithEmail;
-  window.signOutAdmin = signOutFirebase;
-
-  // listen to auth state changes
+  // Auth state listener
   auth.onAuthStateChanged(async (user) => {
     try {
       if (!user) {
@@ -127,113 +154,162 @@ console.log("Loading app.firebase.js (fixed)...");
         return;
       }
 
-      // refresh token for custom claims — prefer force refresh only when needed
+      // Check admin status
       let isAdmin = false;
       try {
-        // Mendapatkan token baru untuk memeriksa custom claims
-        const token = await user.getIdTokenResult(true); 
-        // Asumsi: Admin memiliki custom claim { admin: true }
+        const token = await user.getIdTokenResult(true);
         isAdmin = token && token.claims && token.claims.admin === true;
       } catch (e) {
-        console.warn('getIdTokenResult failed', e);
+        console.warn('Auth state token check failed:', e);
+        // Fallback: check email
+        isAdmin = user.email === 'admin@sdnmuhara.sch.id';
       }
 
       window.__WH_FIREBASE.currentUser = {
         uid: user.uid,
         email: user.email,
-        admin: !!isAdmin
+        admin: isAdmin
       };
 
       emit("auth-changed", window.__WH_FIREBASE.currentUser);
-    } catch(e){
-      console.error('onAuthStateChanged handler error', e);
+      
+    } catch(e) {
+      console.error('Auth state changed error:', e);
     }
   });
 
   // ======================================================
-  // 4) GURU FUNCTIONS (Admin-Only)
+  // 5) GURU FUNCTIONS (Admin Only)
   // ======================================================
   async function addGuruFirebase(data) {
-    checkAdminAuth(); // <-- Admin Check
     try {
+      await checkAdminAuth();
+      
       const ref = db.ref("gurus").push();
       const newData = {
         id: ref.key,
         nip: data.nip || "",
         nama: data.nama || "",
         jabatan: data.jabatan || "",
-        status: "Aktif"
+        status: "Aktif",
+        createdAt: firebase.database.ServerValue.TIMESTAMP
       };
+      
       await ref.set(newData);
       return newData;
+      
     } catch (err) {
-      console.error('addGuruFirebase error', err);
+      console.error('addGuruFirebase error:', err);
       throw err;
     }
   }
 
   async function updateGuruFirebase(id, updates) {
-    checkAdminAuth(); // <-- Admin Check
-    if (!id) throw Object.assign(new Error("id guru kosong"), { code: 'invalid-arg' });
     try {
-      await db.ref("gurus/" + id).update(updates);
+      await checkAdminAuth();
+      
+      if (!id) {
+        throw Object.assign(new Error("ID guru kosong"), { code: 'invalid-arg' });
+      }
+      
+      const updatesWithTimestamp = {
+        ...updates,
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      await db.ref("gurus/" + id).update(updatesWithTimestamp);
       return true;
+      
     } catch (err) {
-      console.error('updateGuruFirebase error', err);
+      console.error('updateGuruFirebase error:', err);
       throw err;
     }
   }
 
   async function deleteGuruFirebase(id) {
-    checkAdminAuth(); // <-- Admin Check
-    if (!id) throw Object.assign(new Error("id guru kosong"), { code: 'invalid-arg' });
     try {
+      await checkAdminAuth();
+      
+      if (!id) {
+        throw Object.assign(new Error("ID guru kosong"), { code: 'invalid-arg' });
+      }
+      
       await db.ref("gurus/" + id).remove();
       return true;
+      
     } catch (err) {
-      console.error('deleteGuruFirebase error', err);
+      console.error('deleteGuruFirebase error:', err);
       throw err;
     }
   }
 
-  window.addGuruFirebase = addGuruFirebase;
-  window.updateGuruFirebase = updateGuruFirebase;
-  window.deleteGuruFirebase = deleteGuruFirebase;
-
   // ======================================================
-  // 5) ATTENDANCE FUNCTIONS (Open Access)
+  // 6) ATTENDANCE FUNCTIONS (All Users)
   // ======================================================
   async function addAttendanceFirebase(data) {
-    // Tidak perlu checkAdminAuth, karena ini adalah aksi pengisian kehadiran
     try {
+      // Cek apakah user sudah login (tidak harus admin)
+      if (!auth.currentUser) {
+        throw new Error('Silakan login terlebih dahulu');
+      }
+
+      const today = data.tanggal || new Date().toISOString().slice(0, 10);
+      const indexKey = `${data.idGuru}_${today}`;
+      
+      // 1. Cek sudah absen hari ini (server-side check)
+      const indexSnap = await db.ref("attendance_index/" + indexKey).once('value');
+      if (indexSnap.exists()) {
+        const error = new Error('Anda sudah absen hari ini');
+        error.code = 'already-attended';
+        throw error;
+      }
+
+      // 2. Simpan data absensi
       const ref = db.ref("attendances").push();
       const payload = {
         id: ref.key,
         idGuru: data.idGuru || "",
-        namaGuru: data.namaGuru || (data.nama || ""),
+        namaGuru: data.namaGuru || "",
         status: data.status || "Hadir",
-        // store ISO date (YYYY-MM-DD) for easy grouping
-        tanggal: data.tanggal || new Date().toISOString().slice(0, 10),
+        tanggal: today,
         jam: data.jam || new Date().toLocaleTimeString("id-ID"),
-        lokasi: data.lokasi || "",
-        tempat: data.tempat || data.tempatName || data.placeName || "",
-        lat: (typeof data.lat !== 'undefined') ? data.lat : (data.latitude || ''),
-        lon: (typeof data.lon !== 'undefined') ? data.lon : (data.longitude || '')
+        tempat: data.tempat || "",
+        lat: data.lat || null,
+        lon: data.lon || null,
+        photoBase64: data.photoBase64 || null,
+        photoSize: data.photoSize || null,
+        hasPhoto: !!data.photoBase64,
+        deviceInfo: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+          isMobile: /Mobi|Android/i.test(navigator.userAgent)
+        },
+        userId: auth.currentUser.uid,
+        timestamp: firebase.database.ServerValue.TIMESTAMP,
+        syncVersion: '3.0-base64'
       };
+      
       await ref.set(payload);
+      
+      // 3. Update index untuk cegah double absen
+      try {
+        await db.ref("attendance_index/" + indexKey).set(true);
+      } catch (indexError) {
+        console.warn('Index update warning (mungkin permission):', indexError);
+        // Lanjutkan saja, absen tetap tersimpan
+      }
+      
       return payload;
+      
     } catch (err) {
-      console.error('addAttendanceFirebase error', err);
+      console.error('addAttendanceFirebase error:', err);
       throw err;
     }
   }
 
-  window.addAttendanceFirebase = addAttendanceFirebase;
-
   // ======================================================
-  // 6) REALTIME LISTENERS (Guru + Attendance)
+  // 7) REALTIME LISTENERS
   // ======================================================
-  // Use 'value' listeners and normalize to arrays with id fields
   db.ref("gurus").on("value", (snap) => {
     try {
       const raw = snap.val() || {};
@@ -241,7 +317,7 @@ console.log("Loading app.firebase.js (fixed)...");
       emit("gurus-updated", arr);
       console.log("Realtime: gurus updated", arr.length);
     } catch (err) {
-      console.error('gurus on value handler', err);
+      console.error('gurus listener error:', err);
     }
   });
 
@@ -252,41 +328,64 @@ console.log("Loading app.firebase.js (fixed)...");
       emit("attendances-updated", arr);
       console.log("Realtime: attendances updated", arr.length);
     } catch (err) {
-      console.error('attendances on value handler', err);
+      console.error('attendances listener error:', err);
     }
   });
 
   // ======================================================
-  // 7) SYNC FROM SERVER (called on load)
+  // 8) SYNC FUNCTION
   // ======================================================
   async function syncFromFirebase() {
     try {
-      const gSnap = await db.ref("gurus").once("value");
-      const aSnap = await db.ref("attendances").once("value");
+      const [gSnap, aSnap] = await Promise.all([
+        db.ref("gurus").once("value"),
+        db.ref("attendances").once("value")
+      ]);
 
       const gArr = normalizeSnapshotToArray(gSnap.val());
       const aArr = normalizeSnapshotToArray(aSnap.val());
 
-      // Simpan ke LocalStorage sebagai backup/cache
-      localStorage.setItem("wh_guru_list_v1", JSON.stringify(gArr));
-      localStorage.setItem("wh_att_list_v1", JSON.stringify(aArr));
+      // Backup ke localStorage
+      try {
+        localStorage.setItem("wh_guru_list_v1", JSON.stringify(gArr));
+        localStorage.setItem("wh_att_list_v1", JSON.stringify(aArr));
+      } catch (storageError) {
+        console.warn('LocalStorage error:', storageError);
+      }
 
-      // also emit events so UI updates immediately
       emit("gurus-updated", gArr);
       emit("attendances-updated", aArr);
 
-      return { gArr, aArr };
+      return { gurus: gArr, attendances: aArr };
+      
     } catch (err) {
-      console.error('syncFromFirebase error', err);
+      console.error('syncFromFirebase error:', err);
       throw err;
     }
   }
 
+  // ======================================================
+  // 9) EXPORT FUNCTIONS
+  // ======================================================
+  window.signInAdmin = signInWithEmail;
+  window.signOutAdmin = signOutFirebase;
+  window.addGuruFirebase = addGuruFirebase;
+  window.updateGuruFirebase = updateGuruFirebase;
+  window.deleteGuruFirebase = deleteGuruFirebase;
+  window.addAttendanceFirebase = addAttendanceFirebase;
   window.syncFromFirebase = syncFromFirebase;
-  window.whUseFirebase = true; // Flag to indicate Firebase is active
+  window.whUseFirebase = true;
 
   // ======================================================
-  // 8) READY
+  // 10) INITIAL SYNC
   // ======================================================
-  console.log("app.firebase.js (fixed) fully loaded ✓");
+  // Auto-sync on load
+  setTimeout(() => {
+    syncFromFirebase().catch(err => {
+      console.warn('Initial sync failed:', err);
+    });
+  }, 1000);
+
+  console.log("app.firebase.js (final) fully loaded ✓");
+
 })();
