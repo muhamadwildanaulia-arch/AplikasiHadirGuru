@@ -43,6 +43,12 @@
         }
         .photo-yes { background-color: #10b981; }
         .photo-no { background-color: #ef4444; }
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .mobile-padding { padding: 1rem; }
+            .mobile-text { font-size: 0.875rem; }
+            .mobile-btn { padding: 0.75rem 1rem; }
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -94,7 +100,7 @@
     </aside>
 
     <!-- WRAPPER KONTEN -->
-    <div class="md:ml-64 p-4">
+    <div class="md:ml-64 p-4 mobile-padding">
 
         <!-- NAV MOBILE -->
         <header class="md:hidden bg-white card-smooth p-3 mb-4 flex justify-between items-center">
@@ -654,7 +660,14 @@
             };
 
             await ref.set(payload);
-            await indexRef.set(true);
+            
+            // Simpan index untuk cegah double absen
+            try {
+                await indexRef.set(true);
+            } catch (indexError) {
+                console.warn('Gagal simpan index (mungkin permission denied):', indexError);
+                // Lanjutkan saja, absen tetap tersimpan
+            }
             
             return payload;
         }
@@ -754,7 +767,7 @@
             currentUserGuruId = idGuru;
 
             const now = new Date();
-            const todayStr = now.toISOString().slice(0, 10);
+            const todayStr = now.toISOString().slice(0, 10); // <-- DIKOREKSI: todayStr dideklarasikan di sini!
 
             // Cek sudah absen (local check)
             const alreadyToday = loadAtt().some(att => 
@@ -833,9 +846,9 @@
         function showMyAttendanceToday() {
             if (!currentUserGuruId) return;
             
-            const today = new Date().toISOString().slice(0, 10);
+            const today = new Date().toISOString().slice(0, 10); // <-- DIKOREKSI: 'today' bukan 'todayStr'
             const myAttToday = loadAtt().find(att => 
-                att.idGuru === currentUserGuruId && att.tanggal === todayStr
+                att.idGuru === currentUserGuruId && att.tanggal === today
             );
             
             const container = $('#today-attendance-info');
@@ -844,18 +857,29 @@
             if (myAttToday) {
                 container.classList.remove('hidden');
                 content.innerHTML = `
-                    <div class="flex items-center justify-between p-3 bg-white rounded border">
+                    <div class="flex items-center justify-between p-3 bg-white rounded-lg border border-green-200 shadow-sm">
                         <div>
-                            <div class="font-medium">${myAttToday.status}</div>
-                            <div class="text-sm text-gray-500">${myAttToday.jam} • ${myAttToday.tempat || 'Lokasi tidak diketahui'}</div>
+                            <div class="font-medium flex items-center">
+                                <span class="mr-2">${
+                                    myAttToday.status === 'Hadir' ? '✅' :
+                                    myAttToday.status === 'Izin' ? '⚠️' :
+                                    myAttToday.status === 'Sakit' ? '🤒' : '🚗'
+                                }</span>
+                                <span class="${
+                                    myAttToday.status === 'Hadir' ? 'text-green-700' :
+                                    myAttToday.status === 'Izin' ? 'text-amber-700' :
+                                    myAttToday.status === 'Sakit' ? 'text-red-700' : 'text-blue-700'
+                                }">${myAttToday.status}</span>
+                            </div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                ${myAttToday.jam} • ${myAttToday.tempat || 'Lokasi tidak diketahui'}
+                            </div>
                         </div>
                         <span class="px-3 py-1 rounded-full text-xs ${
-                            myAttToday.status === 'Hadir' ? 'bg-green-100 text-green-800' :
-                            myAttToday.status === 'Izin' ? 'bg-amber-100 text-amber-800' :
-                            myAttToday.status === 'Sakit' ? 'bg-red-100 text-red-800' :
-                            'bg-blue-100 text-blue-800'
+                            myAttToday.hasPhoto || myAttToday.photoBase64 ? 
+                            'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                         }">
-                            ${myAttToday.hasPhoto ? '📷 Dengan foto' : 'Tanpa foto'}
+                            ${myAttToday.hasPhoto || myAttToday.photoBase64 ? '📷 Dengan foto' : '📵 Tanpa foto'}
                         </span>
                     </div>
                 `;
@@ -1727,7 +1751,7 @@
                 whAttList = e.detail;
                 renderDashboard();
                 generateReport();
-                showMyAttendanceToday();
+                showMyAttendanceToday(); // <-- DIKOREKSI: Dipanggil setelah data update
             });
             
             document.addEventListener('auth-changed', (e) => {
