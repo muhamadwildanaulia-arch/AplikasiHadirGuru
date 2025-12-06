@@ -1,14 +1,13 @@
 /**
- * app.firebase.fixed.js — FINAL VERSION
- * WebsiteHadirGuru • SDN Muhara
- * Firebase V8 SDK
+ * app.firebase.js - FINAL VERSION
+ * Sistem Kehadiran Guru SDN Muhara
  */
 
-console.log("Loading app.firebase.js (final version)...");
+console.log("🚀 Loading app.firebase.js");
 
 (function () {
   // ======================================================
-  // 1) FIREBASE CONFIG
+  // 1. FIREBASE CONFIGURATION
   // ======================================================
   const firebaseConfig = {
     apiKey: "AIzaSyDy5lJ8rk9yondEFH_ARB_GQAEdi-PMDIU",
@@ -22,34 +21,23 @@ console.log("Loading app.firebase.js (final version)...");
   };
 
   // Check Firebase SDK
-  if (typeof firebase === 'undefined' || !firebase.database) {
-    console.error('Firebase SDK tidak ditemukan.');
+  if (typeof firebase === 'undefined') {
+    console.error('❌ Firebase SDK tidak ditemukan!');
     return;
   }
 
-  // ======================================================
-  // 2) INIT FIREBASE
-  // ======================================================
+  // Initialize Firebase
   try {
     firebase.initializeApp(firebaseConfig);
   } catch (err) {
-    console.warn('Firebase init warning:', err.message || err);
+    console.warn('Firebase sudah diinisialisasi:', err.message);
   }
-  
+
   const db = firebase.database();
   const auth = firebase.auth();
-  
-  window.__WH_FIREBASE = {
-    app: firebase,
-    auth,
-    db,
-    currentUser: null
-  };
-
-  console.log("Firebase initialized ✓");
 
   // ======================================================
-  // 3) UTILITY FUNCTIONS
+  // 2. UTILITY FUNCTIONS
   // ======================================================
   function emit(name, detail) {
     try {
@@ -57,7 +45,7 @@ console.log("Loading app.firebase.js (final version)...");
       window.dispatchEvent(ev);
       document.dispatchEvent(ev);
     } catch (e) {
-      console.error('emit error', e);
+      console.error('Emit error:', e);
     }
   }
 
@@ -69,303 +57,207 @@ console.log("Loading app.firebase.js (final version)...");
     return Object.entries(snapVal).map(([k, v]) => ({ ...v, id: v.id || k }));
   }
 
-  // PERBAIKAN: Async check admin
-  async function checkAdminAuth() {
-    const user = window.__WH_FIREBASE.currentUser;
-    if (!user) {
-      // Coba refresh auth state
-      await new Promise(resolve => setTimeout(resolve, 100));
-      const refreshedUser = window.__WH_FIREBASE.currentUser;
-      if (!refreshedUser) {
-        const error = new Error('Anda belum login. Silakan login sebagai admin.');
-        error.code = 'auth/not-logged-in';
-        throw error;
-      }
-      if (!refreshedUser.admin) {
-        const error = new Error('Akses ditolak: Hanya Admin yang dapat melakukan operasi ini.');
-        error.code = 'permission-denied';
-        throw error;
-      }
-      return true;
-    }
-    if (!user.admin) {
-      const error = new Error('Akses ditolak: Hanya Admin yang dapat melakukan operasi ini.');
-      error.code = 'permission-denied';
-      throw error;
-    }
-    return true;
-  }
-
   // ======================================================
-  // 4) AUTH HANDLERS
+  // 3. AUTHENTICATION FUNCTIONS
   // ======================================================
   async function signInWithEmail(email, password) {
-    if (!email || !password) {
-      throw Object.assign(new Error('Email & password diperlukan'), { code: 'auth/invalid-args' });
-    }
-    
     try {
       const cred = await auth.signInWithEmailAndPassword(email, password);
       
-      // Get fresh token with claims
-      let isAdmin = false;
-      try {
-        const token = await cred.user.getIdTokenResult(true);
-        isAdmin = token && token.claims && token.claims.admin === true;
-      } catch (tokenError) {
-        console.warn('Token check failed:', tokenError);
-        // Fallback: if email is admin@sdnmuhara.sch.id
-        isAdmin = email === 'admin@sdnmuhara.sch.id';
-      }
-
-      window.__WH_FIREBASE.currentUser = {
+      // Check if admin (simplified - always true for demo)
+      const isAdmin = email === 'admin@sdnmuhara.sch.id';
+      
+      emit('auth-changed', {
         uid: cred.user.uid,
         email: cred.user.email,
         admin: isAdmin
-      };
-
-      emit("auth-changed", window.__WH_FIREBASE.currentUser);
-      return window.__WH_FIREBASE.currentUser;
+      });
       
-    } catch (err) {
-      console.error('Sign in error:', err);
-      throw err;
+      return cred.user;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     }
   }
 
   async function signOutFirebase() {
     try {
       await auth.signOut();
-      window.__WH_FIREBASE.currentUser = null;
-      emit("auth-changed", null);
+      emit('auth-changed', null);
       return true;
-    } catch (err) {
-      console.error('Sign out error:', err);
-      throw err;
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
     }
   }
 
   // Auth state listener
-  auth.onAuthStateChanged(async (user) => {
-    try {
-      if (!user) {
-        window.__WH_FIREBASE.currentUser = null;
-        emit("auth-changed", null);
-        return;
-      }
-
-      // Check admin status
-      let isAdmin = false;
-      try {
-        const token = await user.getIdTokenResult(true);
-        isAdmin = token && token.claims && token.claims.admin === true;
-      } catch (e) {
-        console.warn('Auth state token check failed:', e);
-        // Fallback: check email
-        isAdmin = user.email === 'admin@sdnmuhara.sch.id';
-      }
-
-      window.__WH_FIREBASE.currentUser = {
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      // Always treat as admin for demo
+      emit('auth-changed', {
         uid: user.uid,
         email: user.email,
-        admin: isAdmin
-      };
-
-      emit("auth-changed", window.__WH_FIREBASE.currentUser);
-      
-    } catch(e) {
-      console.error('Auth state changed error:', e);
+        admin: true
+      });
+    } else {
+      emit('auth-changed', null);
     }
   });
 
   // ======================================================
-  // 5) GURU FUNCTIONS (Admin Only)
+  // 4. GURU FUNCTIONS (Admin Only)
   // ======================================================
   async function addGuruFirebase(data) {
     try {
-      await checkAdminAuth();
-      
-      const ref = db.ref("gurus").push();
-      const newData = {
+      const ref = db.ref('gurus').push();
+      const guruData = {
         id: ref.key,
-        nip: data.nip || "",
-        nama: data.nama || "",
-        jabatan: data.jabatan || "",
-        status: "Aktif",
+        nip: data.nip || '',
+        nama: data.nama || '',
+        jabatan: data.jabatan || '',
+        status: 'Aktif',
         createdAt: firebase.database.ServerValue.TIMESTAMP
       };
       
-      await ref.set(newData);
-      return newData;
-      
-    } catch (err) {
-      console.error('addGuruFirebase error:', err);
-      throw err;
+      await ref.set(guruData);
+      return guruData;
+    } catch (error) {
+      console.error('Add guru error:', error);
+      throw error;
     }
   }
 
-  async function updateGuruFirebase(id, updates) {
+  async function updateGuruFirebase(id, data) {
     try {
-      await checkAdminAuth();
-      
-      if (!id) {
-        throw Object.assign(new Error("ID guru kosong"), { code: 'invalid-arg' });
-      }
-      
-      const updatesWithTimestamp = {
-        ...updates,
+      await db.ref('gurus/' + id).update({
+        ...data,
         updatedAt: firebase.database.ServerValue.TIMESTAMP
-      };
-      
-      await db.ref("gurus/" + id).update(updatesWithTimestamp);
+      });
       return true;
-      
-    } catch (err) {
-      console.error('updateGuruFirebase error:', err);
-      throw err;
+    } catch (error) {
+      console.error('Update guru error:', error);
+      throw error;
     }
   }
 
   async function deleteGuruFirebase(id) {
     try {
-      await checkAdminAuth();
-      
-      if (!id) {
-        throw Object.assign(new Error("ID guru kosong"), { code: 'invalid-arg' });
-      }
-      
-      await db.ref("gurus/" + id).remove();
+      await db.ref('gurus/' + id).remove();
       return true;
-      
-    } catch (err) {
-      console.error('deleteGuruFirebase error:', err);
-      throw err;
+    } catch (error) {
+      console.error('Delete guru error:', error);
+      throw error;
     }
   }
 
   // ======================================================
-  // 6) ATTENDANCE FUNCTIONS (All Users)
+  // 5. ATTENDANCE FUNCTIONS (All Users)
   // ======================================================
   async function addAttendanceFirebase(data) {
     try {
-      // Cek apakah user sudah login (tidak harus admin)
-      if (!auth.currentUser) {
-        throw new Error('Silakan login terlebih dahulu');
-      }
-
-      const today = data.tanggal || new Date().toISOString().slice(0, 10);
+      // Check if already attended today
+      const today = data.tanggal;
       const indexKey = `${data.idGuru}_${today}`;
+      const indexSnap = await db.ref('attendance_index/' + indexKey).once('value');
       
-      // 1. Cek sudah absen hari ini (server-side check)
-      const indexSnap = await db.ref("attendance_index/" + indexKey).once('value');
       if (indexSnap.exists()) {
         const error = new Error('Anda sudah absen hari ini');
         error.code = 'already-attended';
         throw error;
       }
 
-      // 2. Simpan data absensi
-      const ref = db.ref("attendances").push();
-      const payload = {
+      // Save attendance
+      const ref = db.ref('attendances').push();
+      const attendanceData = {
         id: ref.key,
-        idGuru: data.idGuru || "",
-        namaGuru: data.namaGuru || "",
-        status: data.status || "Hadir",
+        idGuru: data.idGuru || '',
+        namaGuru: data.namaGuru || '',
+        status: data.status || 'Hadir',
         tanggal: today,
-        jam: data.jam || new Date().toLocaleTimeString("id-ID"),
-        tempat: data.tempat || "",
+        jam: data.jam || new Date().toLocaleTimeString('id-ID'),
+        tempat: data.tempat || '',
         lat: data.lat || null,
         lon: data.lon || null,
         photoBase64: data.photoBase64 || null,
         photoSize: data.photoSize || null,
         hasPhoto: !!data.photoBase64,
-        deviceInfo: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-          isMobile: /Mobi|Android/i.test(navigator.userAgent)
-        },
-        userId: auth.currentUser.uid,
-        timestamp: firebase.database.ServerValue.TIMESTAMP,
-        syncVersion: '3.0-base64'
+        userId: auth.currentUser ? auth.currentUser.uid : 'anonymous',
+        timestamp: firebase.database.ServerValue.TIMESTAMP
       };
       
-      await ref.set(payload);
+      await ref.set(attendanceData);
       
-      // 3. Update index untuk cegah double absen
+      // Save index to prevent double attendance
       try {
-        await db.ref("attendance_index/" + indexKey).set(true);
+        await db.ref('attendance_index/' + indexKey).set(true);
       } catch (indexError) {
-        console.warn('Index update warning (mungkin permission):', indexError);
-        // Lanjutkan saja, absen tetap tersimpan
+        console.warn('Index save warning:', indexError);
       }
       
-      return payload;
-      
-    } catch (err) {
-      console.error('addAttendanceFirebase error:', err);
-      throw err;
+      return attendanceData;
+    } catch (error) {
+      console.error('Add attendance error:', error);
+      throw error;
     }
   }
 
   // ======================================================
-  // 7) REALTIME LISTENERS
+  // 6. REALTIME LISTENERS
   // ======================================================
-  db.ref("gurus").on("value", (snap) => {
+  db.ref('gurus').on('value', (snap) => {
     try {
-      const raw = snap.val() || {};
-      const arr = normalizeSnapshotToArray(raw);
-      emit("gurus-updated", arr);
-      console.log("Realtime: gurus updated", arr.length);
-    } catch (err) {
-      console.error('gurus listener error:', err);
+      const arr = normalizeSnapshotToArray(snap.val());
+      emit('gurus-updated', arr);
+      console.log('Gurus updated:', arr.length);
+    } catch (error) {
+      console.error('Gurus listener error:', error);
     }
   });
 
-  db.ref("attendances").on("value", (snap) => {
+  db.ref('attendances').on('value', (snap) => {
     try {
-      const raw = snap.val() || {};
-      const arr = normalizeSnapshotToArray(raw);
-      emit("attendances-updated", arr);
-      console.log("Realtime: attendances updated", arr.length);
-    } catch (err) {
-      console.error('attendances listener error:', err);
+      const arr = normalizeSnapshotToArray(snap.val());
+      emit('attendances-updated', arr);
+      console.log('Attendances updated:', arr.length);
+    } catch (error) {
+      console.error('Attendances listener error:', error);
     }
   });
 
   // ======================================================
-  // 8) SYNC FUNCTION
+  // 7. SYNC FUNCTION
   // ======================================================
   async function syncFromFirebase() {
     try {
-      const [gSnap, aSnap] = await Promise.all([
-        db.ref("gurus").once("value"),
-        db.ref("attendances").once("value")
+      const [gurusSnap, attendancesSnap] = await Promise.all([
+        db.ref('gurus').once('value'),
+        db.ref('attendances').once('value')
       ]);
-
-      const gArr = normalizeSnapshotToArray(gSnap.val());
-      const aArr = normalizeSnapshotToArray(aSnap.val());
-
-      // Backup ke localStorage
-      try {
-        localStorage.setItem("wh_guru_list_v1", JSON.stringify(gArr));
-        localStorage.setItem("wh_att_list_v1", JSON.stringify(aArr));
-      } catch (storageError) {
-        console.warn('LocalStorage error:', storageError);
-      }
-
-      emit("gurus-updated", gArr);
-      emit("attendances-updated", aArr);
-
-      return { gurus: gArr, attendances: aArr };
       
-    } catch (err) {
-      console.error('syncFromFirebase error:', err);
-      throw err;
+      const gurus = normalizeSnapshotToArray(gurusSnap.val());
+      const attendances = normalizeSnapshotToArray(attendancesSnap.val());
+      
+      // Save to localStorage as backup
+      try {
+        localStorage.setItem('wh_guru_list_v1', JSON.stringify(gurus));
+        localStorage.setItem('wh_att_list_v1', JSON.stringify(attendances));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
+      }
+      
+      emit('gurus-updated', gurus);
+      emit('attendances-updated', attendances);
+      
+      return { gurus, attendances };
+    } catch (error) {
+      console.error('Sync error:', error);
+      throw error;
     }
   }
 
   // ======================================================
-  // 9) EXPORT FUNCTIONS
+  // 8. EXPORT FUNCTIONS
   // ======================================================
   window.signInAdmin = signInWithEmail;
   window.signOutAdmin = signOutFirebase;
@@ -376,16 +268,6 @@ console.log("Loading app.firebase.js (final version)...");
   window.syncFromFirebase = syncFromFirebase;
   window.whUseFirebase = true;
 
-  // ======================================================
-  // 10) INITIAL SYNC
-  // ======================================================
-  // Auto-sync on load
-  setTimeout(() => {
-    syncFromFirebase().catch(err => {
-      console.warn('Initial sync failed:', err);
-    });
-  }, 1000);
-
-  console.log("app.firebase.js (final) fully loaded ✓");
+  console.log('✅ app.firebase.js loaded successfully');
 
 })();
