@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -44,6 +43,77 @@
         }
         .photo-yes { background-color: #10b981; }
         .photo-no { background-color: #ef4444; }
+        
+        /* Animasi untuk password system */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+            20%, 40%, 60%, 80% { transform: translateX(8px); }
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeInContent {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+        .animate-pulse {
+            animation: pulse 2s infinite;
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+        .animate-scale-in {
+            animation: scaleIn 0.3s ease-out;
+        }
+        
+        /* Smooth transitions */
+        #page-kehadiran,
+        #page-dashboard,
+        #page-guru,
+        #page-laporan {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        main, #sidebar, footer {
+            opacity: 0;
+            animation: fadeInContent 0.5s ease-out forwards;
+            animation-delay: 0.2s;
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9998;
+            transition: opacity 0.3s;
+        }
+        
         /* Mobile optimizations */
         @media (max-width: 640px) {
             .mobile-padding { padding: 1rem; }
@@ -54,11 +124,19 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 
+    <!-- LOADING OVERLAY (Awal) -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4" style="width: 50px; height: 50px;"></div>
+            <p class="text-gray-600">Memuat sistem kehadiran...</p>
+        </div>
+    </div>
+
     <!-- TOAST -->
-    <div id="toast-container" class="fixed top-5 right-5 space-y-2 z-80"></div>
+    <div id="toast-container" class="fixed top-5 right-5 space-y-2 z-80" style="display: none;"></div>
 
     <!-- SIDEBAR DESKTOP -->
-    <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-indigo-700 text-white p-4 hidden md:block">
+    <aside id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-indigo-700 text-white p-4 hidden md:block" style="display: none;">
         <div class="mb-6">
             <h1 class="text-2xl font-bold mb-2">Sistem Kehadiran</h1>
             <p class="text-sm text-indigo-100">SDN Muhara</p>
@@ -101,10 +179,10 @@
     </aside>
 
     <!-- WRAPPER KONTEN -->
-    <div class="md:ml-64 p-4 mobile-padding">
+    <div class="md:ml-64 p-4 mobile-padding" style="display: none;">
 
         <!-- NAV MOBILE -->
-        <header class="md:hidden bg-white card-smooth p-3 mb-4 flex justify-between items-center">
+        <header class="md:hidden bg-white card-smooth p-3 mb-4 flex justify-between items-center" style="display: none;">
             <div>
                 <h1 class="text-lg font-bold text-indigo-700">Sistem Kehadiran</h1>
                 <p class="text-xs text-gray-500">SDN Muhara</p>
@@ -117,7 +195,7 @@
             </nav>
         </header>
 
-        <main>
+        <main style="display: none;">
             <!-- PAGE KEHADIRAN -->
             <section id="page-kehadiran" class="card-smooth p-4">
                 <h2 class="text-xl font-semibold mb-4 text-indigo-700">Absen Hari Ini</h2>
@@ -354,7 +432,7 @@
         </main>
         
         <!-- FOOTER -->
-        <footer class="mt-8 text-center text-xs text-gray-500">
+        <footer class="mt-8 text-center text-xs text-gray-500" style="display: none;">
             <p>Sistem Kehadiran Guru SDN Muhara &copy; D.A.N 2026</p>
             <p class="mt-1">📱 Compatible with mobile devices</p>
         </footer>
@@ -471,6 +549,7 @@
         let whAttList = [];
         let whIsAdmin = false;
         let currentUserGuruId = null;
+        let isAppInitialized = false;
 
         // ========== TOAST SYSTEM ==========
         function toast(message, type = 'info', duration = 3000) {
@@ -492,11 +571,18 @@
             `;
 
             container.appendChild(toastEl);
+            
+            // Tampilkan container jika hidden
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+            }
 
             setTimeout(() => {
                 toastEl.classList.add('opacity-0', 'translate-x-full');
                 setTimeout(() => toastEl.remove(), 300);
             }, duration);
+            
+            return toastEl;
         }
 
         // ========== DATA MANAGEMENT ==========
@@ -723,8 +809,8 @@
         }
 
         // ========== ATTENDANCE FORM SUBMISSION ==========
-        $('#attendance-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        async function handleAttendanceSubmit(e) {
+            if (e) e.preventDefault();
             
             const selectedOption = $('#guru-select').options[$('#guru-select').selectedIndex];
             const idGuru = selectedOption.value;
@@ -837,7 +923,7 @@
                 submitBtn.disabled = false;
                 updateSubmitButtonState();
             }
-        });
+        }
 
         // ========== SHOW MY ATTENDANCE TODAY ==========
         function showMyAttendanceToday() {
@@ -1636,42 +1722,74 @@
 
         // ========== INITIALIZATION ==========
         function initApp() {
-            // Set current date
-            const today = new Date();
-            const options = { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            };
-            $('#current-date-display').textContent = `📅 ${today.toLocaleDateString('id-ID', options)}`;
-            
-            // Get location
-            getLocation();
-            
-            // Setup event listeners
-            setupEventListeners();
-            
-            // Load initial data
-            renderGuruSelect();
-            renderDashboard();
-            populateReportSelectors();
-            
-            // Show default page
-            showPage('kehadiran');
-            
-            // Check for existing attendance today
-            showMyAttendanceToday();
-            
-            // Setup Firebase listeners if available
-            if (window.whUseFirebase) {
-                setupFirebaseListeners();
+            if (isAppInitialized) {
+                console.log('⚠️ App sudah diinisialisasi sebelumnya');
+                return;
             }
             
-            toast('Sistem siap digunakan', 'info');
+            console.log('🎬 Starting application initialization...');
+            
+            // Cek akses sebelum inisialisasi
+            const hasAccess = sessionStorage.getItem('wh_access_granted') === 'true' || 
+                             (window.whCurrentUser && window.whCurrentUser.admin === true);
+            
+            if (!hasAccess) {
+                console.log('⏳ Waiting for access before initializing app...');
+                return;
+            }
+            
+            try {
+                // Set current date
+                const today = new Date();
+                const options = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                };
+                $('#current-date-display').textContent = `📅 ${today.toLocaleDateString('id-ID', options)}`;
+                
+                // Get location
+                getLocation();
+                
+                // Load initial data
+                renderGuruSelect();
+                renderDashboard();
+                populateReportSelectors();
+                
+                // Show default page
+                showPage('kehadiran');
+                
+                // Check for existing attendance today
+                showMyAttendanceToday();
+                
+                // Setup Firebase listeners if available
+                if (window.whUseFirebase) {
+                    setupFirebaseListeners();
+                }
+                
+                // Sembunyikan loading overlay
+                const loadingOverlay = $('#loading-overlay');
+                if (loadingOverlay) {
+                    loadingOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'none';
+                    }, 300);
+                }
+                
+                isAppInitialized = true;
+                console.log('✅ Application initialized successfully');
+                toast('Sistem siap digunakan', 'info', 2000);
+                
+            } catch (error) {
+                console.error('Error during initialization:', error);
+                toast('Terjadi kesalahan saat inisialisasi', 'error');
+            }
         }
 
         function setupEventListeners() {
+            console.log('🔗 Setting up event listeners...');
+            
             // Navigation
             $$('.nav-item').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -1690,6 +1808,9 @@
             $$('input[name="status"]').forEach(radio => {
                 radio.addEventListener('change', updateSubmitButtonState);
             });
+            
+            // Attendance form
+            $('#attendance-form').addEventListener('submit', handleAttendanceSubmit);
             
             // Admin login
             $('#login-submit').addEventListener('click', handleLogin);
@@ -1732,6 +1853,8 @@
                     toast(`Gagal reset: ${error.message}`, 'error');
                 }
             });
+            
+            console.log('✅ Event listeners setup complete');
         }
 
         function setupFirebaseListeners() {
@@ -1755,6 +1878,11 @@
                 const user = e.detail;
                 const isAdmin = user && user.admin === true;
                 updateAdminUI(isAdmin);
+                
+                // Jika login sebagai admin, init app
+                if (isAdmin && !isAppInitialized) {
+                    setTimeout(initApp, 500);
+                }
             });
         }
 
@@ -1802,8 +1930,24 @@
             }
         }
 
-        // ========== START APPLICATION ==========
-        document.addEventListener('DOMContentLoaded', initApp);
+        // ========== MAIN INITIALIZATION ==========
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 DOM Content Loaded');
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Check if we should auto-init
+            const hasAccess = sessionStorage.getItem('wh_access_granted') === 'true' || 
+                             (window.whCurrentUser && window.whCurrentUser.admin === true);
+            
+            if (hasAccess) {
+                console.log('✅ Access already granted, initializing app...');
+                setTimeout(initApp, 500);
+            } else {
+                console.log('⏳ Waiting for password or admin login...');
+            }
+        });
 
         // ========== GLOBAL FUNCTIONS ==========
         window.openGuruModal = openGuruModal;
@@ -1811,6 +1955,25 @@
         window.showPhotoModal = showPhotoModal;
         window.closePhotoModal = closePhotoModal;
         window.renderDashboard = renderDashboard;
+        window.handleAttendanceSubmit = handleAttendanceSubmit;
+        window.initApp = initApp;
+
+        // ========== ERROR HANDLING ==========
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            console.error('Error at:', e.filename, 'line:', e.lineno, 'col:', e.colno);
+            
+            // Tampilkan error yang user-friendly
+            if (typeof toast === 'function') {
+                toast('Terjadi kesalahan sistem. Silakan refresh halaman.', 'error');
+            }
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
+        });
+
+        console.log('🎯 Application script loaded');
 
     </script>
 </body>
