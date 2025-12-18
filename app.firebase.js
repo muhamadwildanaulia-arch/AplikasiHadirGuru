@@ -39,28 +39,7 @@ console.log("🚀 Loading app.firebase.js");
   const auth = firebase.auth();
 
   // ======================================================
-  // 2. UTILITY FUNCTIONS
-  // ======================================================
-  function emit(name, detail) {
-    try {
-      const ev = new CustomEvent(name, { detail });
-      window.dispatchEvent(ev);
-      document.dispatchEvent(ev);
-    } catch (e) {
-      console.error('Emit error:', e);
-    }
-  }
-
-  function normalizeSnapshotToArray(snapVal) {
-    if (!snapVal) return [];
-    if (Array.isArray(snapVal)) {
-      return snapVal.map((v, i) => ({ ...v, id: v.id || String(i) }));
-    }
-    return Object.entries(snapVal).map(([k, v]) => ({ ...v, id: v.id || k }));
-  }
-
-  // ======================================================
-  // 3. PASSWORD PROTECTION SYSTEM
+  // 2. PASSWORD PROTECTION SYSTEM
   // ======================================================
   const ACCESS_CONFIG = {
     password: "sdnmuhara123",  // Password utama untuk akses sistem
@@ -72,6 +51,81 @@ console.log("🚀 Loading app.firebase.js");
   let passwordAttempts = 0;
   let isLocked = false;
   let unlockTime = 0;
+
+  // Function untuk menampilkan konten utama
+  function showMainContent() {
+    console.log('🔄 Menampilkan konten utama...');
+    
+    const mainContent = document.querySelector('main');
+    const sidebar = document.getElementById('sidebar');
+    const footer = document.querySelector('footer');
+    const toastContainer = document.getElementById('toast-container');
+    const wrapper = document.querySelector('.md\\:ml-64');
+    const mobileHeader = document.querySelector('header.md\\:hidden');
+    
+    // Tampilkan semua elemen dengan animasi
+    const elementsToShow = [
+      mainContent,
+      sidebar,
+      footer,
+      wrapper,
+      mobileHeader,
+      toastContainer
+    ];
+    
+    elementsToShow.forEach(el => {
+      if (el) {
+        el.style.display = el.classList.contains('hidden') ? 'block' : 'block';
+        el.style.opacity = '0';
+        
+        // Trigger reflow untuk animasi
+        el.offsetHeight;
+        
+        // Animate in
+        setTimeout(() => {
+          el.style.opacity = '1';
+          el.style.transition = 'opacity 0.3s ease-in-out';
+        }, 50);
+      }
+    });
+    
+    // Jika ada initApp function, panggil
+    if (typeof window.initApp === 'function') {
+      console.log('🚀 Memanggil initApp...');
+      setTimeout(() => {
+        try {
+          window.initApp();
+        } catch (error) {
+          console.error('Error in initApp:', error);
+        }
+      }, 300);
+    }
+  }
+
+  // Function untuk menyembunyikan konten utama
+  function hideMainContent() {
+    console.log('🔒 Menyembunyikan konten utama...');
+    
+    const mainContent = document.querySelector('main');
+    const sidebar = document.getElementById('sidebar');
+    const footer = document.querySelector('footer');
+    const wrapper = document.querySelector('.md\\:ml-64');
+    const mobileHeader = document.querySelector('header.md\\:hidden');
+    
+    const elementsToHide = [
+      mainContent,
+      sidebar,
+      footer,
+      wrapper,
+      mobileHeader
+    ];
+    
+    elementsToHide.forEach(el => {
+      if (el) {
+        el.style.display = 'none';
+      }
+    });
+  }
 
   // Function utama untuk cek akses
   function checkAccessPassword() {
@@ -86,7 +140,9 @@ console.log("🚀 Loading app.firebase.js");
       const now = Date.now();
       if (now < unlockTime) {
         const remainingMinutes = Math.ceil((unlockTime - now) / 60000);
-        showLockedScreen(remainingMinutes);
+        if (!document.getElementById('locked-modal')) {
+          showLockedScreen(remainingMinutes);
+        }
         return false;
       } else {
         // Reset lock state
@@ -106,7 +162,7 @@ console.log("🚀 Loading app.firebase.js");
       return true;
     }
     
-    // 4. Jika semua gagal, tampilkan password prompt
+    // 4. Jika semua gagal, butuh password
     console.log('⏳ Butuh password untuk akses');
     return false;
   }
@@ -117,6 +173,8 @@ console.log("🚀 Loading app.firebase.js");
     if (document.getElementById('password-modal')) {
       return;
     }
+    
+    console.log('🔐 Menampilkan password prompt...');
     
     // Hitung attempt dari localStorage
     const storedAttempts = localStorage.getItem('wh_password_attempts');
@@ -146,13 +204,16 @@ console.log("🚀 Loading app.firebase.js");
       }
     }
     
+    // Sembunyikan konten utama
+    hideMainContent();
+    
     // Tampilkan modal password
     const modalHTML = `
-      <div id="password-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4 transition-all duration-300">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all duration-300 scale-100">
+      <div id="password-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 p-4 transition-all duration-300 animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md transform transition-all duration-300 scale-100 animate-scale-in">
           <div class="text-center mb-8">
             <div class="mx-auto w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full flex items-center justify-center mb-4 shadow-lg">
-              <span class="text-3xl">🔐</span>
+              <span class="text-3xl animate-pulse">🔐</span>
             </div>
             <h1 class="text-2xl font-bold text-gray-900">SDN Muhara</h1>
             <h2 class="text-xl font-semibold text-indigo-700 mt-2">Sistem Kehadiran Guru</h2>
@@ -173,14 +234,14 @@ console.log("🚀 Loading app.firebase.js");
               </label>
               <div class="relative">
                 <input type="password" id="access-password" 
-                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center text-lg tracking-widest"
+                       class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-center text-lg tracking-widest transition-all"
                        placeholder="••••••••" 
                        required
                        autocomplete="off"
                        autofocus
                        ${isLocked ? 'disabled' : ''}>
                 <button type="button" onclick="togglePasswordVisibility()" 
-                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1">
+                        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1 transition-colors">
                   👁️
                 </button>
               </div>
@@ -191,20 +252,20 @@ console.log("🚀 Loading app.firebase.js");
             
             <div class="flex flex-col gap-3">
               <button type="submit" 
-                      class="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2"
+                      class="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 transform hover:-translate-y-0.5"
                       ${isLocked ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                 <span>🔓</span>
                 <span>Masuk ke Sistem</span>
               </button>
               
               <button type="button" onclick="showFirebaseLogin()" 
-                      class="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all">
+                      class="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all transform hover:-translate-y-0.5">
                 🔑 Login sebagai Admin
               </button>
             </div>
           </form>
           
-          <div id="password-error" class="mt-4 p-3 bg-red-50 text-red-700 rounded-lg hidden text-sm text-center"></div>
+          <div id="password-error" class="mt-4 p-3 bg-red-50 text-red-700 rounded-lg hidden text-sm text-center transition-all"></div>
           
           <div class="mt-6 pt-6 border-t border-gray-200 text-center">
             <p class="text-xs text-gray-500">
@@ -212,7 +273,7 @@ console.log("🚀 Loading app.firebase.js");
               © SDN Muhara 2026
             </p>
             ${passwordAttempts >= 3 ? `
-              <p class="text-xs text-amber-600 mt-2">
+              <p class="text-xs text-amber-600 mt-2 animate-pulse">
                 ⚠️ ${passwordAttempts} percobaan gagal
               </p>
             ` : ''}
@@ -236,14 +297,31 @@ console.log("🚀 Loading app.firebase.js");
         0%, 100% { opacity: 1; }
         50% { opacity: 0.7; }
       }
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes scaleIn {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+      }
       .animate-shake {
         animation: shake 0.5s ease-in-out;
       }
-      .animate-pulse-slow {
+      .animate-pulse {
         animation: pulse 2s infinite;
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+      }
+      .animate-scale-in {
+        animation: scaleIn 0.3s ease-out;
       }
       #password-modal {
         backdrop-filter: blur(10px);
+      }
+      #access-password:focus {
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
       }
     `;
     document.head.appendChild(style);
@@ -252,12 +330,14 @@ console.log("🚀 Loading app.firebase.js");
     setupPasswordListeners();
   }
 
-  // Function untuk setup event listeners
+  // Setup password listeners
   function setupPasswordListeners() {
     const modal = document.getElementById('password-modal');
     const form = document.getElementById('password-form');
     const passwordInput = document.getElementById('access-password');
     const errorDiv = document.getElementById('password-error');
+    
+    if (!form || !passwordInput) return;
     
     // Function toggle visibility password
     window.togglePasswordVisibility = function() {
@@ -268,116 +348,137 @@ console.log("🚀 Loading app.firebase.js");
     
     // Function untuk tampilkan login Firebase
     window.showFirebaseLogin = function() {
-      // Sembunyikan modal password
+      console.log('🔑 Switching to Firebase login...');
+      
+      // Sembunyikan modal password dengan animasi
       if (modal) {
         modal.style.opacity = '0';
-        setTimeout(() => modal.remove(), 300);
+        setTimeout(() => {
+          if (modal.parentNode) {
+            modal.remove();
+          }
+        }, 300);
       }
       
       // Tampilkan modal login admin yang sudah ada
       const loginModal = document.getElementById('login-modal');
       if (loginModal) {
         loginModal.classList.remove('hidden');
+        loginModal.style.opacity = '0';
+        loginModal.style.display = 'flex';
+        
+        // Animate in
+        setTimeout(() => {
+          loginModal.style.opacity = '1';
+        }, 10);
         
         // Auto focus ke email
         setTimeout(() => {
           const emailInput = document.getElementById('login-email');
-          if (emailInput) emailInput.focus();
+          if (emailInput) {
+            emailInput.focus();
+            emailInput.select();
+          }
         }, 100);
       }
     };
     
     // Handle form submission
-    if (form) {
-      form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        if (isLocked) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      if (isLocked) {
+        if (errorDiv) {
           errorDiv.textContent = 'Sistem terkunci. Silakan coba lagi nanti.';
           errorDiv.classList.remove('hidden');
-          return;
+        }
+        return;
+      }
+      
+      const enteredPassword = passwordInput.value.trim();
+      
+      // Validasi password
+      if (enteredPassword === ACCESS_CONFIG.password) {
+        // SUCCESS - Grant access
+        passwordAttempts = 0;
+        localStorage.removeItem('wh_password_attempts');
+        
+        // Simpan sesi
+        const expiryTime = Date.now() + (ACCESS_CONFIG.sessionHours * 60 * 60 * 1000);
+        sessionStorage.setItem('wh_access_granted', 'true');
+        sessionStorage.setItem('wh_access_expiry', expiryTime.toString());
+        sessionStorage.setItem('wh_last_login', Date.now().toString());
+        
+        // Update UI untuk menunjukkan login
+        updateUIAfterLogin();
+        
+        // Sembunyikan modal dengan animasi
+        if (modal) {
+          modal.style.opacity = '0';
+          modal.style.transform = 'scale(0.95)';
+          
+          setTimeout(() => {
+            modal.remove();
+            
+            // Tampilkan konten utama
+            showMainContent();
+            
+            // Tampilkan toast sukses
+            if (typeof window.toast === 'function') {
+              window.toast('✅ Akses diberikan! Selamat menggunakan sistem', 'success', 3000);
+            }
+            
+          }, 300);
+        } else {
+          // Jika modal tidak ada, langsung tampilkan konten
+          showMainContent();
         }
         
-        const enteredPassword = passwordInput.value.trim();
+      } else {
+        // FAILED - Wrong password
+        passwordAttempts++;
+        localStorage.setItem('wh_password_attempts', passwordAttempts.toString());
         
-        // Validasi password
-        if (enteredPassword === ACCESS_CONFIG.password) {
-          // SUCCESS - Grant access
-          passwordAttempts = 0;
-          localStorage.removeItem('wh_password_attempts');
-          
-          // Simpan sesi
-          const expiryTime = Date.now() + (ACCESS_CONFIG.sessionHours * 60 * 60 * 1000);
-          sessionStorage.setItem('wh_access_granted', 'true');
-          sessionStorage.setItem('wh_access_expiry', expiryTime.toString());
-          sessionStorage.setItem('wh_last_login', Date.now().toString());
-          
-          // Update UI untuk menunjukkan login
-          updateUIAfterLogin();
-          
-          // Sembunyikan modal dengan animasi
-          if (modal) {
-            modal.style.opacity = '0';
-            modal.style.transform = 'scale(0.95)';
-            
-            setTimeout(() => {
-              modal.remove();
-              
-              // Tampilkan toast sukses
-              if (typeof window.toast === 'function') {
-                window.toast('✅ Akses diberikan! Selamat menggunakan sistem', 'success', 3000);
-              }
-              
-              // Jika ada initApp function, panggil
-              if (typeof window.initApp === 'function') {
-                setTimeout(window.initApp, 500);
-              }
-            }, 300);
-          }
-          
-        } else {
-          // FAILED - Wrong password
-          passwordAttempts++;
-          localStorage.setItem('wh_password_attempts', passwordAttempts.toString());
-          
-          // Tampilkan error
-          const remainingAttempts = ACCESS_CONFIG.maxAttempts - passwordAttempts;
+        // Tampilkan error
+        const remainingAttempts = ACCESS_CONFIG.maxAttempts - passwordAttempts;
+        if (errorDiv) {
           errorDiv.textContent = `❌ Password salah! ${remainingAttempts > 0 ? 
             `Percobaan ${passwordAttempts}/${ACCESS_CONFIG.maxAttempts}` : 
             'Sistem akan terkunci!'}`;
           errorDiv.classList.remove('hidden');
-          
-          // Animasi shake
-          passwordInput.classList.add('animate-shake');
-          setTimeout(() => {
-            passwordInput.classList.remove('animate-shake');
-          }, 500);
-          
-          // Kosongkan field
-          passwordInput.value = '';
-          passwordInput.focus();
-          
-          // Cek jika sudah mencapai max attempts
-          if (passwordAttempts >= ACCESS_CONFIG.maxAttempts) {
-            isLocked = true;
-            unlockTime = Date.now() + (ACCESS_CONFIG.lockTimeMinutes * 60 * 1000);
-            
-            localStorage.setItem('wh_password_lock', 'true');
-            localStorage.setItem('wh_unlock_time', unlockTime.toString());
-            
-            // Tampilkan locked screen
-            showLockedScreen(ACCESS_CONFIG.lockTimeMinutes);
-          }
         }
-      });
-    }
+        
+        // Animasi shake
+        passwordInput.classList.add('animate-shake');
+        setTimeout(() => {
+          passwordInput.classList.remove('animate-shake');
+        }, 500);
+        
+        // Kosongkan field
+        passwordInput.value = '';
+        passwordInput.focus();
+        
+        // Cek jika sudah mencapai max attempts
+        if (passwordAttempts >= ACCESS_CONFIG.maxAttempts) {
+          isLocked = true;
+          unlockTime = Date.now() + (ACCESS_CONFIG.lockTimeMinutes * 60 * 1000);
+          
+          localStorage.setItem('wh_password_lock', 'true');
+          localStorage.setItem('wh_unlock_time', unlockTime.toString());
+          
+          // Tampilkan locked screen
+          showLockedScreen(ACCESS_CONFIG.lockTimeMinutes);
+        }
+      }
+    });
     
     // Auto focus
     setTimeout(() => {
       if (passwordInput && !isLocked) {
         passwordInput.focus();
+        passwordInput.select();
       }
-    }, 100);
+    }, 300);
   }
 
   // Function untuk tampilkan locked screen
@@ -388,9 +489,15 @@ console.log("🚀 Loading app.firebase.js");
       existingModal.remove();
     }
     
+    // Sembunyikan loading overlay jika ada
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      loadingOverlay.style.display = 'none';
+    }
+    
     const lockedHTML = `
-      <div id="locked-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-red-900 via-rose-900 to-pink-900 p-4">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center">
+      <div id="locked-modal" class="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-red-900 via-rose-900 to-pink-900 p-4 animate-fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md text-center animate-scale-in">
           <div class="mx-auto w-24 h-24 bg-gradient-to-br from-red-100 to-pink-100 rounded-full flex items-center justify-center mb-6 shadow-lg">
             <span class="text-4xl">🔒</span>
           </div>
@@ -590,32 +697,42 @@ console.log("🚀 Loading app.firebase.js");
   function initPasswordSystem() {
     console.log('🔐 Password Protection System Initializing...');
     
+    // Tunggu DOM benar-benar siap
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(checkAndShowPassword, 100);
+      });
+    } else {
+      setTimeout(checkAndShowPassword, 100);
+    }
+  }
+
+  function checkAndShowPassword() {
+    console.log('🔍 Checking access permissions...');
+    
+    // Sembunyikan loading overlay jika ada
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+      setTimeout(() => {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+          loadingOverlay.style.display = 'none';
+        }, 300);
+      }, 500);
+    }
+    
     // Cek jika akses sudah diberikan
     if (!checkAccessPassword()) {
       console.log('🔒 Access denied. Showing password prompt...');
       
-      // Sembunyikan konten utama dulu
-      const mainContent = document.querySelector('main');
-      const sidebar = document.getElementById('sidebar');
-      const footer = document.querySelector('footer');
-      
-      if (mainContent) mainContent.style.display = 'none';
-      if (sidebar) sidebar.style.display = 'none';
-      if (footer) footer.style.display = 'none';
-      
       // Tampilkan password prompt
-      showPasswordPrompt();
+      setTimeout(showPasswordPrompt, 300);
+      
     } else {
       console.log('✅ Access granted');
       
-      // Tampilkan semua konten
-      const mainContent = document.querySelector('main');
-      const sidebar = document.getElementById('sidebar');
-      const footer = document.querySelector('footer');
-      
-      if (mainContent) mainContent.style.display = 'block';
-      if (sidebar) sidebar.style.display = 'block';
-      if (footer) footer.style.display = 'block';
+      // Tampilkan konten utama
+      showMainContent();
       
       // Update UI untuk menunjukkan user sudah login
       updateUIAfterLogin();
@@ -623,6 +740,27 @@ console.log("🚀 Loading app.firebase.js");
       // Start session checker
       startSessionChecker();
     }
+  }
+
+  // ======================================================
+  // 3. UTILITY FUNCTIONS
+  // ======================================================
+  function emit(name, detail) {
+    try {
+      const ev = new CustomEvent(name, { detail });
+      window.dispatchEvent(ev);
+      document.dispatchEvent(ev);
+    } catch (e) {
+      console.error('Emit error:', e);
+    }
+  }
+
+  function normalizeSnapshotToArray(snapVal) {
+    if (!snapVal) return [];
+    if (Array.isArray(snapVal)) {
+      return snapVal.map((v, i) => ({ ...v, id: v.id || String(i) }));
+    }
+    return Object.entries(snapVal).map(([k, v]) => ({ ...v, id: v.id || k }));
   }
 
   // ======================================================
@@ -650,14 +788,14 @@ console.log("🚀 Loading app.firebase.js");
         passwordModal.remove();
       }
       
-      // Tampilkan semua konten
-      const mainContent = document.querySelector('main');
-      const sidebar = document.getElementById('sidebar');
-      const footer = document.querySelector('footer');
+      // Juga hapus locked modal jika ada
+      const lockedModal = document.getElementById('locked-modal');
+      if (lockedModal) {
+        lockedModal.remove();
+      }
       
-      if (mainContent) mainContent.style.display = 'block';
-      if (sidebar) sidebar.style.display = 'block';
-      if (footer) footer.style.display = 'block';
+      // Tampilkan konten utama
+      showMainContent();
       
       return cred.user;
     } catch (error) {
@@ -700,14 +838,14 @@ console.log("🚀 Loading app.firebase.js");
         passwordModal.remove();
       }
       
-      // Tampilkan semua konten
-      const mainContent = document.querySelector('main');
-      const sidebar = document.getElementById('sidebar');
-      const footer = document.querySelector('footer');
+      const lockedModal = document.getElementById('locked-modal');
+      if (lockedModal) {
+        lockedModal.remove();
+      }
       
-      if (mainContent) mainContent.style.display = 'block';
-      if (sidebar) sidebar.style.display = 'block';
-      if (footer) footer.style.display = 'block';
+      // Tampilkan konten utama
+      showMainContent();
+      
     } else {
       window.whCurrentUser = null;
       emit('auth-changed', null);
@@ -889,6 +1027,7 @@ console.log("🚀 Loading app.firebase.js");
   window.checkAccessPassword = checkAccessPassword;
   window.logoutAccess = logoutAccess;
   window.showPasswordPrompt = showPasswordPrompt;
+  window.showMainContent = showMainContent;
   
   window.whUseFirebase = true;
 
@@ -903,10 +1042,12 @@ console.log("🚀 Loading app.firebase.js");
 
   // Initialize password system setelah DOM siap
   document.addEventListener('DOMContentLoaded', function() {
+    console.log('📄 Firebase: DOM Content Loaded');
+    
     // Tunggu Firebase siap jika digunakan
     if (window.whUseFirebase) {
-      // Tunggu 2 detik untuk Firebase initialization
-      setTimeout(initPasswordSystem, 2000);
+      // Tunggu 1 detik untuk Firebase initialization
+      setTimeout(initPasswordSystem, 1000);
     } else {
       initPasswordSystem();
     }
